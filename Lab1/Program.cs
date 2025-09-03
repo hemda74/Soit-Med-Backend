@@ -11,7 +11,8 @@ namespace Lab1
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
+		
         {
             var builder = WebApplication.CreateBuilder(args);
 
@@ -57,7 +58,7 @@ namespace Lab1
 					ValidAudience = builder.Configuration["JWT:ValidAud"],
 					IssuerSigningKey =
 					new SymmetricSecurityKey(
-						Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecritKey"]))
+						Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecritKey"] ?? ""))
 				};
 			});
 
@@ -105,6 +106,13 @@ namespace Lab1
 
 			var app = builder.Build();
 
+			// Seed roles
+			using (var scope = app.Services.CreateScope())
+			{
+				var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+				await SeedRoles(roleManager);
+			}
+
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
@@ -119,6 +127,19 @@ namespace Lab1
             app.MapControllers();
 
             app.Run();
+        }
+
+        private static async Task SeedRoles(RoleManager<IdentityRole> roleManager)
+        {
+            var roles = UserRoles.GetAllRoles();
+            
+            foreach (var role in roles)
+            {
+                if (!await roleManager.RoleExistsAsync(role))
+                {
+                    await roleManager.CreateAsync(new IdentityRole(role));
+                }
+            }
         }
     }
 }

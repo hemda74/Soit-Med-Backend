@@ -26,6 +26,12 @@ namespace Lab1.Controllers
 		{
 			if(ModelState.IsValid)
 			{
+				// Validate the role
+				if (!UserRoles.IsValidRole(userDTO.Role))
+				{
+					return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
+				}
+
 				ApplicationUser AppUser = new ApplicationUser()
 				{
 					UserName = userDTO.UserName,
@@ -35,9 +41,9 @@ namespace Lab1.Controllers
 			 IdentityResult Result=	await userManager.CreateAsync(AppUser,userDTO.Password);
 				if (Result.Succeeded)
 				{
-					//this when you make to add registered user as an admin
-					await userManager.AddToRoleAsync(AppUser, "Admin");
-					return Ok("Account Created");
+					// Assign the specified role instead of hardcoded "Admin"
+					await userManager.AddToRoleAsync(AppUser, userDTO.Role);
+					return Ok($"Account Created with role: {userDTO.Role}");
 				}
 				return BadRequest(Result.Errors);
 			}
@@ -57,7 +63,7 @@ namespace Lab1.Controllers
 					{
 						//Create Token
 						List<Claim> myclaims = new List<Claim>();
-						myclaims.Add(new Claim(ClaimTypes.Name,UserFromDB.UserName));
+						myclaims.Add(new Claim(ClaimTypes.Name,UserFromDB.UserName ?? ""));
 						myclaims.Add(new Claim(ClaimTypes.NameIdentifier, UserFromDB.Id));
 						myclaims.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
 
@@ -68,7 +74,7 @@ namespace Lab1.Controllers
 						}
 
 						var SignKey = new SymmetricSecurityKey(
-						   Encoding.UTF8.GetBytes(config["JWT:SecritKey"]));
+						   Encoding.UTF8.GetBytes(config["JWT:SecritKey"] ?? ""));
 
 						SigningCredentials signingCredentials =
 							new SigningCredentials(SignKey, SecurityAlgorithms.HmacSha256);

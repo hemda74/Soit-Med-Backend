@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Lab1.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +16,7 @@ namespace Lab1.Controllers
 			roleManager = _roleManager;
 		}
 		[HttpPost]
+		[Authorize(Roles = "SuperAdmin")]
 		public async Task<IActionResult> CreateRole(string roleName)
 		{
 			bool roleExist = await roleManager.RoleExistsAsync(roleName);
@@ -39,12 +41,21 @@ namespace Lab1.Controllers
 
 		}
 		[HttpGet]
+		[Authorize(Roles = "SuperAdmin,Admin")]
 		public IActionResult GetRoles()
 		{
 			IQueryable<IdentityRole> roles = roleManager.Roles;
 			return Ok(roles);
 		}
+
+		[HttpGet("available")]
+		public IActionResult GetAvailableRoles()
+		{
+			var availableRoles = UserRoles.GetAllRoles();
+			return Ok(new { roles = availableRoles });
+		}
 		[HttpDelete]
+		[Authorize(Roles = "SuperAdmin")]
 		public async Task< IActionResult> DeleteRole(string roleName)
 		{
 			var role= await roleManager.FindByNameAsync(roleName);
@@ -67,7 +78,7 @@ namespace Lab1.Controllers
 			}
 		}
 		[HttpPut]
-		[Authorize(Roles = "Admin")]
+		[Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> UpdateRole(string roleName, string newRoleName)
         {
             IdentityRole? role = await roleManager.FindByNameAsync(roleName);

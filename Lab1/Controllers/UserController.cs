@@ -17,11 +17,17 @@ namespace Lab1.Controllers
 			userManager = _userManager;
 		}
 		[HttpPost]
-		[Authorize(Roles = "Admin")]
+		[Authorize(Roles = "SuperAdmin,Admin")]
 		public async Task<IActionResult> CreateUser(RegisterUserDTO userDTO)
 		{
 			if(ModelState.IsValid)
 			{
+				// Validate the role
+				if (!UserRoles.IsValidRole(userDTO.Role))
+				{
+					return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
+				}
+
 				ApplicationUser user = new ApplicationUser
 				{
 					UserName = userDTO.UserName,
@@ -32,7 +38,9 @@ namespace Lab1.Controllers
 				IdentityResult result=	await userManager.CreateAsync(user,userDTO.Password);
 				if(result.Succeeded)
 				{
-					return Ok($"User {user.UserName} created successfully");
+					// Assign the specified role
+					await userManager.AddToRoleAsync(user, userDTO.Role);
+					return Ok($"User {user.UserName} created successfully with role: {userDTO.Role}");
 				}
 				else
 				{
@@ -45,14 +53,14 @@ namespace Lab1.Controllers
 			}
 		}
 		[HttpGet]
-		[Authorize(Roles = "Admin")]
+		[Authorize(Roles = "SuperAdmin,Admin")]
 		public IActionResult GetUsers()
          {
             var users = userManager.Users.ToList();
             return Ok(users);
          }
 		[HttpDelete]
-		[Authorize(Roles = "Admin")]
+		[Authorize(Roles = "SuperAdmin,Admin")]
 		public async Task<IActionResult>DeleteUser(string Name)
 		{
 		 ApplicationUser user=	await userManager.FindByNameAsync(Name);
@@ -71,9 +79,15 @@ namespace Lab1.Controllers
 			return NotFound($"User with Name {Name} not found");
 		}
 		[HttpPut]
-		[Authorize(Roles = "Admin")]
+		[Authorize(Roles = "SuperAdmin,Admin")]
 		public async Task<IActionResult>UpdateUser(string userName, RegisterUserDTO userDTO)
 		{
+			// Validate the role
+			if (!UserRoles.IsValidRole(userDTO.Role))
+			{
+				return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
+			}
+
 			ApplicationUser user=await userManager.FindByNameAsync(userName);
 			if (user != null)
 			{
@@ -84,7 +98,15 @@ namespace Lab1.Controllers
 				IdentityResult result = await userManager.UpdateAsync(user);
 				if (result.Succeeded)
 				{
-					return Ok($"User {userName} updated successfully");
+					// Update user roles - remove all current roles and add the new one
+					var currentRoles = await userManager.GetRolesAsync(user);
+					if (currentRoles.Any())
+					{
+						await userManager.RemoveFromRolesAsync(user, currentRoles);
+					}
+					await userManager.AddToRoleAsync(user, userDTO.Role);
+
+					return Ok($"User {userName} updated successfully with role: {userDTO.Role}");
 				}
 				else
 				{
