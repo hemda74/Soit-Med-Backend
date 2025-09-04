@@ -1,50 +1,50 @@
-# 🏥 Soit Medical Backend - Hospital Management System
+# Soit-Med Hospital Management System
 
 A comprehensive hospital management system with equipment tracking, repair request management, and multi-departmental user roles. Built with ASP.NET Core 8, Entity Framework Core, and JWT authentication.
 
-## ✨ Features
+## Features
 
-### 🏢 **Multi-Departmental Organization**
+### Multi-Departmental Organization
 - **6 Departments**: Administration, Medical, Sales, Engineering, Finance, Legal
 - **10 User Roles**: SuperAdmin, Admin, Doctor, Technician, Salesman, Engineer, FinanceManager, FinanceEmployee, LegalManager, LegalEmployee
 - **Role-based Access Control** with hierarchical permissions
 
-### 🏥 **Hospital Network Management**
+### Hospital Network Management
 - **Hospital Registration** with unique codes and contact information
 - **Doctor & Technician Management** linked to hospitals
 - **Geographic Coverage** through governorate-engineer assignments
 
-### 🔧 **Equipment Tracking System**
+### Equipment Tracking System
 - **QR Code Integration** for unique equipment identification
 - **Equipment Status Tracking**: Operational, Under Maintenance, Out of Order, Retired
 - **Maintenance History** with detailed repair logs
 - **Visit Counter** for repair frequency tracking
 
-### 🛠️ **Repair Request Management**
+### Repair Request Management
 - **Automated Assignment** to engineers based on hospital location
 - **Priority-based Queuing**: Emergency, Critical, High, Medium, Low
 - **Complete Workflow**: Pending → Assigned → In Progress → Completed
 - **Cost Tracking** with parts and labor documentation
 - **Time Estimation** vs actual hours reporting
 
-### 🔐 **Advanced Security**
+### Advanced Security
 - **JWT Authentication** with 5-year token validity
 - **Role-based Authorization** for all endpoints
 - **Secure API** with CORS support and Swagger documentation
 
-## 🚀 Getting Started
+## Getting Started
 
-### **Prerequisites**
+### Prerequisites
 - .NET 8 SDK
 - SQL Server (LocalDB or full instance)
 - Visual Studio 2022 or VS Code
 
-### **Installation**
+### Installation
 
 1. **Clone the repository**
 ```bash
 git clone https://github.com/hemda74/Soit-Med-Backend.git
-cd Soit-Med-Backend/Lab1
+cd Soit-Med-Backend/SoitMed
 ```
 
 2. **Update Connection String**
@@ -75,74 +75,74 @@ dotnet run
 5. **Access Swagger UI**
 Navigate to: `https://localhost:5117/swagger`
 
-## 🔧 Equipment Management
+## Equipment Management
 
-### **Equipment Lifecycle**
+### Equipment Lifecycle
 1. **Registration**: Add equipment with QR code and hospital assignment
 2. **Operation**: Track status and maintenance schedules
 3. **Repair**: Handle repair requests and track visit counts
 4. **Retirement**: Mark equipment as retired when end-of-life
 
-### **QR Code Integration**
+### QR Code Integration
 - **Unique Identifiers**: Each equipment has a unique QR code
 - **Quick Access**: API endpoint for QR code lookup
 - **Mobile Friendly**: Designed for mobile scanning applications
 
-## 🛠️ Repair Request Workflow
+## Repair Request Workflow
 
-### **Request Creation**
+### Request Creation
 1. **Doctor/Technician** identifies equipment issue
 2. **Scans QR code** or selects equipment
 3. **Submits repair request** with description and priority
 4. **System increments** equipment repair visit count
 
-### **Automatic Assignment**
+### Automatic Assignment
 1. **System identifies** hospital location
 2. **Finds engineers** in matching governorate
 3. **Assigns to engineer** with lowest current workload
 4. **Updates status** to "Assigned"
 
-### **Priority Levels**
+### Priority Levels
 - **Emergency (5)**: Immediate attention required
 - **Critical (4)**: Urgent repair needed
 - **High (3)**: Important but not critical
 - **Medium (2)**: Standard priority
 - **Low (1)**: Can be scheduled flexibly
 
-## 📊 Key API Endpoints
+## API Endpoints
 
-### **Authentication**
+### Authentication
 ```http
 POST   /api/Account/register     # Register new user with role
 POST   /api/Account/login        # Login and get JWT token (5-year validity)
 ```
 
-### **Equipment Management**
+### Equipment Management
 ```http
 GET    /api/Equipment/qr/{qrCode}        # Get equipment by QR code
 POST   /api/Equipment                    # Create equipment
 GET    /api/Equipment/{id}/repair-history    # Get repair history
 ```
 
-### **Repair Request Management**
+### Repair Request Management
 ```http
 POST   /api/RepairRequest                # Create repair request (Doctor/Technician)
 GET    /api/RepairRequest/pending        # Get pending requests
 GET    /api/RepairRequest/engineer/{id}  # Get engineer's assigned requests
 ```
 
-### **Required API Endpoints**
+### Required API Endpoints
 ```http
-GET    /api/Governorate/{id}/engineers   # Get engineers in governorate ⭐
-POST   /api/Role/business                # Create business role ⭐
-PUT    /api/Role/business/{id}           # Update business role ⭐
+GET    /api/Governorate/{id}/engineers   # Get engineers in governorate
+POST   /api/Role/business                # Create business role
+PUT    /api/Role/business/{id}           # Update business role
 ```
 
-## 🏗️ Architecture
+## Architecture
 
-### **Project Structure**
+### Project Structure
 ```
-Lab1/
+SoitMed/
 ├── Controllers/           # API Controllers
 ├── Models/               # Data Models (Organized by Domain)
 │   ├── Core/            # Core business models
@@ -156,17 +156,46 @@ Lab1/
 └── Program.cs           # Application Entry Point
 ```
 
-## 📝 Recent Changes
+### Technology Stack
+- **Framework**: ASP.NET Core 8
+- **Database**: SQL Server with Entity Framework Core
+- **Authentication**: JWT Bearer Tokens
+- **Documentation**: Swagger/OpenAPI
+- **Architecture**: Clean Architecture with Domain-Driven Design
 
-### **Major System Overhaul** (Latest)
-- ✅ **Equipment Management System** with QR code integration
-- ✅ **Repair Request Workflow** with automated engineer assignment
-- ✅ **Model Restructure** into domain-specific folders
-- ✅ **Extended JWT Tokens** to 5-year validity
-- ✅ **Enhanced Database Schema** with proper relationships
-- ✅ **Comprehensive API Documentation**
+## Recent Changes
 
-## 🤝 Contributing
+### Major System Overhaul
+- Equipment Management System with QR code integration
+- Repair Request Workflow with automated engineer assignment
+- Model Restructure into domain-specific folders
+- Extended JWT Tokens to 5-year validity
+- Enhanced Database Schema with proper relationships
+- Comprehensive API Documentation
+- Solution renamed from Lab1 to SoitMed
+
+## Database Schema
+
+### Core Tables
+- **ApplicationUsers** - System users with department assignments
+- **Departments** - Organizational departments
+- **BusinessRoles** - Custom business roles (separate from Identity roles)
+
+### Hospital Domain
+- **Hospitals** - Hospital information with unique codes
+- **Doctors** - Medical staff linked to hospitals
+- **Technicians** - Technical staff linked to hospitals
+
+### Location Domain
+- **Governorates** - Geographic regions
+- **Engineers** - Engineering staff
+- **EngineerGovernorates** - Many-to-many relationship for coverage areas
+
+### Equipment Domain
+- **Equipment** - Medical equipment with QR codes and hospital assignments
+- **RepairRequests** - Repair requests with complete workflow tracking
+
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
@@ -174,15 +203,19 @@ Lab1/
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📞 Support
+## Support
 
 For support and questions:
 - Create an issue in the repository
 - Check the API documentation at `/swagger`
 - Review the comprehensive endpoint documentation above
 
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
 ---
 
-**Built with ❤️ for healthcare management**
+**Built for healthcare management excellence**
 
 *Last Updated: September 2025*
