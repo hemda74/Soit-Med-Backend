@@ -16,5 +16,12 @@ namespace Lab1.DTO
 		
 		[Required]
 		public required string Role { get; set; }
+
+		// Optional user details
+		public string? FirstName { get; set; }
+		public string? LastName { get; set; }
+
+		// Department assignment (optional - will be auto-assigned based on role if not provided)
+		public int? DepartmentId { get; set; }
 	}
 }

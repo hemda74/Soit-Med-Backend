@@ -1,5 +1,7 @@
 ﻿using Lab1.DTO;
 using Lab1.Models;
+using Lab1.Models.Identity;
+using Lab1.Models.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -22,6 +24,12 @@ namespace Lab1.Controllers
 		{
 			if(ModelState.IsValid)
 			{
+				// Check if role is provided
+				if (string.IsNullOrEmpty(userDTO.Role))
+				{
+					return BadRequest("Role field is required.");
+				}
+
 				// Validate the role
 				if (!UserRoles.IsValidRole(userDTO.Role))
 				{
@@ -82,6 +90,12 @@ namespace Lab1.Controllers
 		[Authorize(Roles = "SuperAdmin,Admin")]
 		public async Task<IActionResult>UpdateUser(string userName, RegisterUserDTO userDTO)
 		{
+			// Check if role is provided
+			if (string.IsNullOrEmpty(userDTO.Role))
+			{
+				return BadRequest("Role field is required.");
+			}
+
 			// Validate the role
 			if (!UserRoles.IsValidRole(userDTO.Role))
 			{
