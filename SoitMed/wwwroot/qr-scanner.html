@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0"
+		/>
+		<title>Hospital Equipment QR Scanner</title>
+		<style>
+			body {
+				font-family: 'Segoe UI', Tahoma, Geneva, Verdana,
+					sans-serif;
+				max-width: 800px;
+				margin: 0 auto;
+				padding: 20px;
+				background: linear-gradient(
+					135deg,
+					#667eea 0%,
+					#764ba2 100%
+				);
+				min-height: 100vh;
+			}
+
+			.container {
+				background: white;
+				border-radius: 15px;
+				padding: 30px;
+				box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+			}
+
+			h1 {
+				color: #333;
+				text-align: center;
+				margin-bottom: 30px;
+			}
+
+			.qr-demo {
+				background: #f8f9fa;
+				border: 2px dashed #dee2e6;
+				border-radius: 10px;
+				padding: 20px;
+				text-align: center;
+				margin: 20px 0;
+			}
+
+			.qr-code {
+				font-family: 'Courier New', monospace;
+				background: #e9ecef;
+				padding: 15px;
+				border-radius: 5px;
+				font-size: 18px;
+				font-weight: bold;
+				color: #495057;
+				margin: 10px 0;
+			}
+
+			.equipment-info {
+				background: #e8f5e8;
+				border-left: 4px solid #28a745;
+				padding: 20px;
+				border-radius: 5px;
+				margin: 20px 0;
+			}
+
+			.json-display {
+				background: #f8f9fa;
+				border: 1px solid #dee2e6;
+				border-radius: 5px;
+				padding: 15px;
+				font-family: 'Courier New', monospace;
+				font-size: 14px;
+				white-space: pre-wrap;
+				margin: 10px 0;
+			}
+
+			.feature-list {
+				background: #fff3cd;
+				border-left: 4px solid #ffc107;
+				padding: 20px;
+				border-radius: 5px;
+				margin: 20px 0;
+			}
+
+			.feature-list ul {
+				margin: 0;
+				padding-left: 20px;
+			}
+
+			.feature-list li {
+				margin: 8px 0;
+			}
+
+			.btn {
+				background: #007bff;
+				color: white;
+				padding: 12px 24px;
+				border: none;
+				border-radius: 5px;
+				cursor: pointer;
+				font-size: 16px;
+				margin: 10px 5px;
+				text-decoration: none;
+				display: inline-block;
+			}
+
+			.btn:hover {
+				background: #0056b3;
+			}
+
+			.btn-success {
+				background: #28a745;
+			}
+
+			.btn-success:hover {
+				background: #1e7e34;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h1>🏥 Hospital Equipment QR Code System</h1>
+
+			<div class="qr-demo">
+				<h2>📱 QR Code Scanner Demo</h2>
+				<p>
+					When you scan the QR code on equipment,
+					you'll see:
+				</p>
+
+				<div class="qr-code">
+					EQ-HOSP001-XRAYMACHINE-1757118242
+				</div>
+
+				<div class="json-display">
+					{ "equipmentId": "1", "qrCode":
+					"EQ-HOSP001-XRAYMACHINE-1757118242",
+					"name": "X-Ray Machine", "hospitalId":
+					"HOSP-001", "model": "XR-2000",
+					"manufacturer": "MedTech Inc",
+					"createdAt": "2025-09-06" }
+				</div>
+			</div>
+
+			<div class="equipment-info">
+				<h3>🔧 Equipment Information</h3>
+				<p><strong>Name:</strong> X-Ray Machine</p>
+				<p>
+					<strong>Hospital:</strong> Cairo Medical
+					Center
+				</p>
+				<p><strong>Model:</strong> XR-2000</p>
+				<p>
+					<strong>Manufacturer:</strong> MedTech
+					Inc
+				</p>
+				<p><strong>Status:</strong> Operational</p>
+				<p>
+					<strong>QR Code:</strong>
+					EQ-HOSP001-XRAYMACHINE-1757118242
+				</p>
+			</div>
+
+			<div class="feature-list">
+				<h3>🌟 QR Code System Features</h3>
+				<ul>
+					<li>
+						<strong
+							>Unique
+							Identification:</strong
+						>
+						Each equipment gets a unique QR
+						code
+					</li>
+					<li>
+						<strong>Instant Access:</strong>
+						Scan to get equipment details
+						immediately
+					</li>
+					<li>
+						<strong>PDF Generation:</strong>
+						Printable QR codes for physical
+						attachment
+					</li>
+					<li>
+						<strong
+							>Database
+							Storage:</strong
+						>
+						QR image data stored in Base64
+						format
+					</li>
+					<li>
+						<strong
+							>Repair
+							Tracking:</strong
+						>
+						Link to repair request system
+					</li>
+					<li>
+						<strong
+							>Hospital
+							Integration:</strong
+						>
+						Connected to hospital management
+					</li>
+					<li>
+						<strong
+							>Mobile
+							Friendly:</strong
+						>
+						Works with any QR scanner app
+					</li>
+				</ul>
+			</div>
+
+			<div style="text-align: center; margin-top: 30px">
+				<a
+					href="/swagger"
+					class="btn"
+					>📚 View API Documentation</a
+				>
+				<a
+					href="qrs/"
+					class="btn btn-success"
+					>📄 View Generated QR PDFs</a
+				>
+			</div>
+
+			<div
+				style="
+					text-align: center;
+					margin-top: 20px;
+					color: #666;
+				"
+			>
+				<p>
+					Powered by SoitMed Hospital Management
+					System
+				</p>
+			</div>
+		</div>
+	</body>
+</html>

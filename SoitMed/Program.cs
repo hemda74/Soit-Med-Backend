@@ -2,6 +2,7 @@
 using SoitMed.Models;
 using SoitMed.Models.Identity;
 using SoitMed.Models.Core;
+using SoitMed.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +43,9 @@ namespace SoitMed
 			});
 
             builder.Services.AddIdentity<ApplicationUser,IdentityRole>().AddEntityFrameworkStores<Context>();
+
+            // Register QR Code Service
+            builder.Services.AddScoped<IQRCodeService, QRCodeService>();
 			
 			builder.Services.AddAuthentication(options =>
             {

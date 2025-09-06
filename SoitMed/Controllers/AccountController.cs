@@ -43,13 +43,26 @@ namespace SoitMed.Controllers
 					return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
 				}
 
-				// Auto-assign department based on role if not provided
+				// Auto-assign department based on role if not provided or invalid
 				int? departmentId = userDTO.DepartmentId;
-				if (departmentId == null)
+				if (departmentId == null || departmentId <= 0)
 				{
 					var departmentName = UserRoles.GetDepartmentForRole(userDTO.Role);
 					var department = await context.Departments.FirstOrDefaultAsync(d => d.Name == departmentName);
-					departmentId = department?.Id;
+					if (department == null)
+					{
+						return BadRequest($"Department '{departmentName}' for role '{userDTO.Role}' not found. Please ensure departments are seeded.");
+					}
+					departmentId = department.Id;
+				}
+				else
+				{
+					// Validate that the provided department exists
+					var departmentExists = await context.Departments.AnyAsync(d => d.Id == departmentId);
+					if (!departmentExists)
+					{
+						return BadRequest($"Department with ID {departmentId} does not exist.");
+					}
 				}
 
 				ApplicationUser AppUser = new ApplicationUser()
@@ -120,6 +133,29 @@ namespace SoitMed.Controllers
 				return BadRequest("Invalid Request");
 			}
 			return BadRequest(ModelState);
+		}
+
+		[HttpGet("departments")]
+		public async Task<IActionResult> GetDepartments()
+		{
+			var departments = await context.Departments
+				.Select(d => new { d.Id, d.Name, d.Description })
+				.ToListAsync();
+			
+			return Ok(departments);
+		}
+
+		[HttpGet("roles")]
+		public IActionResult GetRoles()
+		{
+			var roles = UserRoles.GetAllRoles();
+			var rolesByDepartment = UserRoles.GetRolesByDepartment();
+			
+			return Ok(new
+			{
+				AllRoles = roles,
+				RolesByDepartment = rolesByDepartment
+			});
 		}
 
 	}

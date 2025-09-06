@@ -16,6 +16,13 @@ namespace SoitMed.Models.Equipment
         [MaxLength(100)]
         public string QRCode { get; set; } = string.Empty; // Unique QR code identifier
 
+        // Store QR code image as base64 string
+        public string? QRCodeImageData { get; set; }
+
+        // Store QR code PDF file path
+        [MaxLength(500)]
+        public string? QRCodePdfPath { get; set; }
+
         [MaxLength(500)]
         public string? Description { get; set; }
 

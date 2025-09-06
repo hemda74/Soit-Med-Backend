@@ -9,9 +9,8 @@ namespace SoitMed.DTO
         [MaxLength(200)]
         public required string Name { get; set; }
 
-        [Required]
         [MaxLength(100)]
-        public required string QRCode { get; set; }
+        public string? QRCode { get; set; } // Optional - will be auto-generated if not provided
 
         [MaxLength(500)]
         public string? Description { get; set; }
@@ -36,6 +35,8 @@ namespace SoitMed.DTO
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string QRCode { get; set; } = string.Empty;
+        public string? QRCodeImageData { get; set; }
+        public string? QRCodePdfPath { get; set; }
         public string? Description { get; set; }
         public string? Model { get; set; }
         public string? Manufacturer { get; set; }
