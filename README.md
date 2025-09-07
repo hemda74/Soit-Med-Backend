@@ -1,58 +1,221 @@
-# ASP.NET Core Web API with JWT Authentication E-Commerce
-This project demonstrates building a secure ASP.NET Core Web API with JWT (JSON Web Token) authentication. It includes features such as user registration, login, and role-based authorization. The API utilizes a code-first approach, integrates with a MSSQL database using Entity Framework Core, and follows modern development practices for maintainability and scalability.
+# Soit-Med Hospital Management System
 
-# Features
-1- JWT Authentication: Implements token-based authentication using JWT to secure user access to the API endpoints. 
+A comprehensive hospital management system with equipment tracking, repair request management, and multi-departmental user roles. Built with ASP.NET Core 8, Entity Framework Core, and JWT authentication.
 
-2- User Registration and Login: Provides endpoints for user registration and login, with password hashing for security.
+## Features
 
-3- Role-Based Authorization: Restricts access to certain actions based on user roles. Only admin users have authorization to perform administrative actions.
+### Multi-Departmental Organization
+- **6 Departments**: Administration, Medical, Sales, Engineering, Finance, Legal
+- **10 User Roles**: SuperAdmin, Admin, Doctor, Technician, Salesman, Engineer, FinanceManager, FinanceEmployee, LegalManager, LegalEmployee
+- **Role-based Access Control** with hierarchical permissions
 
-4- Repository Pattern: Utilizes the repository pattern to separate data access logic, improving code organization and testability.
+### Hospital Network Management
+- **Hospital Registration** with unique codes and contact information
+- **Doctor & Technician Management** linked to hospitals
+- **Geographic Coverage** through governorate-engineer assignments
 
-5- Dependency Injection: Leverages ASP.NET Core's built-in dependency injection for loosely coupled components and better code maintainability.
+### Equipment Tracking System
+- **QR Code Integration** for unique equipment identification
+- **Equipment Status Tracking**: Operational, Under Maintenance, Out of Order, Retired
+- **Maintenance History** with detailed repair logs
+- **Visit Counter** for repair frequency tracking
 
-6- Identity Framework Integration: Integrates with Identity Framework for user authentication and authorization, enabling role-based access control.
+### Repair Request Management
+- **Automated Assignment** to engineers based on hospital location
+- **Priority-based Queuing**: Emergency, Critical, High, Medium, Low
+- **Complete Workflow**: Pending → Assigned → In Progress → Completed
+- **Cost Tracking** with parts and labor documentation
+- **Time Estimation** vs actual hours reporting
 
-# Technologies Used:
-1-ASP.NET Core.
+### Advanced Security
+- **JWT Authentication** with 5-year token validity
+- **Role-based Authorization** for all endpoints
+- **Secure API** with CORS support and Swagger documentation
 
-2-Entity Framework Core.
+## Getting Started
 
-3-MSSQL.
+### Prerequisites
+- .NET 8 SDK
+- SQL Server (LocalDB or full instance)
+- Visual Studio 2022 or VS Code
 
-4-JWT Token Authentication.
+### Installation
 
-5-Dependency Injection.
+1. **Clone the repository**
+```bash
+git clone https://github.com/hemda74/Soit-Med-Backend.git
+cd Soit-Med-Backend/SoitMed
+```
 
-6-Repository Pattern.
+2. **Update Connection String**
+Edit `appsettings.json`:
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=SoitMedDB;Trusted_Connection=true"
+  },
+  "JWT": {
+    "ValidIss": "https://localhost:7271",
+    "ValidAud": "https://localhost:7271",
+    "SecritKey": "YourSuperSecretKeyHere123456789"
+  }
+}
+```
 
-7-LINQ.
+3. **Run Database Migrations**
+```bash
+dotnet ef database update
+```
 
-8-Identity Framework.
+4. **Start the Application**
+```bash
+dotnet run
+```
 
-# How It Works
-1- User Registration: Users can register with the API by providing their username, email, and password. Upon successful registration, the user is added to the database, and a JWT token is generated for authentication.
+5. **Access Swagger UI**
+Navigate to: `https://localhost:5117/swagger`
 
-2- User Login: Registered users can log in using their credentials. The API verifies the user's credentials, and if valid, issues a JWT token for subsequent requests.
+## Equipment Management
 
-3- Role-Based Authorization: Certain actions in the API are restricted to admin users. To grant admin privileges to a user, you can uncomment the line await userManager.AddToRoleAsync(user, "Admin"); in the Register action of the AccountController. This will assign the "Admin" role to the user upon registration.
+### Equipment Lifecycle
+1. **Registration**: Add equipment with QR code and hospital assignment
+2. **Operation**: Track status and maintenance schedules
+3. **Repair**: Handle repair requests and track visit counts
+4. **Retirement**: Mark equipment as retired when end-of-life
 
-4- Accessing Protected Endpoints: Users can access protected endpoints by including the JWT token in the Authorization header of the HTTP request. The token is validated by the API to ensure the user has the necessary permissions.
+### QR Code Integration
+- **Unique Identifiers**: Each equipment has a unique QR code
+- **Quick Access**: API endpoint for QR code lookup
+- **Mobile Friendly**: Designed for mobile scanning applications
 
-# Getting Started
-1-Clone the Repository: Clone this repository to your local machine using git clone.
+## Repair Request Workflow
 
-2-Set Up the Database: Configure a MSSQL database and update the connection string in the appsettings.json file.
+### Request Creation
+1. **Doctor/Technician** identifies equipment issue
+2. **Scans QR code** or selects equipment
+3. **Submits repair request** with description and priority
+4. **System increments** equipment repair visit count
 
-3-Run Migrations: Run the Entity Framework Core migrations to create the database schema.
+### Automatic Assignment
+1. **System identifies** hospital location
+2. **Finds engineers** in matching governorate
+3. **Assigns to engineer** with lowest current workload
+4. **Updates status** to "Assigned"
 
-4-Build and Run the Project: Build and run the ASP.NET Core Web API project using Visual Studio or the .NET CLI.
+### Priority Levels
+- **Emergency (5)**: Immediate attention required
+- **Critical (4)**: Urgent repair needed
+- **High (3)**: Important but not critical
+- **Medium (2)**: Standard priority
+- **Low (1)**: Can be scheduled flexibly
 
-5-Test the Endpoints: Use tools like Postman or curl to test the API endpoints for user registration, login, and other actions.
+## API Endpoints
 
-# Important Note
-To grant admin privileges to a user for the first time, uncomment the line await userManager.AddToRoleAsync(user, "Admin"); in the Register action of the AccountController. This will make the user an admin upon registration.
-# Contributing
-Contributions are welcome! If you find any issues or have suggestions for improvements, feel free to open an issue or submit a pull request.
+### Authentication
+```http
+POST   /api/Account/register     # Register new user with role
+POST   /api/Account/login        # Login and get JWT token (5-year validity)
+```
 
+### Equipment Management
+```http
+GET    /api/Equipment/qr/{qrCode}        # Get equipment by QR code
+POST   /api/Equipment                    # Create equipment
+GET    /api/Equipment/{id}/repair-history    # Get repair history
+```
+
+### Repair Request Management
+```http
+POST   /api/RepairRequest                # Create repair request (Doctor/Technician)
+GET    /api/RepairRequest/pending        # Get pending requests
+GET    /api/RepairRequest/engineer/{id}  # Get engineer's assigned requests
+```
+
+### Required API Endpoints
+```http
+GET    /api/Governorate/{id}/engineers   # Get engineers in governorate
+POST   /api/Role/business                # Create business role
+PUT    /api/Role/business/{id}           # Update business role
+```
+
+## Architecture
+
+### Project Structure
+```
+SoitMed/
+├── Controllers/           # API Controllers
+├── Models/               # Data Models (Organized by Domain)
+│   ├── Core/            # Core business models
+│   ├── Identity/        # User & Authentication models
+│   ├── Hospital/        # Hospital domain models
+│   ├── Location/        # Geographic models
+│   ├── Equipment/       # Equipment domain models
+│   └── Context.cs       # Entity Framework DbContext
+├── DTO/                 # Data Transfer Objects
+├── Migrations/          # Entity Framework Migrations
+└── Program.cs           # Application Entry Point
+```
+
+### Technology Stack
+- **Framework**: ASP.NET Core 8
+- **Database**: SQL Server with Entity Framework Core
+- **Authentication**: JWT Bearer Tokens
+- **Documentation**: Swagger/OpenAPI
+- **Architecture**: Clean Architecture with Domain-Driven Design
+
+## Recent Changes
+
+### Major System Overhaul
+- Equipment Management System with QR code integration
+- Repair Request Workflow with automated engineer assignment
+- Model Restructure into domain-specific folders
+- Extended JWT Tokens to 5-year validity
+- Enhanced Database Schema with proper relationships
+- Comprehensive API Documentation
+- Solution renamed from Lab1 to SoitMed
+
+## Database Schema
+
+### Core Tables
+- **ApplicationUsers** - System users with department assignments
+- **Departments** - Organizational departments
+- **BusinessRoles** - Custom business roles (separate from Identity roles)
+
+### Hospital Domain
+- **Hospitals** - Hospital information with unique codes
+- **Doctors** - Medical staff linked to hospitals
+- **Technicians** - Technical staff linked to hospitals
+
+### Location Domain
+- **Governorates** - Geographic regions
+- **Engineers** - Engineering staff
+- **EngineerGovernorates** - Many-to-many relationship for coverage areas
+
+### Equipment Domain
+- **Equipment** - Medical equipment with QR codes and hospital assignments
+- **RepairRequests** - Repair requests with complete workflow tracking
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## Support
+
+For support and questions:
+- Create an issue in the repository
+- Check the API documentation at `/swagger`
+- Review the comprehensive endpoint documentation above
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+**Built for healthcare management excellence**
+
+*Last Updated: September 2025*
