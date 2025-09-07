@@ -1,7 +1,8 @@
 
-using Lab1.Models;
-using Lab1.Models.Identity;
-using Lab1.Models.Core;
+using SoitMed.Models;
+using SoitMed.Models.Identity;
+using SoitMed.Models.Core;
+using SoitMed.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 
-namespace Lab1
+namespace SoitMed
 {
     public class Program
     {
@@ -42,6 +43,9 @@ namespace Lab1
 			});
 
             builder.Services.AddIdentity<ApplicationUser,IdentityRole>().AddEntityFrameworkStores<Context>();
+
+            // Register QR Code Service
+            builder.Services.AddScoped<IQRCodeService, QRCodeService>();
 			
 			builder.Services.AddAuthentication(options =>
             {
