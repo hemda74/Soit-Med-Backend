@@ -2,6 +2,7 @@
 using SoitMed.Models;
 using SoitMed.Models.Identity;
 using SoitMed.Models.Core;
+using SoitMed.Models.Location;
 using SoitMed.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -112,13 +113,14 @@ namespace SoitMed
 
 			var app = builder.Build();
 
-			// Seed roles and departments
+			// Seed roles, departments, and governorates
 			using (var scope = app.Services.CreateScope())
 			{
 				var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 				var context = scope.ServiceProvider.GetRequiredService<Context>();
 				await SeedRoles(roleManager);
 				await SeedDepartments(context);
+				await SeedEgyptGovernorates(context);
 			}
 
             // Configure the HTTP request pipeline.
@@ -129,6 +131,7 @@ namespace SoitMed
             }
             app.UseStaticFiles();
             app.UseCors("MyPolicy");
+            app.UseAuthentication();
             app.UseAuthorization();
 
 
@@ -168,6 +171,51 @@ namespace SoitMed
                 if (!context.Departments.Any(d => d.Name == department.Name))
                 {
                     context.Departments.Add(department);
+                }
+            }
+
+            await context.SaveChangesAsync();
+        }
+
+        private static async Task SeedEgyptGovernorates(Context context)
+        {
+            // All 27 governorates of Egypt
+            var egyptGovernorates = new List<Governorate>
+            {
+                new Governorate { Name = "Cairo", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Alexandria", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Giza", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Qalyubia", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Port Said", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Suez", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Luxor", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Aswan", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Asyut", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Beheira", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Beni Suef", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Dakahlia", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Damietta", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Faiyum", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Gharbia", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Ismailia", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Kafr el-Sheikh", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Matrouh", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Minya", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Monufia", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "New Valley", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "North Sinai", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Qena", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Red Sea", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Sharqia", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "Sohag", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new Governorate { Name = "South Sinai", CreatedAt = DateTime.UtcNow, IsActive = true }
+            };
+
+            foreach (var governorate in egyptGovernorates)
+            {
+                if (!context.Governorates.Any(g => g.Name == governorate.Name))
+                {
+                    context.Governorates.Add(governorate);
                 }
             }
 

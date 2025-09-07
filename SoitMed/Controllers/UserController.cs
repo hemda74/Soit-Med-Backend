@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace SoitMed.Controllers
 {
@@ -14,15 +16,17 @@ namespace SoitMed.Controllers
 	public class UserController : ControllerBase
 	{
 		private readonly UserManager<ApplicationUser> userManager;
-		public UserController(UserManager<ApplicationUser> _userManager)
+		private readonly Context context;
+		public UserController(UserManager<ApplicationUser> _userManager, Context _context)
 		{
 			userManager = _userManager;
+			context = _context;
 		}
 		[HttpPost]
 		[Authorize(Roles = "SuperAdmin,Admin")]
 		public async Task<IActionResult> CreateUser(RegisterUserDTO userDTO)
 		{
-			if(ModelState.IsValid)
+			if (ModelState.IsValid)
 			{
 				// Check if role is provided
 				if (string.IsNullOrEmpty(userDTO.Role))
@@ -40,11 +44,11 @@ namespace SoitMed.Controllers
 				{
 					UserName = userDTO.UserName,
 					Email = userDTO.Email,
-					PasswordHash=userDTO.Password,
+					PasswordHash = userDTO.Password,
 				};
-				
-				IdentityResult result=	await userManager.CreateAsync(user,userDTO.Password);
-				if(result.Succeeded)
+
+				IdentityResult result = await userManager.CreateAsync(user, userDTO.Password);
+				if (result.Succeeded)
 				{
 					// Assign the specified role
 					await userManager.AddToRoleAsync(user, userDTO.Role);
@@ -63,19 +67,19 @@ namespace SoitMed.Controllers
 		[HttpGet]
 		[Authorize(Roles = "SuperAdmin,Admin")]
 		public IActionResult GetUsers()
-         {
-            var users = userManager.Users.ToList();
-            return Ok(users);
-         }
+		{
+			var users = userManager.Users.ToList();
+			return Ok(users);
+		}
 		[HttpDelete]
 		[Authorize(Roles = "SuperAdmin,Admin")]
-		public async Task<IActionResult>DeleteUser(string Name)
+		public async Task<IActionResult> DeleteUser(string Name)
 		{
-		 ApplicationUser user=	await userManager.FindByNameAsync(Name);
-			if(user!=null)
+			ApplicationUser user = await userManager.FindByNameAsync(Name);
+			if (user != null)
 			{
 				IdentityResult result = await userManager.DeleteAsync(user);
-				if(result.Succeeded)
+				if (result.Succeeded)
 				{
 					return Ok($"User {Name} deleted successfully");
 				}
@@ -88,7 +92,7 @@ namespace SoitMed.Controllers
 		}
 		[HttpPut]
 		[Authorize(Roles = "SuperAdmin,Admin")]
-		public async Task<IActionResult>UpdateUser(string userName, RegisterUserDTO userDTO)
+		public async Task<IActionResult> UpdateUser(string userName, RegisterUserDTO userDTO)
 		{
 			// Check if role is provided
 			if (string.IsNullOrEmpty(userDTO.Role))
@@ -102,7 +106,7 @@ namespace SoitMed.Controllers
 				return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
 			}
 
-			ApplicationUser user=await userManager.FindByNameAsync(userName);
+			ApplicationUser user = await userManager.FindByNameAsync(userName);
 			if (user != null)
 			{
 				user.UserName = userDTO.UserName;
@@ -130,6 +134,253 @@ namespace SoitMed.Controllers
 			return NotFound($"User with Name {userName} not found");
 		}
 
+		// Get current logged-in user's data
+		[HttpGet("me")]
+		[Authorize]
+		public async Task<IActionResult> GetCurrentUserData()
+		{
+			var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+			if (string.IsNullOrEmpty(userId))
+			{
+				return BadRequest("User ID not found in token");
+			}
+
+			var user = await context.Users
+				.Include(u => u.Department)
+				.FirstOrDefaultAsync(u => u.Id == userId);
+
+			if (user == null)
+			{
+				return NotFound("User not found");
+			}
+
+			var roles = await userManager.GetRolesAsync(user);
+
+			var userData = new CurrentUserDataDTO
+			{
+				Id = user.Id,
+				UserName = user.UserName ?? "",
+				Email = user.Email ?? "",
+				FirstName = user.FirstName,
+				LastName = user.LastName,
+				FullName = user.FullName,
+				IsActive = user.IsActive,
+				CreatedAt = user.CreatedAt,
+				LastLoginAt = user.LastLoginAt,
+				Roles = roles.ToList(),
+				DepartmentId = user.DepartmentId,
+				DepartmentName = user.Department?.Name,
+				DepartmentDescription = user.Department?.Description,
+				EmailConfirmed = user.EmailConfirmed,
+				PhoneNumberConfirmed = user.PhoneNumberConfirmed,
+				PhoneNumber = user.PhoneNumber
+			};
+
+			return Ok(userData);
+		}
+
+		// Get user data by ID
+		[HttpGet("{id}")]
+		[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
+		public async Task<IActionResult> GetUserById(string id)
+		{
+			var user = await context.Users
+				.Include(u => u.Department)
+				.FirstOrDefaultAsync(u => u.Id == id);
+
+			if (user == null)
+			{
+				return NotFound($"User with ID {id} not found");
+			}
+
+			var roles = await userManager.GetRolesAsync(user);
+
+			var userData = new UserDataDTO
+			{
+				Id = user.Id,
+				UserName = user.UserName ?? "",
+				Email = user.Email ?? "",
+				FirstName = user.FirstName,
+				LastName = user.LastName,
+				FullName = user.FullName,
+				IsActive = user.IsActive,
+				CreatedAt = user.CreatedAt,
+				LastLoginAt = user.LastLoginAt,
+				Roles = roles.ToList(),
+				DepartmentId = user.DepartmentId,
+				DepartmentName = user.Department?.Name,
+				DepartmentDescription = user.Department?.Description
+			};
+
+			return Ok(userData);
+		}
+
+		// Get user data by username
+		[HttpGet("username/{username}")]
+		[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
+		public async Task<IActionResult> GetUserByUsername(string username)
+		{
+			var user = await context.Users
+				.Include(u => u.Department)
+				.FirstOrDefaultAsync(u => u.UserName == username);
+
+			if (user == null)
+			{
+				return NotFound($"User with username {username} not found");
+			}
+
+			var roles = await userManager.GetRolesAsync(user);
+
+			var userData = new UserDataDTO
+			{
+				Id = user.Id,
+				UserName = user.UserName ?? "",
+				Email = user.Email ?? "",
+				FirstName = user.FirstName,
+				LastName = user.LastName,
+				FullName = user.FullName,
+				IsActive = user.IsActive,
+				CreatedAt = user.CreatedAt,
+				LastLoginAt = user.LastLoginAt,
+				Roles = roles.ToList(),
+				DepartmentId = user.DepartmentId,
+				DepartmentName = user.Department?.Name,
+				DepartmentDescription = user.Department?.Description
+			};
+
+			return Ok(userData);
+		}
+
+		// Get all users with detailed data (improved version of existing GetUsers)
+		[HttpGet("all")]
+		[Authorize(Roles = "SuperAdmin,Admin")]
+		public async Task<IActionResult> GetAllUsersData()
+		{
+			var users = await context.Users
+				.Include(u => u.Department)
+				.ToListAsync();
+
+			var usersData = new List<UserDataDTO>();
+
+			foreach (var user in users)
+			{
+				var roles = await userManager.GetRolesAsync(user);
+
+				usersData.Add(new UserDataDTO
+				{
+					Id = user.Id,
+					UserName = user.UserName ?? "",
+					Email = user.Email ?? "",
+					FirstName = user.FirstName,
+					LastName = user.LastName,
+					FullName = user.FullName,
+					IsActive = user.IsActive,
+					CreatedAt = user.CreatedAt,
+					LastLoginAt = user.LastLoginAt,
+					Roles = roles.ToList(),
+					DepartmentId = user.DepartmentId,
+					DepartmentName = user.Department?.Name,
+					DepartmentDescription = user.Department?.Description
+				});
+			}
+
+			return Ok(usersData);
+		}
+
+		// Get users by role
+		[HttpGet("role/{role}")]
+		[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
+		public async Task<IActionResult> GetUsersByRole(string role)
+		{
+			// Validate role
+			if (!UserRoles.IsValidRole(role))
+			{
+				return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
+			}
+
+			var usersInRole = await userManager.GetUsersInRoleAsync(role);
+			var usersData = new List<UserDataDTO>();
+
+			foreach (var user in usersInRole)
+			{
+				var userWithDepartment = await context.Users
+					.Include(u => u.Department)
+					.FirstOrDefaultAsync(u => u.Id == user.Id);
+
+				if (userWithDepartment != null)
+				{
+					var roles = await userManager.GetRolesAsync(userWithDepartment);
+
+					usersData.Add(new UserDataDTO
+					{
+						Id = userWithDepartment.Id,
+						UserName = userWithDepartment.UserName ?? "",
+						Email = userWithDepartment.Email ?? "",
+						FirstName = userWithDepartment.FirstName,
+						LastName = userWithDepartment.LastName,
+						FullName = userWithDepartment.FullName,
+						IsActive = userWithDepartment.IsActive,
+						CreatedAt = userWithDepartment.CreatedAt,
+						LastLoginAt = userWithDepartment.LastLoginAt,
+						Roles = roles.ToList(),
+						DepartmentId = userWithDepartment.DepartmentId,
+						DepartmentName = userWithDepartment.Department?.Name,
+						DepartmentDescription = userWithDepartment.Department?.Description
+					});
+				}
+			}
+
+			return Ok(new { Role = role, UserCount = usersData.Count, Users = usersData });
+		}
+
+		// Get users by department
+		[HttpGet("department/{departmentId}")]
+		[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
+		public async Task<IActionResult> GetUsersByDepartment(int departmentId)
+		{
+			var department = await context.Departments.FindAsync(departmentId);
+			if (department == null)
+			{
+				return NotFound($"Department with ID {departmentId} not found");
+			}
+
+			var users = await context.Users
+				.Include(u => u.Department)
+				.Where(u => u.DepartmentId == departmentId)
+				.ToListAsync();
+
+			var usersData = new List<UserDataDTO>();
+
+			foreach (var user in users)
+			{
+				var roles = await userManager.GetRolesAsync(user);
+
+				usersData.Add(new UserDataDTO
+				{
+					Id = user.Id,
+					UserName = user.UserName ?? "",
+					Email = user.Email ?? "",
+					FirstName = user.FirstName,
+					LastName = user.LastName,
+					FullName = user.FullName,
+					IsActive = user.IsActive,
+					CreatedAt = user.CreatedAt,
+					LastLoginAt = user.LastLoginAt,
+					Roles = roles.ToList(),
+					DepartmentId = user.DepartmentId,
+					DepartmentName = user.Department?.Name,
+					DepartmentDescription = user.Department?.Description
+				});
+			}
+
+			return Ok(new
+			{
+				Department = department.Name,
+				DepartmentId = departmentId,
+				UserCount = usersData.Count,
+				Users = usersData
+			});
+		}
 
 	}
 }
