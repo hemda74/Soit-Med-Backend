@@ -253,7 +253,7 @@ namespace SoitMed.Controllers
 
 		// Get all users with detailed data (improved version of existing GetUsers)
 		[HttpGet("all")]
-		[Authorize(Roles = "SuperAdmin,Admin")]
+		[Authorize(Roles = "SuperAdmin,Admin,Doctor")]
 		public async Task<IActionResult> GetAllUsersData()
 		{
 			var users = await context.Users
