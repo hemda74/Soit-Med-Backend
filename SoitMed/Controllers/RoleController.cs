@@ -53,12 +53,7 @@ namespace SoitMed.Controllers
 			return Ok(roles);
 		}
 
-		[HttpGet("available")]
-		public IActionResult GetAvailableRoles()
-		{
-			var availableRoles = UserRoles.GetAllRoles();
-			return Ok(new { roles = availableRoles });
-		}
+		
 
 		[HttpGet("fields/{role}")]
 		[Authorize(Roles = "SuperAdmin,Admin")]
@@ -96,7 +91,7 @@ namespace SoitMed.Controllers
 				case "engineer":
 					roleSpecificFields.AddRange(new[]
 					{
-						new { name = "specialty", type = "string", required = true, label = "Engineering Specialty" },
+						new { name = "specialty", type = "string", required = true, label = "Engineering Specialty", itemType = (string)null },
 						new { name = "governorateIds", type = "array", required = true, label = "Assigned Governorates", itemType = "number" }
 					});
 					requiredData.Add(new { endpoint = "/api/Governorate", description = "Get list of governorates for governorateIds selection" });
