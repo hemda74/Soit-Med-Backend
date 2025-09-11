@@ -1,10 +1,10 @@
-
 using SoitMed.Models;
 using SoitMed.Models.Identity;
 using SoitMed.Models.Core;
 using SoitMed.Models.Location;
 using SoitMed.Models.Hospital;
 using SoitMed.Services;
+using SoitMed.Scripts;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -44,10 +44,32 @@ namespace SoitMed
 				options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"));
 			});
 
-            builder.Services.AddIdentity<ApplicationUser,IdentityRole>().AddEntityFrameworkStores<Context>();
+            builder.Services.AddIdentity<ApplicationUser,IdentityRole>()
+                .AddEntityFrameworkStores<Context>()
+                .AddDefaultTokenProviders();
 
             // Register QR Code Service
             builder.Services.AddScoped<IQRCodeService, QRCodeService>();
+            
+            // Register User ID Generation Service
+            builder.Services.AddScoped<UserIdGenerationService>();
+            
+            // Register Migration Script
+            builder.Services.AddScoped<UpdateUserIdsScript>();
+            
+            // Register SuperAdmin Update Script
+            builder.Services.AddScoped<UpdateSuperAdminScript>();
+            
+            // Register Clean SuperAdmin Script
+            builder.Services.AddScoped<CleanSuperAdminScript>();
+            
+            // Register Clean and Create Test Users Script
+            builder.Services.AddScoped<CleanAndCreateTestUsersScript>();
+            
+            // Register Update Existing User IDs Script
+            builder.Services.AddScoped<UpdateExistingUserIdsScript>();
+            
+            
 			
 			builder.Services.AddAuthentication(options =>
             {
@@ -290,15 +312,14 @@ namespace SoitMed
                     string firstName = isMale ? maleNames[random.Next(maleNames.Length)] : femaleNames[random.Next(femaleNames.Length)];
                     string lastName = lastNames[random.Next(lastNames.Length)];
                     
-                    string userName = $"{firstName.ToLower()}.{lastName.ToLower()}{userCounter}";
-                    string email = $"{userName}@soitmed.com";
+                    string email = $"{firstName.ToLower()}.{lastName.ToLower()}{userCounter}@soitmed.com";
 
                     // Check if user already exists
                     if (await userManager.FindByEmailAsync(email) == null)
                     {
                         var user = new ApplicationUser
                         {
-                            UserName = userName,
+                            UserName = email, // Use email as username
                             Email = email,
                             EmailConfirmed = true,
                             FirstName = firstName,
