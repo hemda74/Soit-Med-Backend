@@ -4,6 +4,7 @@ using SoitMed.Models.Identity;
 using SoitMed.Models.Core;
 using SoitMed.Models.Hospital;
 using SoitMed.Models.Location;
+using SoitMed.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -17,11 +18,13 @@ namespace SoitMed.Controllers
     {
         private readonly UserManager<ApplicationUser> userManager;
         private readonly Context context;
+        private readonly UserIdGenerationService userIdGenerationService;
 
-        public RoleSpecificUserController(UserManager<ApplicationUser> _userManager, Context _context)
+        public RoleSpecificUserController(UserManager<ApplicationUser> _userManager, Context _context, UserIdGenerationService _userIdGenerationService)
         {
             userManager = _userManager;
             context = _context;
+            userIdGenerationService = _userIdGenerationService;
         }
 
         // Create Doctor with User Account
@@ -48,10 +51,20 @@ namespace SoitMed.Controllers
                 return BadRequest("Medical department not found. Please ensure departments are seeded.");
             }
 
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                doctorDTO.FirstName ?? "Unknown",
+                doctorDTO.LastName ?? "User",
+                UserRoles.Doctor,
+                doctorDTO.DepartmentId ?? medicalDepartment.Id,
+                doctorDTO.HospitalId
+            );
+
             // Create user account
             var user = new ApplicationUser
             {
-                UserName = doctorDTO.UserName,
+                Id = customUserId, // Use custom generated ID
+                UserName = doctorDTO.Email, // Use email as username
                 Email = doctorDTO.Email,
                 FirstName = doctorDTO.FirstName,
                 LastName = doctorDTO.LastName,
@@ -86,8 +99,7 @@ namespace SoitMed.Controllers
             return Ok(new CreatedDoctorResponseDTO
             {
                 UserId = user.Id,
-                UserName = user.UserName,
-                Email = user.Email,
+                Email = user.Email, // Email is now the username
                 Role = UserRoles.Doctor,
                 DepartmentName = medicalDepartment.Name,
                 CreatedAt = user.CreatedAt,
@@ -126,10 +138,20 @@ namespace SoitMed.Controllers
                 return BadRequest("Engineering department not found. Please ensure departments are seeded.");
             }
 
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                engineerDTO.FirstName ?? "Unknown",
+                engineerDTO.LastName ?? "User",
+                UserRoles.Engineer,
+                engineerDTO.DepartmentId ?? engineeringDepartment.Id,
+                null // Engineers don't use hospital ID
+            );
+
             // Create user account
             var user = new ApplicationUser
             {
-                UserName = engineerDTO.UserName,
+                Id = customUserId, // Use custom generated ID
+                UserName = engineerDTO.Email, // Use email as username
                 Email = engineerDTO.Email,
                 FirstName = engineerDTO.FirstName,
                 LastName = engineerDTO.LastName,
@@ -177,8 +199,7 @@ namespace SoitMed.Controllers
             return Ok(new CreatedEngineerResponseDTO
             {
                 UserId = user.Id,
-                UserName = user.UserName,
-                Email = user.Email,
+                Email = user.Email, // Email is now the username
                 Role = UserRoles.Engineer,
                 DepartmentName = engineeringDepartment.Name,
                 CreatedAt = user.CreatedAt,
@@ -213,10 +234,20 @@ namespace SoitMed.Controllers
                 return BadRequest("Medical department not found. Please ensure departments are seeded.");
             }
 
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                technicianDTO.FirstName ?? "Unknown",
+                technicianDTO.LastName ?? "User",
+                UserRoles.Technician,
+                technicianDTO.DepartmentId ?? medicalDepartment.Id,
+                technicianDTO.HospitalId
+            );
+
             // Create user account
             var user = new ApplicationUser
             {
-                UserName = technicianDTO.UserName,
+                Id = customUserId, // Use custom generated ID
+                UserName = technicianDTO.Email, // Use email as username
                 Email = technicianDTO.Email,
                 FirstName = technicianDTO.FirstName,
                 LastName = technicianDTO.LastName,
@@ -251,8 +282,7 @@ namespace SoitMed.Controllers
             return Ok(new CreatedTechnicianResponseDTO
             {
                 UserId = user.Id,
-                UserName = user.UserName,
-                Email = user.Email,
+                Email = user.Email, // Email is now the username
                 Role = UserRoles.Technician,
                 DepartmentName = medicalDepartment.Name,
                 CreatedAt = user.CreatedAt,
@@ -280,10 +310,20 @@ namespace SoitMed.Controllers
                 return BadRequest("Administration department not found. Please ensure departments are seeded.");
             }
 
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                adminDTO.FirstName ?? "Unknown",
+                adminDTO.LastName ?? "User",
+                UserRoles.Admin,
+                adminDTO.DepartmentId ?? adminDepartment.Id,
+                null // Admins don't use hospital ID
+            );
+
             // Create user account
             var user = new ApplicationUser
             {
-                UserName = adminDTO.UserName,
+                Id = customUserId, // Use custom generated ID
+                UserName = adminDTO.Email, // Use email as username
                 Email = adminDTO.Email,
                 FirstName = adminDTO.FirstName,
                 LastName = adminDTO.LastName,
@@ -304,8 +344,7 @@ namespace SoitMed.Controllers
             return Ok(new CreatedUserResponseDTO
             {
                 UserId = user.Id,
-                UserName = user.UserName,
-                Email = user.Email,
+                Email = user.Email, // Email is now the username
                 Role = UserRoles.Admin,
                 DepartmentName = adminDepartment.Name,
                 CreatedAt = user.CreatedAt,
@@ -330,10 +369,20 @@ namespace SoitMed.Controllers
                 return BadRequest("Finance department not found. Please ensure departments are seeded.");
             }
 
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                financeDTO.FirstName ?? "Unknown",
+                financeDTO.LastName ?? "User",
+                UserRoles.FinanceManager,
+                financeDTO.DepartmentId ?? financeDepartment.Id,
+                null // Finance Managers don't use hospital ID
+            );
+
             // Create user account
             var user = new ApplicationUser
             {
-                UserName = financeDTO.UserName,
+                Id = customUserId, // Use custom generated ID
+                UserName = financeDTO.Email, // Use email as username
                 Email = financeDTO.Email,
                 FirstName = financeDTO.FirstName,
                 LastName = financeDTO.LastName,
@@ -354,8 +403,7 @@ namespace SoitMed.Controllers
             return Ok(new CreatedUserResponseDTO
             {
                 UserId = user.Id,
-                UserName = user.UserName,
-                Email = user.Email,
+                Email = user.Email, // Email is now the username
                 Role = UserRoles.FinanceManager,
                 DepartmentName = financeDepartment.Name,
                 CreatedAt = user.CreatedAt,
@@ -380,10 +428,20 @@ namespace SoitMed.Controllers
                 return BadRequest("Legal department not found. Please ensure departments are seeded.");
             }
 
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                legalDTO.FirstName ?? "Unknown",
+                legalDTO.LastName ?? "User",
+                UserRoles.LegalManager,
+                legalDTO.DepartmentId ?? legalDepartment.Id,
+                null // Legal Managers don't use hospital ID
+            );
+
             // Create user account
             var user = new ApplicationUser
             {
-                UserName = legalDTO.UserName,
+                Id = customUserId, // Use custom generated ID
+                UserName = legalDTO.Email, // Use email as username
                 Email = legalDTO.Email,
                 FirstName = legalDTO.FirstName,
                 LastName = legalDTO.LastName,
@@ -404,8 +462,7 @@ namespace SoitMed.Controllers
             return Ok(new CreatedUserResponseDTO
             {
                 UserId = user.Id,
-                UserName = user.UserName,
-                Email = user.Email,
+                Email = user.Email, // Email is now the username
                 Role = UserRoles.LegalManager,
                 DepartmentName = legalDepartment.Name,
                 CreatedAt = user.CreatedAt,
@@ -430,10 +487,20 @@ namespace SoitMed.Controllers
                 return BadRequest("Sales department not found. Please ensure departments are seeded.");
             }
 
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                salesDTO.FirstName ?? "Unknown",
+                salesDTO.LastName ?? "User",
+                UserRoles.Salesman,
+                salesDTO.DepartmentId ?? salesDepartment.Id,
+                null // Salesmen don't use hospital ID
+            );
+
             // Create user account
             var user = new ApplicationUser
             {
-                UserName = salesDTO.UserName,
+                Id = customUserId, // Use custom generated ID
+                UserName = salesDTO.Email, // Use email as username
                 Email = salesDTO.Email,
                 FirstName = salesDTO.FirstName,
                 LastName = salesDTO.LastName,
@@ -454,8 +521,7 @@ namespace SoitMed.Controllers
             return Ok(new CreatedUserResponseDTO
             {
                 UserId = user.Id,
-                UserName = user.UserName,
-                Email = user.Email,
+                Email = user.Email, // Email is now the username
                 Role = UserRoles.Salesman,
                 DepartmentName = salesDepartment.Name,
                 CreatedAt = user.CreatedAt,

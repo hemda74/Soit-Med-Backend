@@ -2,6 +2,7 @@ using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Identity;
 using SoitMed.Models.Core;
+using SoitMed.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -17,10 +18,12 @@ namespace SoitMed.Controllers
 	{
 		private readonly UserManager<ApplicationUser> userManager;
 		private readonly Context context;
-		public UserController(UserManager<ApplicationUser> _userManager, Context _context)
+		private readonly UserIdGenerationService userIdGenerationService;
+		public UserController(UserManager<ApplicationUser> _userManager, Context _context, UserIdGenerationService _userIdGenerationService)
 		{
 			userManager = _userManager;
 			context = _context;
+			userIdGenerationService = _userIdGenerationService;
 		}
 		[HttpPost]
 		[Authorize(Roles = "SuperAdmin,Admin")]
@@ -40,11 +43,25 @@ namespace SoitMed.Controllers
 					return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
 				}
 
+				// Generate custom user ID
+				string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+					userDTO.FirstName ?? "Unknown",
+					userDTO.LastName ?? "User", 
+					userDTO.Role, 
+					userDTO.DepartmentId
+				);
+
 				ApplicationUser user = new ApplicationUser
 				{
-					UserName = userDTO.UserName,
+					Id = customUserId,
+					UserName = userDTO.Email, // Use email as username
 					Email = userDTO.Email,
 					PasswordHash = userDTO.Password,
+					FirstName = userDTO.FirstName,
+					LastName = userDTO.LastName,
+					DepartmentId = userDTO.DepartmentId,
+					CreatedAt = DateTime.UtcNow,
+					IsActive = true
 				};
 
 				IdentityResult result = await userManager.CreateAsync(user, userDTO.Password);
@@ -109,7 +126,7 @@ namespace SoitMed.Controllers
 			ApplicationUser user = await userManager.FindByNameAsync(userName);
 			if (user != null)
 			{
-				user.UserName = userDTO.UserName;
+				user.UserName = userDTO.Email; // Use email as username
 				user.PasswordHash = userDTO.Password;
 				user.Email = userDTO.Email;
 
@@ -380,6 +397,33 @@ namespace SoitMed.Controllers
 				UserCount = usersData.Count,
 				Users = usersData
 			});
+		}
+
+		// Test endpoint for ID generation
+		[HttpGet("test-id-generation")]
+		[Authorize(Roles = "SuperAdmin,Admin,Doctor")]
+		public async Task<IActionResult> TestIdGeneration(string firstName, string lastName, string role, int? departmentId = null, string? hospitalId = null)
+		{
+			try
+			{
+				var generatedId = await userIdGenerationService.GenerateUserIdAsync(firstName, lastName, role, departmentId, hospitalId);
+				var isUnique = await userIdGenerationService.IsUserIdUniqueAsync(generatedId);
+				
+				return Ok(new
+				{
+					GeneratedId = generatedId,
+					IsUnique = isUnique,
+					FirstName = firstName,
+					LastName = lastName,
+					Role = role,
+					DepartmentId = departmentId,
+					HospitalId = hospitalId
+				});
+			}
+			catch (Exception ex)
+			{
+				return BadRequest($"Error generating ID: {ex.Message}");
+			}
 		}
 
 	}

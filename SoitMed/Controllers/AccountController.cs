@@ -2,6 +2,8 @@ using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Identity;
 using SoitMed.Models.Core;
+using SoitMed.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -20,11 +22,13 @@ namespace SoitMed.Controllers
 		private readonly UserManager<ApplicationUser> userManager;
 		private readonly IConfiguration config;
 		private readonly Context context;
-		public AccountController(UserManager<ApplicationUser> _userManager, IConfiguration config, Context _context)
+		private readonly UserIdGenerationService userIdGenerationService;
+		public AccountController(UserManager<ApplicationUser> _userManager, IConfiguration config, Context _context, UserIdGenerationService _userIdGenerationService)
 		{
 		userManager = _userManager;
 	    this.config = config;
 		context = _context;
+		userIdGenerationService = _userIdGenerationService;
 		}
 		[HttpPost("register")]
 		public async Task< IActionResult> Registe(RegisterUserDTO userDTO)
@@ -65,9 +69,18 @@ namespace SoitMed.Controllers
 					}
 				}
 
+				// Generate custom user ID
+				string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+					userDTO.FirstName ?? "Unknown",
+					userDTO.LastName ?? "User", 
+					userDTO.Role, 
+					departmentId
+				);
+
 				ApplicationUser AppUser = new ApplicationUser()
 				{
-					UserName = userDTO.UserName,
+					Id = customUserId,
+					UserName = userDTO.Email, // Use email as username
 					Email = userDTO.Email,
 					PasswordHash = userDTO.Password,
 					FirstName = userDTO.FirstName,
@@ -93,7 +106,15 @@ namespace SoitMed.Controllers
 		{
 			if(ModelState.IsValid)
 			{
-				ApplicationUser? UserFromDB= await userManager.FindByNameAsync(userDTO.UserName);
+				// Try to find user by username first, then by email
+				ApplicationUser? UserFromDB = await userManager.FindByNameAsync(userDTO.UserName);
+				
+				// If not found by username, try by email
+				if (UserFromDB == null)
+				{
+					UserFromDB = await userManager.FindByEmailAsync(userDTO.UserName);
+				}
+
 				if (UserFromDB != null)
 				{
 					bool found= await userManager.CheckPasswordAsync(UserFromDB,userDTO.Password);
@@ -156,6 +177,74 @@ namespace SoitMed.Controllers
 				AllRoles = roles,
 				RolesByDepartment = rolesByDepartment
 			});
+		}
+
+		[HttpPost("change-password")]
+		[Authorize] // User must be authenticated to change password
+		public async Task<IActionResult> ChangePassword(ChangePasswordDTO changePasswordDTO)
+		{
+			if (!ModelState.IsValid)
+			{
+				return BadRequest(ModelState);
+			}
+
+			try
+			{
+				// Get current user from JWT token
+				var userEmail = User.FindFirst(ClaimTypes.Name)?.Value;
+				if (string.IsNullOrEmpty(userEmail))
+				{
+					return Unauthorized("User not found in token.");
+				}
+
+				// Find user by email (since email is now the username)
+				var user = await userManager.FindByEmailAsync(userEmail);
+				if (user == null)
+				{
+					return NotFound("User not found.");
+				}
+
+				// Verify current password
+				var isCurrentPasswordValid = await userManager.CheckPasswordAsync(user, changePasswordDTO.CurrentPassword);
+				if (!isCurrentPasswordValid)
+				{
+					return BadRequest(new
+					{
+						success = false,
+						message = "Current password is incorrect."
+					});
+				}
+
+				// Change password
+				var result = await userManager.ChangePasswordAsync(user, changePasswordDTO.CurrentPassword, changePasswordDTO.NewPassword);
+				
+				if (result.Succeeded)
+				{
+					return Ok(new
+					{
+						success = true,
+						message = "Password changed successfully."
+					});
+				}
+				else
+				{
+					return BadRequest(new
+					{
+						success = false,
+						message = "Failed to change password.",
+						errors = result.Errors.Select(e => e.Description).ToList()
+					});
+				}
+			}
+			catch (Exception ex)
+			{
+				return StatusCode(500, new
+				{
+					success = false,
+					message = "An error occurred while changing password.",
+					error = ex.Message
+				});
+			}
 		}
 
 	}
