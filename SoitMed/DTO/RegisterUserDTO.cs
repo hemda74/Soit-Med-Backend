@@ -5,9 +5,6 @@ namespace SoitMed.DTO
 	public class RegisterUserDTO
 	{
 		[Required]
-		public required string UserName {  get; set; }
-		
-		[Required]
 		public required string Password { get; set; }
 		
 		[Required]

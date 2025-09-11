@@ -6,9 +6,6 @@ namespace SoitMed.DTO
     public class BaseUserCreationDTO
     {
         [Required]
-        public required string UserName { get; set; }
-
-        [Required]
         [EmailAddress]
         public required string Email { get; set; }
 
@@ -59,7 +56,7 @@ namespace SoitMed.DTO
     // Finance Manager creation DTO
     public class CreateFinanceManagerDTO : BaseUserCreationDTO
     {
-        public string? BudgetAuthority { get; set; } // Optional: budget limits
+        // BudgetAuthority removed as requested
     }
 
     // Legal Manager creation DTO
@@ -72,15 +69,14 @@ namespace SoitMed.DTO
     public class CreateSalesmanDTO : BaseUserCreationDTO
     {
         public string? Territory { get; set; } // Optional: sales territory
-        public string? SalesTarget { get; set; } // Optional: sales targets
+        // SalesTarget removed as requested
     }
 
     // Response DTOs for created users
     public class CreatedUserResponseDTO
     {
         public string UserId { get; set; } = string.Empty;
-        public string UserName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty; // Email is now the username
         public string Role { get; set; } = string.Empty;
         public string? DepartmentName { get; set; }
         public DateTime CreatedAt { get; set; }
