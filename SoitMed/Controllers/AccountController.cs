@@ -109,7 +109,6 @@ namespace SoitMed.Controllers
 				// Try to find user by username first, then by email
 				ApplicationUser? UserFromDB = await userManager.FindByNameAsync(userDTO.UserName);
 				
-				// If not found by username, try by email
 				if (UserFromDB == null)
 				{
 					UserFromDB = await userManager.FindByEmailAsync(userDTO.UserName);
@@ -150,10 +149,19 @@ namespace SoitMed.Controllers
 							expired = mytoken.ValidTo
 						});
 					}
+					else
+					{
+						// User exists but password is incorrect
+						return BadRequest(new { message = "Invalid password. Please check your password and try again." });
+					}
 				}
-				return BadRequest("Invalid Request");
+				else
+				{
+					// User not found (invalid username/email)
+					return BadRequest(new { message = "Invalid username or email. Please check your credentials and try again." });
+				}
 			}
-			return BadRequest(ModelState);
+			return BadRequest(new { message = "Invalid request data", errors = ModelState });
 		}
 
 		[HttpGet("departments")]
@@ -242,6 +250,79 @@ namespace SoitMed.Controllers
 				{
 					success = false,
 					message = "An error occurred while changing password.",
+					error = ex.Message
+				});
+			}
+		}
+
+		[HttpPost("superadmin-update-password")]
+		[Authorize(Roles = "SuperAdmin")]
+		public async Task<IActionResult> SuperAdminUpdatePassword(SuperAdminPasswordUpdateDTO passwordUpdateDTO)
+		{
+			try
+			{
+				if (!ModelState.IsValid)
+				{
+					return BadRequest(new
+					{
+						success = false,
+						message = "Invalid request data",
+						errors = ModelState
+					});
+				}
+
+				// Find the user by ID
+				var user = await userManager.FindByIdAsync(passwordUpdateDTO.UserId);
+				if (user == null)
+				{
+					return NotFound(new
+					{
+						success = false,
+						message = "User not found"
+					});
+				}
+
+				// Check if the user is trying to update their own password
+				var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+				if (currentUserId == passwordUpdateDTO.UserId)
+				{
+					return BadRequest(new
+					{
+						success = false,
+						message = "SuperAdmin cannot update their own password through this endpoint. Use the change-password endpoint instead."
+					});
+				}
+
+				// Update the password
+				var token = await userManager.GeneratePasswordResetTokenAsync(user);
+				var result = await userManager.ResetPasswordAsync(user, token, passwordUpdateDTO.NewPassword);
+
+				if (result.Succeeded)
+				{
+					return Ok(new
+					{
+						success = true,
+						message = $"Password updated successfully for user: {user.UserName}",
+						userId = user.Id,
+						userName = user.UserName
+					});
+				}
+				else
+				{
+					return BadRequest(new
+					{
+						success = false,
+						message = "Failed to update password",
+						errors = result.Errors.Select(e => e.Description).ToList()
+					});
+				}
+			}
+			catch (Exception ex)
+			{
+				return StatusCode(500, new
+				{
+					success = false,
+					message = "An error occurred while updating password.",
 					error = ex.Message
 				});
 			}
