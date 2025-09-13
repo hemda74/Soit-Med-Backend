@@ -34,21 +34,29 @@ namespace SoitMed.Controllers
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
             }
 
             // Check if hospital exists
             var hospital = await context.Hospitals.FindAsync(doctorDTO.HospitalId);
             if (hospital == null)
             {
-                return NotFound($"Hospital with ID {doctorDTO.HospitalId} not found");
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    $"Hospital with ID '{doctorDTO.HospitalId}' not found. Please verify the hospital ID is correct.",
+                    "HospitalId",
+                    "HOSPITAL_NOT_FOUND"
+                ));
             }
 
             // Get Medical department
             var medicalDepartment = await context.Departments.FirstOrDefaultAsync(d => d.Name == "Medical");
             if (medicalDepartment == null)
             {
-                return BadRequest("Medical department not found. Please ensure departments are seeded.");
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Medical department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
             }
 
             // Generate custom user ID
@@ -76,7 +84,11 @@ namespace SoitMed.Controllers
             var result = await userManager.CreateAsync(user, doctorDTO.Password);
             if (!result.Succeeded)
             {
-                return BadRequest(result.Errors);
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
             }
 
             // Assign Doctor role
@@ -117,7 +129,7 @@ namespace SoitMed.Controllers
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
             }
 
             // Validate governorates
@@ -128,14 +140,22 @@ namespace SoitMed.Controllers
             if (governorates.Count != engineerDTO.GovernorateIds.Count)
             {
                 var missingIds = engineerDTO.GovernorateIds.Except(governorates.Select(g => g.GovernorateId));
-                return BadRequest($"Governorates with IDs [{string.Join(", ", missingIds)}] not found");
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    $"Governorates with IDs [{string.Join(", ", missingIds)}] not found. Please verify the governorate IDs are correct.",
+                    "GovernorateIds",
+                    "GOVERNORATE_NOT_FOUND"
+                ));
             }
 
             // Get Engineering department
             var engineeringDepartment = await context.Departments.FirstOrDefaultAsync(d => d.Name == "Engineering");
             if (engineeringDepartment == null)
             {
-                return BadRequest("Engineering department not found. Please ensure departments are seeded.");
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Engineering department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
             }
 
             // Generate custom user ID
@@ -163,7 +183,11 @@ namespace SoitMed.Controllers
             var result = await userManager.CreateAsync(user, engineerDTO.Password);
             if (!result.Succeeded)
             {
-                return BadRequest(result.Errors);
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
             }
 
             // Assign Engineer role
@@ -217,21 +241,29 @@ namespace SoitMed.Controllers
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
             }
 
             // Check if hospital exists
             var hospital = await context.Hospitals.FindAsync(technicianDTO.HospitalId);
             if (hospital == null)
             {
-                return NotFound($"Hospital with ID {technicianDTO.HospitalId} not found");
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    $"Hospital with ID '{technicianDTO.HospitalId}' not found. Please verify the hospital ID is correct.",
+                    "HospitalId",
+                    "HOSPITAL_NOT_FOUND"
+                ));
             }
 
             // Get Medical department
             var medicalDepartment = await context.Departments.FirstOrDefaultAsync(d => d.Name == "Medical");
             if (medicalDepartment == null)
             {
-                return BadRequest("Medical department not found. Please ensure departments are seeded.");
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Medical department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
             }
 
             // Generate custom user ID
@@ -259,7 +291,11 @@ namespace SoitMed.Controllers
             var result = await userManager.CreateAsync(user, technicianDTO.Password);
             if (!result.Succeeded)
             {
-                return BadRequest(result.Errors);
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
             }
 
             // Assign Technician role
@@ -300,14 +336,18 @@ namespace SoitMed.Controllers
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
             }
 
             // Get Administration department
             var adminDepartment = await context.Departments.FirstOrDefaultAsync(d => d.Name == "Administration");
             if (adminDepartment == null)
             {
-                return BadRequest("Administration department not found. Please ensure departments are seeded.");
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Administration department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
             }
 
             // Generate custom user ID
@@ -335,7 +375,11 @@ namespace SoitMed.Controllers
             var result = await userManager.CreateAsync(user, adminDTO.Password);
             if (!result.Succeeded)
             {
-                return BadRequest(result.Errors);
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
             }
 
             // Assign Admin role
@@ -359,14 +403,18 @@ namespace SoitMed.Controllers
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
             }
 
             // Get Finance department
             var financeDepartment = await context.Departments.FirstOrDefaultAsync(d => d.Name == "Finance");
             if (financeDepartment == null)
             {
-                return BadRequest("Finance department not found. Please ensure departments are seeded.");
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Finance department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
             }
 
             // Generate custom user ID
@@ -394,7 +442,11 @@ namespace SoitMed.Controllers
             var result = await userManager.CreateAsync(user, financeDTO.Password);
             if (!result.Succeeded)
             {
-                return BadRequest(result.Errors);
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
             }
 
             // Assign FinanceManager role
@@ -418,14 +470,18 @@ namespace SoitMed.Controllers
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
             }
 
             // Get Legal department
             var legalDepartment = await context.Departments.FirstOrDefaultAsync(d => d.Name == "Legal");
             if (legalDepartment == null)
             {
-                return BadRequest("Legal department not found. Please ensure departments are seeded.");
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Legal department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
             }
 
             // Generate custom user ID
@@ -453,7 +509,11 @@ namespace SoitMed.Controllers
             var result = await userManager.CreateAsync(user, legalDTO.Password);
             if (!result.Succeeded)
             {
-                return BadRequest(result.Errors);
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
             }
 
             // Assign LegalManager role
@@ -477,14 +537,18 @@ namespace SoitMed.Controllers
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
             }
 
             // Get Sales department
             var salesDepartment = await context.Departments.FirstOrDefaultAsync(d => d.Name == "Sales");
             if (salesDepartment == null)
             {
-                return BadRequest("Sales department not found. Please ensure departments are seeded.");
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Sales department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
             }
 
             // Generate custom user ID
@@ -512,7 +576,11 @@ namespace SoitMed.Controllers
             var result = await userManager.CreateAsync(user, salesDTO.Password);
             if (!result.Succeeded)
             {
-                return BadRequest(result.Errors);
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
             }
 
             // Assign Salesman role
