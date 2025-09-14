@@ -54,8 +54,6 @@ namespace SoitMed
             // Register User ID Generation Service
             builder.Services.AddScoped<UserIdGenerationService>();
             
-            // Register Migration Script
-            builder.Services.AddScoped<UpdateUserIdsScript>();
             
             // Register SuperAdmin Update Script
             builder.Services.AddScoped<UpdateSuperAdminScript>();

@@ -25,62 +25,6 @@ namespace SoitMed.Controllers
 			context = _context;
 			userIdGenerationService = _userIdGenerationService;
 		}
-		[HttpPost]
-		[Authorize(Roles = "SuperAdmin,Admin")]
-		public async Task<IActionResult> CreateUser(RegisterUserDTO userDTO)
-		{
-			if (ModelState.IsValid)
-			{
-				// Check if role is provided
-				if (string.IsNullOrEmpty(userDTO.Role))
-				{
-					return BadRequest("Role field is required.");
-				}
-
-				// Validate the role
-				if (!UserRoles.IsValidRole(userDTO.Role))
-				{
-					return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
-				}
-
-				// Generate custom user ID
-				string customUserId = await userIdGenerationService.GenerateUserIdAsync(
-					userDTO.FirstName ?? "Unknown",
-					userDTO.LastName ?? "User", 
-					userDTO.Role, 
-					userDTO.DepartmentId
-				);
-
-				ApplicationUser user = new ApplicationUser
-				{
-					Id = customUserId,
-					UserName = userDTO.Email, // Use email as username
-					Email = userDTO.Email,
-					PasswordHash = userDTO.Password,
-					FirstName = userDTO.FirstName,
-					LastName = userDTO.LastName,
-					DepartmentId = userDTO.DepartmentId,
-					CreatedAt = DateTime.UtcNow,
-					IsActive = true
-				};
-
-				IdentityResult result = await userManager.CreateAsync(user, userDTO.Password);
-				if (result.Succeeded)
-				{
-					// Assign the specified role
-					await userManager.AddToRoleAsync(user, userDTO.Role);
-					return Ok($"User {user.UserName} created successfully with role: {userDTO.Role}");
-				}
-				else
-				{
-					return BadRequest(result.Errors);
-				}
-			}
-			else
-			{
-				return BadRequest(ModelState);
-			}
-		}
 		[HttpGet]
 		[Authorize(Roles = "SuperAdmin,Admin")]
 		public IActionResult GetUsers()
@@ -196,41 +140,6 @@ namespace SoitMed.Controllers
 			return Ok(userData);
 		}
 
-		// Get user data by ID
-		[HttpGet("{id}")]
-		[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
-		public async Task<IActionResult> GetUserById(string id)
-		{
-			var user = await context.Users
-				.Include(u => u.Department)
-				.FirstOrDefaultAsync(u => u.Id == id);
-
-			if (user == null)
-			{
-				return NotFound($"User with ID {id} not found");
-			}
-
-			var roles = await userManager.GetRolesAsync(user);
-
-			var userData = new UserDataDTO
-			{
-				Id = user.Id,
-				UserName = user.UserName ?? "",
-				Email = user.Email ?? "",
-				FirstName = user.FirstName,
-				LastName = user.LastName,
-				FullName = user.FullName,
-				IsActive = user.IsActive,
-				CreatedAt = user.CreatedAt,
-				LastLoginAt = user.LastLoginAt,
-				Roles = roles.ToList(),
-				DepartmentId = user.DepartmentId,
-				DepartmentName = user.Department?.Name,
-				DepartmentDescription = user.Department?.Description
-			};
-
-			return Ok(userData);
-		}
 
 		// Get user data by username
 		[HttpGet("username/{username}")]
@@ -268,13 +177,64 @@ namespace SoitMed.Controllers
 			return Ok(userData);
 		}
 
-		// Get all users with detailed data (improved version of existing GetUsers)
+		// Get all users with detailed data (improved version with filtering and sorting)
 		[HttpGet("all")]
 		[Authorize(Roles = "SuperAdmin,Admin,Doctor")]
-		public async Task<IActionResult> GetAllUsersData()
+		public async Task<IActionResult> GetAllUsersData([FromQuery] UserFilterDTO filter)
 		{
-			var users = await context.Users
+			var query = context.Users
 				.Include(u => u.Department)
+				.AsQueryable();
+
+			// Apply filters
+			if (!string.IsNullOrEmpty(filter.SearchTerm))
+			{
+				var searchTerm = filter.SearchTerm.ToLower();
+				query = query.Where(u => 
+					(u.FirstName != null && u.FirstName.ToLower().Contains(searchTerm)) ||
+					(u.LastName != null && u.LastName.ToLower().Contains(searchTerm)) ||
+					(u.Email != null && u.Email.ToLower().Contains(searchTerm)) ||
+					(u.UserName != null && u.UserName.ToLower().Contains(searchTerm))
+				);
+			}
+
+			if (filter.DepartmentId.HasValue)
+			{
+				query = query.Where(u => u.DepartmentId == filter.DepartmentId.Value);
+			}
+
+			if (filter.IsActive.HasValue)
+			{
+				query = query.Where(u => u.IsActive == filter.IsActive.Value);
+			}
+
+			if (filter.CreatedFrom.HasValue)
+			{
+				query = query.Where(u => u.CreatedAt >= filter.CreatedFrom.Value);
+			}
+
+			if (filter.CreatedTo.HasValue)
+			{
+				query = query.Where(u => u.CreatedAt <= filter.CreatedTo.Value);
+			}
+
+			// Apply sorting
+			query = filter.SortBy?.ToLower() switch
+			{
+				"firstname" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.FirstName) : query.OrderByDescending(u => u.FirstName),
+				"lastname" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.LastName) : query.OrderByDescending(u => u.LastName),
+				"email" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.Email) : query.OrderByDescending(u => u.Email),
+				"isactive" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.IsActive) : query.OrderByDescending(u => u.IsActive),
+				"createdat" or _ => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.CreatedAt) : query.OrderByDescending(u => u.CreatedAt)
+			};
+
+			// Get total count before pagination
+			var totalCount = await query.CountAsync();
+
+			// Apply pagination
+			var users = await query
+				.Skip((filter.PageNumber - 1) * filter.PageSize)
+				.Take(filter.PageSize)
 				.ToListAsync();
 
 			var usersData = new List<UserDataDTO>();
@@ -282,6 +242,12 @@ namespace SoitMed.Controllers
 			foreach (var user in users)
 			{
 				var roles = await userManager.GetRolesAsync(user);
+
+				// Apply role filter if specified
+				if (!string.IsNullOrEmpty(filter.Role) && !roles.Contains(filter.Role))
+				{
+					continue;
+				}
 
 				usersData.Add(new UserDataDTO
 				{
@@ -301,7 +267,27 @@ namespace SoitMed.Controllers
 				});
 			}
 
-			return Ok(usersData);
+			// If role filter was applied, we need to recount
+			if (!string.IsNullOrEmpty(filter.Role))
+			{
+				totalCount = usersData.Count;
+			}
+
+			var totalPages = (int)Math.Ceiling((double)totalCount / filter.PageSize);
+
+			var response = new PaginatedUserResponseDTO
+			{
+				Users = usersData,
+				TotalCount = totalCount,
+				PageNumber = filter.PageNumber,
+				PageSize = filter.PageSize,
+				TotalPages = totalPages,
+				HasPreviousPage = filter.PageNumber > 1,
+				HasNextPage = filter.PageNumber < totalPages,
+				AppliedFilters = filter
+			};
+
+			return Ok(response);
 		}
 
 		// Get users by role
@@ -399,30 +385,160 @@ namespace SoitMed.Controllers
 			});
 		}
 
-		// Test endpoint for ID generation
-		[HttpGet("test-id-generation")]
-		[Authorize(Roles = "SuperAdmin,Admin,Doctor")]
-		public async Task<IActionResult> TestIdGeneration(string firstName, string lastName, string role, int? departmentId = null, string? hospitalId = null)
+
+		// SuperAdmin: Activate or Deactivate User
+		[HttpPut("activate-deactivate")]
+		[Authorize(Roles = "SuperAdmin")]
+		public async Task<IActionResult> ActivateDeactivateUser([FromBody] UserActivationDTO activationDTO)
+		{
+			if (!ModelState.IsValid)
+			{
+				return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+			}
+
+			// Validate action
+			if (activationDTO.Action.ToLower() != "activate" && activationDTO.Action.ToLower() != "deactivate")
+			{
+				return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+					"Action must be either 'activate' or 'deactivate'",
+					"Action",
+					"INVALID_ACTION"
+				));
+			}
+
+			// Find user
+			var user = await userManager.FindByIdAsync(activationDTO.UserId);
+			if (user == null)
+			{
+				return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+					$"User with ID '{activationDTO.UserId}' not found",
+					"UserId",
+					"USER_NOT_FOUND"
+				));
+			}
+
+			// Check if user is SuperAdmin (prevent deactivating SuperAdmin)
+			var roles = await userManager.GetRolesAsync(user);
+			if (roles.Contains("SuperAdmin"))
+			{
+				return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+					"Cannot deactivate SuperAdmin user",
+					"UserId",
+					"SUPERADMIN_PROTECTION"
+				));
+			}
+
+			// Update user status
+			user.IsActive = activationDTO.Action.ToLower() == "activate";
+
+			var result = await userManager.UpdateAsync(user);
+			if (!result.Succeeded)
+			{
+				var identityErrors = result.Errors.Select(e => e.Description).ToList();
+				return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+					new Dictionary<string, string> { { "User", string.Join("; ", identityErrors) } },
+					"Failed to update user status"
+				));
+			}
+
+			var response = new UserActivationResponseDTO
+			{
+				UserId = user.Id,
+				UserName = user.UserName ?? "",
+				Email = user.Email ?? "",
+				IsActive = user.IsActive,
+				Action = activationDTO.Action,
+				Reason = activationDTO.Reason,
+				ActionDate = DateTime.UtcNow,
+				Message = $"User '{user.UserName}' has been {activationDTO.Action}d successfully"
+			};
+
+			return Ok(response);
+		}
+
+		// SuperAdmin: Get User Statistics
+		[HttpGet("statistics")]
+		[Authorize(Roles = "SuperAdmin")]
+		public async Task<IActionResult> GetUserStatistics()
 		{
 			try
 			{
-				var generatedId = await userIdGenerationService.GenerateUserIdAsync(firstName, lastName, role, departmentId, hospitalId);
-				var isUnique = await userIdGenerationService.IsUserIdUniqueAsync(generatedId);
-				
+				var allUsers = await context.Users.ToListAsync();
+				var departments = await context.Departments.ToListAsync();
+
+				// Basic counts
+				var totalUsers = allUsers.Count;
+				var activeUsers = allUsers.Count(u => u.IsActive);
+				var inactiveUsers = totalUsers - activeUsers;
+
+				// Users by role breakdown
+				var usersByRole = new Dictionary<string, int>();
+				foreach (var role in UserRoles.GetAllRoles())
+				{
+					var usersInRole = await userManager.GetUsersInRoleAsync(role);
+					usersByRole[role] = usersInRole.Count;
+				}
+
+				// Users by department breakdown
+				var usersByDepartment = new Dictionary<string, int>();
+				foreach (var department in departments)
+				{
+					var count = allUsers.Count(u => u.DepartmentId == department.Id);
+					if (count > 0)
+					{
+						usersByDepartment[department.Name] = count;
+					}
+				}
+
+				var statistics = new UserStatisticsDTO
+				{
+					TotalUsers = totalUsers,
+					ActiveUsers = activeUsers,
+					InactiveUsers = inactiveUsers,
+					UsersByRole = usersByRole.Values.Sum(),
+					GeneratedAt = DateTime.UtcNow,
+					UsersByRoleBreakdown = usersByRole,
+					UsersByDepartment = usersByDepartment
+				};
+
+				return Ok(statistics);
+			}
+			catch (Exception ex)
+			{
+				return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+					$"Error generating user statistics: {ex.Message}",
+					"Statistics",
+					"STATISTICS_ERROR"
+				));
+			}
+		}
+
+		// SuperAdmin: Get User Counts (Simple version)
+		[HttpGet("counts")]
+		[Authorize(Roles = "SuperAdmin")]
+		public async Task<IActionResult> GetUserCounts()
+		{
+			try
+			{
+				var allUsers = await context.Users.ToListAsync();
+				var totalUsers = allUsers.Count;
+				var activeUsers = allUsers.Count(u => u.IsActive);
+
 				return Ok(new
 				{
-					GeneratedId = generatedId,
-					IsUnique = isUnique,
-					FirstName = firstName,
-					LastName = lastName,
-					Role = role,
-					DepartmentId = departmentId,
-					HospitalId = hospitalId
+					TotalUsers = totalUsers,
+					ActiveUsers = activeUsers,
+					InactiveUsers = totalUsers - activeUsers,
+					GeneratedAt = DateTime.UtcNow
 				});
 			}
 			catch (Exception ex)
 			{
-				return BadRequest($"Error generating ID: {ex.Message}");
+				return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+					$"Error getting user counts: {ex.Message}",
+					"Counts",
+					"COUNTS_ERROR"
+				));
 			}
 		}
 

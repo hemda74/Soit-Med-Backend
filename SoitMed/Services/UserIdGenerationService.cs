@@ -135,43 +135,5 @@ namespace SoitMed.Services
             return !await _context.Users.AnyAsync(u => u.Id == userId);
         }
 
-        /// <summary>
-        /// Updates existing user IDs to the new pattern
-        /// This method should be used carefully and preferably in a migration script
-        /// </summary>
-        public async Task<string> UpdateUserToNewIdPatternAsync(ApplicationUser user)
-        {
-            // Get user roles to determine the correct pattern
-            var userRoles = await _context.UserRoles
-                .Where(ur => ur.UserId == user.Id)
-                .Join(_context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Name)
-                .ToListAsync();
-
-            string role = userRoles.FirstOrDefault() ?? "User";
-            
-            // Get hospital ID if user is a doctor or technician
-            string? hospitalId = null;
-            if (role == "Doctor")
-            {
-                var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.UserId == user.Id);
-                hospitalId = doctor?.HospitalId;
-            }
-            else if (role == "Technician")
-            {
-                var technician = await _context.Technicians.FirstOrDefaultAsync(t => t.UserId == user.Id);
-                hospitalId = technician?.HospitalId;
-            }
-
-            // Generate new ID
-            string newId = await GenerateUserIdAsync(
-                user.FirstName ?? "Unknown", 
-                user.LastName ?? "User", 
-                role, 
-                user.DepartmentId, 
-                hospitalId
-            );
-
-            return newId;
-        }
     }
 }
