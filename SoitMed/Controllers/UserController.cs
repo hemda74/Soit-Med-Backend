@@ -25,13 +25,6 @@ namespace SoitMed.Controllers
 			context = _context;
 			userIdGenerationService = _userIdGenerationService;
 		}
-		[HttpGet]
-		[Authorize(Roles = "SuperAdmin,Admin")]
-		public IActionResult GetUsers()
-		{
-			var users = userManager.Users.ToList();
-			return Ok(users);
-		}
 		[HttpDelete]
 		[Authorize(Roles = "SuperAdmin,Admin")]
 		public async Task<IActionResult> DeleteUser(string Name)
@@ -182,6 +175,116 @@ namespace SoitMed.Controllers
 		[Authorize(Roles = "SuperAdmin,Admin,Doctor")]
 		public async Task<IActionResult> GetAllUsersData([FromQuery] UserFilterDTO filter)
 		{
+			// If role filter is specified, use the role-specific approach
+			if (!string.IsNullOrEmpty(filter.Role))
+			{
+				// Validate role
+				if (!UserRoles.IsValidRole(filter.Role))
+				{
+					return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
+				}
+
+				// Get all users with the specified role
+				var usersInRole = await userManager.GetUsersInRoleAsync(filter.Role);
+				var allUsersData = new List<UserDataDTO>();
+
+				foreach (var user in usersInRole)
+				{
+					var userWithDepartment = await context.Users
+						.Include(u => u.Department)
+						.FirstOrDefaultAsync(u => u.Id == user.Id);
+
+					if (userWithDepartment != null)
+					{
+						var roles = await userManager.GetRolesAsync(userWithDepartment);
+
+						// Apply other filters
+						if (!string.IsNullOrEmpty(filter.SearchTerm))
+						{
+							var searchTerm = filter.SearchTerm.ToLower();
+							if (!((userWithDepartment.FirstName != null && userWithDepartment.FirstName.ToLower().Contains(searchTerm)) ||
+								(userWithDepartment.LastName != null && userWithDepartment.LastName.ToLower().Contains(searchTerm)) ||
+								(userWithDepartment.Email != null && userWithDepartment.Email.ToLower().Contains(searchTerm)) ||
+								(userWithDepartment.UserName != null && userWithDepartment.UserName.ToLower().Contains(searchTerm))))
+							{
+								continue;
+							}
+						}
+
+						if (filter.DepartmentId.HasValue && userWithDepartment.DepartmentId != filter.DepartmentId.Value)
+						{
+							continue;
+						}
+
+						if (filter.IsActive.HasValue && userWithDepartment.IsActive != filter.IsActive.Value)
+						{
+							continue;
+						}
+
+						if (filter.CreatedFrom.HasValue && userWithDepartment.CreatedAt < filter.CreatedFrom.Value)
+						{
+							continue;
+						}
+
+						if (filter.CreatedTo.HasValue && userWithDepartment.CreatedAt > filter.CreatedTo.Value)
+						{
+							continue;
+						}
+
+						allUsersData.Add(new UserDataDTO
+						{
+							Id = userWithDepartment.Id,
+							UserName = userWithDepartment.UserName ?? "",
+							Email = userWithDepartment.Email ?? "",
+							FirstName = userWithDepartment.FirstName,
+							LastName = userWithDepartment.LastName,
+							FullName = userWithDepartment.FullName,
+							IsActive = userWithDepartment.IsActive,
+							CreatedAt = userWithDepartment.CreatedAt,
+							LastLoginAt = userWithDepartment.LastLoginAt,
+							Roles = roles.ToList(),
+							DepartmentId = userWithDepartment.DepartmentId,
+							DepartmentName = userWithDepartment.Department?.Name,
+							DepartmentDescription = userWithDepartment.Department?.Description
+						});
+					}
+				}
+
+				// Apply sorting
+				allUsersData = filter.SortBy?.ToLower() switch
+				{
+					"firstname" => filter.SortOrder?.ToLower() == "asc" ? allUsersData.OrderBy(u => u.FirstName).ToList() : allUsersData.OrderByDescending(u => u.FirstName).ToList(),
+					"lastname" => filter.SortOrder?.ToLower() == "asc" ? allUsersData.OrderBy(u => u.LastName).ToList() : allUsersData.OrderByDescending(u => u.LastName).ToList(),
+					"email" => filter.SortOrder?.ToLower() == "asc" ? allUsersData.OrderBy(u => u.Email).ToList() : allUsersData.OrderByDescending(u => u.Email).ToList(),
+					"isactive" => filter.SortOrder?.ToLower() == "asc" ? allUsersData.OrderBy(u => u.IsActive).ToList() : allUsersData.OrderByDescending(u => u.IsActive).ToList(),
+					"createdat" or _ => filter.SortOrder?.ToLower() == "asc" ? allUsersData.OrderBy(u => u.CreatedAt).ToList() : allUsersData.OrderByDescending(u => u.CreatedAt).ToList()
+				};
+
+				// Apply pagination
+				var roleFilteredTotalCount = allUsersData.Count;
+				var roleFilteredUsersData = allUsersData
+					.Skip((filter.PageNumber - 1) * filter.PageSize)
+					.Take(filter.PageSize)
+					.ToList();
+
+				var roleFilteredTotalPages = (int)Math.Ceiling((double)roleFilteredTotalCount / filter.PageSize);
+
+				var roleFilteredResponse = new PaginatedUserResponseDTO
+				{
+					Users = roleFilteredUsersData,
+					TotalCount = roleFilteredTotalCount,
+					PageNumber = filter.PageNumber,
+					PageSize = filter.PageSize,
+					TotalPages = roleFilteredTotalPages,
+					HasPreviousPage = filter.PageNumber > 1,
+					HasNextPage = filter.PageNumber < roleFilteredTotalPages,
+					AppliedFilters = filter
+				};
+
+				return Ok(roleFilteredResponse);
+			}
+
+			// Original logic for when no role filter is specified
 			var query = context.Users
 				.Include(u => u.Department)
 				.AsQueryable();
@@ -243,12 +346,6 @@ namespace SoitMed.Controllers
 			{
 				var roles = await userManager.GetRolesAsync(user);
 
-				// Apply role filter if specified
-				if (!string.IsNullOrEmpty(filter.Role) && !roles.Contains(filter.Role))
-				{
-					continue;
-				}
-
 				usersData.Add(new UserDataDTO
 				{
 					Id = user.Id,
@@ -265,12 +362,6 @@ namespace SoitMed.Controllers
 					DepartmentName = user.Department?.Name,
 					DepartmentDescription = user.Department?.Description
 				});
-			}
-
-			// If role filter was applied, we need to recount
-			if (!string.IsNullOrEmpty(filter.Role))
-			{
-				totalCount = usersData.Count;
 			}
 
 			var totalPages = (int)Math.Ceiling((double)totalCount / filter.PageSize);

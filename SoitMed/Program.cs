@@ -4,7 +4,6 @@ using SoitMed.Models.Core;
 using SoitMed.Models.Location;
 using SoitMed.Models.Hospital;
 using SoitMed.Services;
-using SoitMed.Scripts;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -55,17 +54,6 @@ namespace SoitMed
             builder.Services.AddScoped<UserIdGenerationService>();
             
             
-            // Register SuperAdmin Update Script
-            builder.Services.AddScoped<UpdateSuperAdminScript>();
-            
-            // Register Clean SuperAdmin Script
-            builder.Services.AddScoped<CleanSuperAdminScript>();
-            
-            // Register Clean and Create Test Users Script
-            builder.Services.AddScoped<CleanAndCreateTestUsersScript>();
-            
-            // Register Update Existing User IDs Script
-            builder.Services.AddScoped<UpdateExistingUserIdsScript>();
             
             
 			
