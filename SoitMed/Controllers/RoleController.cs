@@ -53,11 +53,96 @@ namespace SoitMed.Controllers
 			return Ok(roles);
 		}
 
-		[HttpGet("available")]
-		public IActionResult GetAvailableRoles()
+		
+
+		[HttpGet("fields/{role}")]
+		[Authorize(Roles = "SuperAdmin,Admin")]
+		public IActionResult GetRoleSpecificFields(string role)
 		{
-			var availableRoles = UserRoles.GetAllRoles();
-			return Ok(new { roles = availableRoles });
+			if (!UserRoles.IsValidRole(role))
+			{
+				return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
+			}
+
+			var baseFields = new List<object>
+			{
+				new { name = "userName", type = "string", required = true, label = "Username" },
+				new { name = "email", type = "email", required = true, label = "Email Address" },
+				new { name = "password", type = "password", required = true, label = "Password" },
+				new { name = "firstName", type = "string", required = false, label = "First Name" },
+				new { name = "lastName", type = "string", required = false, label = "Last Name" },
+				new { name = "departmentId", type = "number", required = false, label = "Department ID (Optional)" }
+			};
+
+			var roleSpecificFields = new List<object>();
+			var requiredData = new List<object>();
+
+			switch (role.ToLower())
+			{
+				case "doctor":
+					roleSpecificFields.AddRange(new[]
+					{
+						new { name = "specialty", type = "string", required = true, label = "Medical Specialty" },
+						new { name = "hospitalId", type = "string", required = true, label = "Hospital ID" }
+					});
+					requiredData.Add(new { endpoint = "/api/Hospital", description = "Get list of hospitals for hospitalId selection" });
+					break;
+
+				case "engineer":
+					roleSpecificFields.AddRange(new[]
+					{
+						new { name = "specialty", type = "string", required = true, label = "Engineering Specialty", itemType = (string)null },
+						new { name = "governorateIds", type = "array", required = true, label = "Assigned Governorates", itemType = "number" }
+					});
+					requiredData.Add(new { endpoint = "/api/Governorate", description = "Get list of governorates for governorateIds selection" });
+					break;
+
+				case "technician":
+					roleSpecificFields.AddRange(new[]
+					{
+						new { name = "department", type = "string", required = true, label = "Technical Department" },
+						new { name = "hospitalId", type = "string", required = true, label = "Hospital ID" }
+					});
+					requiredData.Add(new { endpoint = "/api/Hospital", description = "Get list of hospitals for hospitalId selection" });
+					break;
+
+				case "admin":
+					roleSpecificFields.Add(new { name = "accessLevel", type = "string", required = false, label = "Access Level (Optional)" });
+					break;
+
+				case "financemanager":
+					roleSpecificFields.Add(new { name = "budgetAuthority", type = "string", required = false, label = "Budget Authority (Optional)" });
+					break;
+
+				case "legalmanager":
+					roleSpecificFields.Add(new { name = "legalSpecialty", type = "string", required = false, label = "Legal Specialty (Optional)" });
+					break;
+
+				case "salesman":
+					roleSpecificFields.AddRange(new[]
+					{
+						new { name = "territory", type = "string", required = false, label = "Sales Territory (Optional)" },
+						new { name = "salesTarget", type = "string", required = false, label = "Sales Target (Optional)" }
+					});
+					break;
+
+				case "financeemployee":
+				case "legalemployee":
+				case "superadmin":
+					// These roles only need base fields
+					break;
+			}
+
+			return Ok(new
+			{
+				role = role,
+				department = UserRoles.GetDepartmentForRole(role),
+				baseFields = baseFields,
+				roleSpecificFields = roleSpecificFields,
+				requiredData = requiredData,
+				createEndpoint = $"/api/RoleSpecificUser/{role.ToLower()}",
+				message = $"Fields required to create a {role} user"
+			});
 		}
 
 		// New dedicated role management endpoints for business roles
