@@ -28,6 +28,9 @@ namespace SoitMed.Models
         public DbSet<Equipment.Equipment> Equipment { get; set; }
         public DbSet<RepairRequest> RepairRequests { get; set; }
 
+        // User image entities
+        public DbSet<UserImage> UserImages { get; set; }
+
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -159,6 +162,19 @@ namespace SoitMed.Models
             modelBuilder.Entity<RepairRequest>()
                 .ToTable(t => t.HasCheckConstraint("CK_RepairRequest_Requestor", 
                     "(DoctorId IS NOT NULL AND TechnicianId IS NULL) OR (DoctorId IS NULL AND TechnicianId IS NOT NULL)"));
+
+            // Configure UserImage relationships
+            modelBuilder.Entity<UserImage>()
+                .HasOne(ui => ui.User)
+                .WithMany(u => u.UserImages)
+                .HasForeignKey(ui => ui.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure unique constraint for profile image per user
+            modelBuilder.Entity<UserImage>()
+                .HasIndex(ui => new { ui.UserId, ui.IsProfileImage })
+                .HasFilter("[IsProfileImage] = 1")
+                .IsUnique();
         }
     }
 }

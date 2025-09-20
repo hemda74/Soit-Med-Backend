@@ -19,6 +19,10 @@ namespace SoitMed.DTO
         public int? DepartmentId { get; set; }
         public string? DepartmentName { get; set; }
         public string? DepartmentDescription { get; set; }
+        
+        // Profile image information
+        public UserImageDTO? ProfileImage { get; set; }
+        public List<UserImageDTO> UserImages { get; set; } = new List<UserImageDTO>();
     }
 
     public class CurrentUserDataDTO
@@ -43,6 +47,10 @@ namespace SoitMed.DTO
         public bool EmailConfirmed { get; set; }
         public bool PhoneNumberConfirmed { get; set; }
         public string? PhoneNumber { get; set; }
+        
+        // Profile image information
+        public UserImageDTO? ProfileImage { get; set; }
+        public List<UserImageDTO> UserImages { get; set; } = new List<UserImageDTO>();
     }
 }
 

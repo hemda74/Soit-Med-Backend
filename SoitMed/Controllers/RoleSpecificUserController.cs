@@ -19,18 +19,20 @@ namespace SoitMed.Controllers
         private readonly UserManager<ApplicationUser> userManager;
         private readonly Context context;
         private readonly UserIdGenerationService userIdGenerationService;
+        private readonly IWebHostEnvironment _environment;
 
-        public RoleSpecificUserController(UserManager<ApplicationUser> _userManager, Context _context, UserIdGenerationService _userIdGenerationService)
+        public RoleSpecificUserController(UserManager<ApplicationUser> _userManager, Context _context, UserIdGenerationService _userIdGenerationService, IWebHostEnvironment environment)
         {
             userManager = _userManager;
             context = _context;
             userIdGenerationService = _userIdGenerationService;
+            _environment = environment;
         }
 
         // Create Doctor with User Account
         [HttpPost("doctor")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateDoctor(CreateDoctorDTO doctorDTO)
+        public async Task<IActionResult> CreateDoctor([FromForm] CreateDoctorDTO doctorDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -106,6 +108,14 @@ namespace SoitMed.Controllers
             };
 
             context.Doctors.Add(doctor);
+
+            // Handle profile image upload if provided
+            UserImageDTO? profileImageDto = null;
+            if (doctorDTO.ProfileImage != null && doctorDTO.ProfileImage.Length > 0)
+            {
+                profileImageDto = await UploadProfileImage(user, doctorDTO.ProfileImage, doctorDTO.ImageAltText);
+            }
+
             await context.SaveChangesAsync();
 
             return Ok(new CreatedDoctorResponseDTO
@@ -118,14 +128,15 @@ namespace SoitMed.Controllers
                 DoctorId = doctor.DoctorId,
                 Specialty = doctor.Specialty,
                 HospitalName = hospital.Name,
-                Message = $"Doctor '{doctor.Name}' created successfully and assigned to hospital '{hospital.Name}'"
+                ProfileImage = profileImageDto,
+                Message = $"Doctor '{doctor.Name}' created successfully and assigned to hospital '{hospital.Name}'" + (profileImageDto != null ? " with profile image" : "")
             });
         }
 
         // Create Engineer with User Account
         [HttpPost("engineer")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateEngineer(CreateEngineerDTO engineerDTO)
+        public async Task<IActionResult> CreateEngineer([FromForm] CreateEngineerDTO engineerDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -204,6 +215,14 @@ namespace SoitMed.Controllers
             };
 
             context.Engineers.Add(engineer);
+
+            // Handle profile image upload if provided
+            UserImageDTO? profileImageDto = null;
+            if (engineerDTO.ProfileImage != null && engineerDTO.ProfileImage.Length > 0)
+            {
+                profileImageDto = await UploadProfileImage(user, engineerDTO.ProfileImage, engineerDTO.ImageAltText);
+            }
+
             await context.SaveChangesAsync();
 
             // Assign governorates to engineer
@@ -230,14 +249,15 @@ namespace SoitMed.Controllers
                 EngineerId = engineer.EngineerId,
                 Specialty = engineer.Specialty,
                 AssignedGovernorates = governorates.Select(g => g.Name).ToList(),
-                Message = $"Engineer '{engineer.Name}' created successfully and assigned to {governorates.Count} governorate(s)"
+                ProfileImage = profileImageDto,
+                Message = $"Engineer '{engineer.Name}' created successfully and assigned to {governorates.Count} governorate(s)" + (profileImageDto != null ? " with profile image" : "")
             });
         }
 
         // Create Technician with User Account
         [HttpPost("technician")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateTechnician(CreateTechnicianDTO technicianDTO)
+        public async Task<IActionResult> CreateTechnician([FromForm] CreateTechnicianDTO technicianDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -313,6 +333,14 @@ namespace SoitMed.Controllers
             };
 
             context.Technicians.Add(technician);
+
+            // Handle profile image upload if provided
+            UserImageDTO? profileImageDto = null;
+            if (technicianDTO.ProfileImage != null && technicianDTO.ProfileImage.Length > 0)
+            {
+                profileImageDto = await UploadProfileImage(user, technicianDTO.ProfileImage, technicianDTO.ImageAltText);
+            }
+
             await context.SaveChangesAsync();
 
             return Ok(new CreatedTechnicianResponseDTO
@@ -325,14 +353,15 @@ namespace SoitMed.Controllers
                 TechnicianId = technician.TechnicianId,
                 Department = technician.Department,
                 HospitalName = hospital.Name,
-                Message = $"Technician '{technician.Name}' created successfully and assigned to hospital '{hospital.Name}'"
+                ProfileImage = profileImageDto,
+                Message = $"Technician '{technician.Name}' created successfully and assigned to hospital '{hospital.Name}'" + (profileImageDto != null ? " with profile image" : "")
             });
         }
 
         // Create Admin with User Account
         [HttpPost("admin")]
         [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> CreateAdmin(CreateAdminDTO adminDTO)
+        public async Task<IActionResult> CreateAdmin([FromForm] CreateAdminDTO adminDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -385,6 +414,15 @@ namespace SoitMed.Controllers
             // Assign Admin role
             await userManager.AddToRoleAsync(user, UserRoles.Admin);
 
+            // Handle profile image upload if provided
+            UserImageDTO? profileImageDto = null;
+            if (adminDTO.ProfileImage != null && adminDTO.ProfileImage.Length > 0)
+            {
+                profileImageDto = await UploadProfileImage(user, adminDTO.ProfileImage, adminDTO.ImageAltText);
+            }
+
+            await context.SaveChangesAsync();
+
             return Ok(new CreatedUserResponseDTO
             {
                 UserId = user.Id,
@@ -392,14 +430,15 @@ namespace SoitMed.Controllers
                 Role = UserRoles.Admin,
                 DepartmentName = adminDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                Message = $"Admin '{user.UserName}' created successfully"
+                ProfileImage = profileImageDto,
+                Message = $"Admin '{user.UserName}' created successfully" + (profileImageDto != null ? " with profile image" : "")
             });
         }
 
         // Create Finance Manager with User Account
         [HttpPost("finance-manager")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateFinanceManager(CreateFinanceManagerDTO financeDTO)
+        public async Task<IActionResult> CreateFinanceManager([FromForm] CreateFinanceManagerDTO financeDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -452,6 +491,15 @@ namespace SoitMed.Controllers
             // Assign FinanceManager role
             await userManager.AddToRoleAsync(user, UserRoles.FinanceManager);
 
+            // Handle profile image upload if provided
+            UserImageDTO? profileImageDto = null;
+            if (financeDTO.ProfileImage != null && financeDTO.ProfileImage.Length > 0)
+            {
+                profileImageDto = await UploadProfileImage(user, financeDTO.ProfileImage, financeDTO.ImageAltText);
+            }
+
+            await context.SaveChangesAsync();
+
             return Ok(new CreatedUserResponseDTO
             {
                 UserId = user.Id,
@@ -459,14 +507,15 @@ namespace SoitMed.Controllers
                 Role = UserRoles.FinanceManager,
                 DepartmentName = financeDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                Message = $"Finance Manager '{user.UserName}' created successfully"
+                ProfileImage = profileImageDto,
+                Message = $"Finance Manager '{user.UserName}' created successfully" + (profileImageDto != null ? " with profile image" : "")
             });
         }
 
         // Create Legal Manager with User Account
         [HttpPost("legal-manager")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateLegalManager(CreateLegalManagerDTO legalDTO)
+        public async Task<IActionResult> CreateLegalManager([FromForm] CreateLegalManagerDTO legalDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -519,6 +568,15 @@ namespace SoitMed.Controllers
             // Assign LegalManager role
             await userManager.AddToRoleAsync(user, UserRoles.LegalManager);
 
+            // Handle profile image upload if provided
+            UserImageDTO? profileImageDto = null;
+            if (legalDTO.ProfileImage != null && legalDTO.ProfileImage.Length > 0)
+            {
+                profileImageDto = await UploadProfileImage(user, legalDTO.ProfileImage, legalDTO.ImageAltText);
+            }
+
+            await context.SaveChangesAsync();
+
             return Ok(new CreatedUserResponseDTO
             {
                 UserId = user.Id,
@@ -526,14 +584,15 @@ namespace SoitMed.Controllers
                 Role = UserRoles.LegalManager,
                 DepartmentName = legalDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                Message = $"Legal Manager '{user.UserName}' created successfully"
+                ProfileImage = profileImageDto,
+                Message = $"Legal Manager '{user.UserName}' created successfully" + (profileImageDto != null ? " with profile image" : "")
             });
         }
 
         // Create Salesman with User Account
         [HttpPost("salesman")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateSalesman(CreateSalesmanDTO salesDTO)
+        public async Task<IActionResult> CreateSalesman([FromForm] CreateSalesmanDTO salesDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -586,6 +645,15 @@ namespace SoitMed.Controllers
             // Assign Salesman role
             await userManager.AddToRoleAsync(user, UserRoles.Salesman);
 
+            // Handle profile image upload if provided
+            UserImageDTO? profileImageDto = null;
+            if (salesDTO.ProfileImage != null && salesDTO.ProfileImage.Length > 0)
+            {
+                profileImageDto = await UploadProfileImage(user, salesDTO.ProfileImage, salesDTO.ImageAltText);
+            }
+
+            await context.SaveChangesAsync();
+
             return Ok(new CreatedUserResponseDTO
             {
                 UserId = user.Id,
@@ -593,8 +661,229 @@ namespace SoitMed.Controllers
                 Role = UserRoles.Salesman,
                 DepartmentName = salesDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                Message = $"Salesman '{user.UserName}' created successfully"
+                ProfileImage = profileImageDto,
+                Message = $"Salesman '{user.UserName}' created successfully" + (profileImageDto != null ? " with profile image" : "")
             });
+        }
+
+        // Create Finance Employee with User Account
+        [HttpPost("finance-employee")]
+        [Authorize(Roles = "SuperAdmin,Admin,FinanceManager")]
+        public async Task<IActionResult> CreateFinanceEmployee([FromForm] CreateFinanceEmployeeDTO financeEmployeeDTO)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+            }
+
+            // Get Finance department
+            var financeDepartment = await context.Departments.FirstOrDefaultAsync(d => d.Name == "Finance");
+            if (financeDepartment == null)
+            {
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Finance department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
+            }
+
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                financeEmployeeDTO.FirstName ?? "Unknown",
+                financeEmployeeDTO.LastName ?? "User",
+                UserRoles.FinanceEmployee,
+                financeEmployeeDTO.DepartmentId ?? financeDepartment.Id
+            );
+
+            // Create user account
+            var user = new ApplicationUser
+            {
+                Id = customUserId, // Use custom generated ID
+                UserName = financeEmployeeDTO.Email, // Use email as username
+                Email = financeEmployeeDTO.Email,
+                FirstName = financeEmployeeDTO.FirstName,
+                LastName = financeEmployeeDTO.LastName,
+                DepartmentId = financeEmployeeDTO.DepartmentId ?? financeDepartment.Id,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            var result = await userManager.CreateAsync(user, financeEmployeeDTO.Password);
+            if (!result.Succeeded)
+            {
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
+            }
+
+            // Assign FinanceEmployee role
+            await userManager.AddToRoleAsync(user, UserRoles.FinanceEmployee);
+
+            // Handle profile image upload if provided
+            UserImageDTO? profileImageDto = null;
+            if (financeEmployeeDTO.ProfileImage != null && financeEmployeeDTO.ProfileImage.Length > 0)
+            {
+                profileImageDto = await UploadProfileImage(user, financeEmployeeDTO.ProfileImage, financeEmployeeDTO.ImageAltText);
+            }
+
+            await context.SaveChangesAsync();
+
+            return Ok(new CreatedUserResponseDTO
+            {
+                UserId = user.Id,
+                Email = user.Email, // Email is now the username
+                Role = UserRoles.FinanceEmployee,
+                DepartmentName = financeDepartment.Name,
+                CreatedAt = user.CreatedAt,
+                ProfileImage = profileImageDto,
+                Message = $"Finance Employee '{user.UserName}' created successfully" + (profileImageDto != null ? " with profile image" : "")
+            });
+        }
+
+        // Create Legal Employee with User Account
+        [HttpPost("legal-employee")]
+        [Authorize(Roles = "SuperAdmin,Admin,LegalManager")]
+        public async Task<IActionResult> CreateLegalEmployee([FromForm] CreateLegalEmployeeDTO legalEmployeeDTO)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+            }
+
+            // Get Legal department
+            var legalDepartment = await context.Departments.FirstOrDefaultAsync(d => d.Name == "Legal");
+            if (legalDepartment == null)
+            {
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Legal department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
+            }
+
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                legalEmployeeDTO.FirstName ?? "Unknown",
+                legalEmployeeDTO.LastName ?? "User",
+                UserRoles.LegalEmployee,
+                legalEmployeeDTO.DepartmentId ?? legalDepartment.Id
+            );
+
+            // Create user account
+            var user = new ApplicationUser
+            {
+                Id = customUserId, // Use custom generated ID
+                UserName = legalEmployeeDTO.Email, // Use email as username
+                Email = legalEmployeeDTO.Email,
+                FirstName = legalEmployeeDTO.FirstName,
+                LastName = legalEmployeeDTO.LastName,
+                DepartmentId = legalEmployeeDTO.DepartmentId ?? legalDepartment.Id,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            var result = await userManager.CreateAsync(user, legalEmployeeDTO.Password);
+            if (!result.Succeeded)
+            {
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
+            }
+
+            // Assign LegalEmployee role
+            await userManager.AddToRoleAsync(user, UserRoles.LegalEmployee);
+
+            // Handle profile image upload if provided
+            UserImageDTO? profileImageDto = null;
+            if (legalEmployeeDTO.ProfileImage != null && legalEmployeeDTO.ProfileImage.Length > 0)
+            {
+                profileImageDto = await UploadProfileImage(user, legalEmployeeDTO.ProfileImage, legalEmployeeDTO.ImageAltText);
+            }
+
+            await context.SaveChangesAsync();
+
+            return Ok(new CreatedUserResponseDTO
+            {
+                UserId = user.Id,
+                Email = user.Email, // Email is now the username
+                Role = UserRoles.LegalEmployee,
+                DepartmentName = legalDepartment.Name,
+                CreatedAt = user.CreatedAt,
+                ProfileImage = profileImageDto,
+                Message = $"Legal Employee '{user.UserName}' created successfully" + (profileImageDto != null ? " with profile image" : "")
+            });
+        }
+
+        private async Task<UserImageDTO?> UploadProfileImage(ApplicationUser user, IFormFile imageFile, string? altText)
+        {
+            try
+            {
+                // Validate file type
+                var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp" };
+                if (!allowedTypes.Contains(imageFile.ContentType.ToLower()))
+                {
+                    return null; // Skip invalid files silently
+                }
+
+                // Validate file size (max 10MB)
+                if (imageFile.Length > 10 * 1024 * 1024)
+                {
+                    return null; // Skip oversized files silently
+                }
+
+                // Create uploads directory
+                var uploadsPath = Path.Combine(_environment.WebRootPath, "uploads", "user-images", user.Id);
+                Directory.CreateDirectory(uploadsPath);
+
+                // Generate unique filename
+                var fileExtension = Path.GetExtension(imageFile.FileName);
+                var fileName = $"{Guid.NewGuid()}{fileExtension}";
+                var filePath = Path.Combine(uploadsPath, fileName);
+
+                // Save file
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await imageFile.CopyToAsync(stream);
+                }
+
+                // Create database record
+                var userImage = new UserImage
+                {
+                    UserId = user.Id,
+                    FileName = imageFile.FileName,
+                    FilePath = Path.Combine("uploads", "user-images", user.Id, fileName).Replace("\\", "/"),
+                    ContentType = imageFile.ContentType,
+                    FileSize = imageFile.Length,
+                    AltText = altText ?? $"{user.FullName} profile picture",
+                    IsProfileImage = true,
+                    UploadedAt = DateTime.UtcNow,
+                    IsActive = true
+                };
+
+                context.UserImages.Add(userImage);
+
+                return new UserImageDTO
+                {
+                    Id = userImage.Id,
+                    UserId = userImage.UserId,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    UploadedAt = userImage.UploadedAt,
+                    IsActive = userImage.IsActive,
+                    IsProfileImage = userImage.IsProfileImage
+                };
+            }
+            catch
+            {
+                return null; // Return null if image upload fails
+            }
         }
     }
 }

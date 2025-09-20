@@ -25,6 +25,31 @@ namespace SoitMed.Controllers
 			context = _context;
 			userIdGenerationService = _userIdGenerationService;
 		}
+
+		// Helper method to get user images
+		private async Task<(UserImageDTO? profileImage, List<UserImageDTO> allImages)> GetUserImagesAsync(string userId)
+		{
+			var images = await context.UserImages
+				.Where(ui => ui.UserId == userId && ui.IsActive)
+				.OrderByDescending(ui => ui.UploadedAt)
+				.Select(ui => new UserImageDTO
+				{
+					Id = ui.Id,
+					UserId = ui.UserId,
+					FileName = ui.FileName,
+					FilePath = ui.FilePath,
+					ContentType = ui.ContentType,
+					FileSize = ui.FileSize,
+					AltText = ui.AltText,
+					UploadedAt = ui.UploadedAt,
+					IsActive = ui.IsActive,
+					IsProfileImage = ui.IsProfileImage
+				})
+				.ToListAsync();
+
+			var profileImage = images.FirstOrDefault(img => img.IsProfileImage);
+			return (profileImage, images);
+		}
 		[HttpDelete]
 		[Authorize(Roles = "SuperAdmin,Admin")]
 		public async Task<IActionResult> DeleteUser(string Name)
@@ -109,6 +134,7 @@ namespace SoitMed.Controllers
 			}
 
 			var roles = await userManager.GetRolesAsync(user);
+			var (profileImage, allImages) = await GetUserImagesAsync(user.Id);
 
 			var userData = new CurrentUserDataDTO
 			{
@@ -127,7 +153,9 @@ namespace SoitMed.Controllers
 				DepartmentDescription = user.Department?.Description,
 				EmailConfirmed = user.EmailConfirmed,
 				PhoneNumberConfirmed = user.PhoneNumberConfirmed,
-				PhoneNumber = user.PhoneNumber
+				PhoneNumber = user.PhoneNumber,
+				ProfileImage = profileImage,
+				UserImages = allImages
 			};
 
 			return Ok(userData);
@@ -149,6 +177,7 @@ namespace SoitMed.Controllers
 			}
 
 			var roles = await userManager.GetRolesAsync(user);
+			var (profileImage, allImages) = await GetUserImagesAsync(user.Id);
 
 			var userData = new UserDataDTO
 			{
@@ -164,7 +193,9 @@ namespace SoitMed.Controllers
 				Roles = roles.ToList(),
 				DepartmentId = user.DepartmentId,
 				DepartmentName = user.Department?.Name,
-				DepartmentDescription = user.Department?.Description
+				DepartmentDescription = user.Department?.Description,
+				ProfileImage = profileImage,
+				UserImages = allImages
 			};
 
 			return Ok(userData);
@@ -231,6 +262,8 @@ namespace SoitMed.Controllers
 							continue;
 						}
 
+						var (profileImage, allImages) = await GetUserImagesAsync(userWithDepartment.Id);
+
 						allUsersData.Add(new UserDataDTO
 						{
 							Id = userWithDepartment.Id,
@@ -245,7 +278,9 @@ namespace SoitMed.Controllers
 							Roles = roles.ToList(),
 							DepartmentId = userWithDepartment.DepartmentId,
 							DepartmentName = userWithDepartment.Department?.Name,
-							DepartmentDescription = userWithDepartment.Department?.Description
+							DepartmentDescription = userWithDepartment.Department?.Description,
+							ProfileImage = profileImage,
+							UserImages = allImages
 						});
 					}
 				}
@@ -345,6 +380,7 @@ namespace SoitMed.Controllers
 			foreach (var user in users)
 			{
 				var roles = await userManager.GetRolesAsync(user);
+				var (profileImage, allImages) = await GetUserImagesAsync(user.Id);
 
 				usersData.Add(new UserDataDTO
 				{
@@ -360,7 +396,9 @@ namespace SoitMed.Controllers
 					Roles = roles.ToList(),
 					DepartmentId = user.DepartmentId,
 					DepartmentName = user.Department?.Name,
-					DepartmentDescription = user.Department?.Description
+					DepartmentDescription = user.Department?.Description,
+					ProfileImage = profileImage,
+					UserImages = allImages
 				});
 			}
 
@@ -404,6 +442,7 @@ namespace SoitMed.Controllers
 				if (userWithDepartment != null)
 				{
 					var roles = await userManager.GetRolesAsync(userWithDepartment);
+					var (profileImage, allImages) = await GetUserImagesAsync(userWithDepartment.Id);
 
 					usersData.Add(new UserDataDTO
 					{
@@ -419,7 +458,9 @@ namespace SoitMed.Controllers
 						Roles = roles.ToList(),
 						DepartmentId = userWithDepartment.DepartmentId,
 						DepartmentName = userWithDepartment.Department?.Name,
-						DepartmentDescription = userWithDepartment.Department?.Description
+						DepartmentDescription = userWithDepartment.Department?.Description,
+						ProfileImage = profileImage,
+						UserImages = allImages
 					});
 				}
 			}
@@ -448,6 +489,7 @@ namespace SoitMed.Controllers
 			foreach (var user in users)
 			{
 				var roles = await userManager.GetRolesAsync(user);
+				var (profileImage, allImages) = await GetUserImagesAsync(user.Id);
 
 				usersData.Add(new UserDataDTO
 				{
@@ -463,7 +505,9 @@ namespace SoitMed.Controllers
 					Roles = roles.ToList(),
 					DepartmentId = user.DepartmentId,
 					DepartmentName = user.Department?.Name,
-					DepartmentDescription = user.Department?.Description
+					DepartmentDescription = user.Department?.Description,
+					ProfileImage = profileImage,
+					UserImages = allImages
 				});
 			}
 

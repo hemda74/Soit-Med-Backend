@@ -574,6 +574,58 @@ namespace SoitMed.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Identity.UserImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AltText")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsProfileImage")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IsProfileImage")
+                        .IsUnique()
+                        .HasFilter("[IsProfileImage] = 1");
+
+                    b.ToTable("UserImages");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Location.Engineer", b =>
                 {
                     b.Property<int>("EngineerId")
@@ -805,6 +857,17 @@ namespace SoitMed.Migrations
                     b.Navigation("Department");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Identity.UserImage", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "User")
+                        .WithMany("UserImages")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Location.Engineer", b =>
                 {
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "User")
@@ -861,6 +924,11 @@ namespace SoitMed.Migrations
             modelBuilder.Entity("SoitMed.Models.Hospital.Technician", b =>
                 {
                     b.Navigation("RepairRequests");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Identity.ApplicationUser", b =>
+                {
+                    b.Navigation("UserImages");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Location.Engineer", b =>
