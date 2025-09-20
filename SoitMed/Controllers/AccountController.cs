@@ -23,82 +23,13 @@ namespace SoitMed.Controllers
 		private readonly IConfiguration config;
 		private readonly Context context;
 		private readonly UserIdGenerationService userIdGenerationService;
+		
 		public AccountController(UserManager<ApplicationUser> _userManager, IConfiguration config, Context _context, UserIdGenerationService _userIdGenerationService)
 		{
 		userManager = _userManager;
 	    this.config = config;
 		context = _context;
 		userIdGenerationService = _userIdGenerationService;
-		}
-		[HttpPost("register")]
-		public async Task< IActionResult> Registe(RegisterUserDTO userDTO)
-		{
-			if(ModelState.IsValid)
-			{
-				// Check if role is provided
-				if (string.IsNullOrEmpty(userDTO.Role))
-				{
-					return BadRequest("Role field is required.");
-				}
-
-				// Validate the role
-				if (!UserRoles.IsValidRole(userDTO.Role))
-				{
-					return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
-				}
-
-				// Auto-assign department based on role if not provided or invalid
-				int? departmentId = userDTO.DepartmentId;
-				if (departmentId == null || departmentId <= 0)
-				{
-					var departmentName = UserRoles.GetDepartmentForRole(userDTO.Role);
-					var department = await context.Departments.FirstOrDefaultAsync(d => d.Name == departmentName);
-					if (department == null)
-					{
-						return BadRequest($"Department '{departmentName}' for role '{userDTO.Role}' not found. Please ensure departments are seeded.");
-					}
-					departmentId = department.Id;
-				}
-				else
-				{
-					// Validate that the provided department exists
-					var departmentExists = await context.Departments.AnyAsync(d => d.Id == departmentId);
-					if (!departmentExists)
-					{
-						return BadRequest($"Department with ID {departmentId} does not exist.");
-					}
-				}
-
-				// Generate custom user ID
-				string customUserId = await userIdGenerationService.GenerateUserIdAsync(
-					userDTO.FirstName ?? "Unknown",
-					userDTO.LastName ?? "User", 
-					userDTO.Role, 
-					departmentId
-				);
-
-				ApplicationUser AppUser = new ApplicationUser()
-				{
-					Id = customUserId,
-					UserName = userDTO.Email, // Use email as username
-					Email = userDTO.Email,
-					PasswordHash = userDTO.Password,
-					FirstName = userDTO.FirstName,
-					LastName = userDTO.LastName,
-					DepartmentId = departmentId,
-					CreatedAt = DateTime.UtcNow,
-					IsActive = true
-				};
-			 IdentityResult Result=	await userManager.CreateAsync(AppUser,userDTO.Password);
-				if (Result.Succeeded)
-				{
-					// Assign the specified role instead of hardcoded "Admin"
-					await userManager.AddToRoleAsync(AppUser, userDTO.Role);
-					return Ok($"Account Created with role: {userDTO.Role}");
-				}
-				return BadRequest(Result.Errors);
-			}
-			return BadRequest(ModelState);
 		}
 
 		[HttpPost("login")]
@@ -327,6 +258,7 @@ namespace SoitMed.Controllers
 				});
 			}
 		}
+
 
 	}
 }

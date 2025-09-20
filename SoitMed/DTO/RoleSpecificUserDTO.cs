@@ -23,6 +23,10 @@ namespace SoitMed.DTO
 
         [Range(1, int.MaxValue, ErrorMessage = "Department ID must be a positive number")]
         public int? DepartmentId { get; set; }
+
+        // Image fields
+        public IFormFile? ProfileImage { get; set; }
+        public string? ImageAltText { get; set; }
     }
 
     // Doctor-specific creation DTO
@@ -89,6 +93,23 @@ namespace SoitMed.DTO
         // SalesTarget removed as requested
     }
 
+    // Finance Employee creation DTO
+    public class CreateFinanceEmployeeDTO : BaseUserCreationDTO
+    {
+        [MaxLength(100, ErrorMessage = "Job title cannot exceed 100 characters")]
+        public string? JobTitle { get; set; } // Optional: Accountant, Financial Analyst, etc.
+    }
+
+    // Legal Employee creation DTO
+    public class CreateLegalEmployeeDTO : BaseUserCreationDTO
+    {
+        [MaxLength(100, ErrorMessage = "Job title cannot exceed 100 characters")]
+        public string? JobTitle { get; set; } // Optional: Legal Assistant, Paralegal, etc.
+        
+        [MaxLength(100, ErrorMessage = "Legal specialty cannot exceed 100 characters")]
+        public string? LegalSpecialty { get; set; } // Optional: contracts, compliance, etc.
+    }
+
     // Response DTOs for created users
     public class CreatedUserResponseDTO
     {
@@ -98,6 +119,7 @@ namespace SoitMed.DTO
         public string? DepartmentName { get; set; }
         public DateTime CreatedAt { get; set; }
         public string Message { get; set; } = string.Empty;
+        public UserImageDTO? ProfileImage { get; set; }
     }
 
     public class CreatedDoctorResponseDTO : CreatedUserResponseDTO
