@@ -1,6 +1,7 @@
 using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Core;
+using SoitMed.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,38 +12,36 @@ namespace SoitMed.Controllers
     [ApiController]
     public class DepartmentController : ControllerBase
     {
-        private readonly Context context;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public DepartmentController(Context _context)
+        public DepartmentController(IUnitOfWork unitOfWork)
         {
-            context = _context;
+            _unitOfWork = unitOfWork;
         }
 
         [HttpGet]
         [Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
         public async Task<IActionResult> GetDepartments()
         {
-            var departments = await context.Departments
-                .Select(d => new DepartmentResponseDTO
-                {
-                    Id = d.Id,
-                    Name = d.Name,
-                    Description = d.Description,
-                    CreatedAt = d.CreatedAt,
-                    UserCount = d.Users.Count()
-                })
-                .ToListAsync();
+            var departments = await _unitOfWork.Departments.GetDepartmentsWithUsersAsync();
+            
+            var response = departments.Select(d => new DepartmentResponseDTO
+            {
+                Id = d.Id,
+                Name = d.Name,
+                Description = d.Description,
+                CreatedAt = d.CreatedAt,
+                UserCount = d.Users.Count()
+            });
 
-            return Ok(departments);
+            return Ok(response);
         }
 
         [HttpGet("{id}")]
         [Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
         public async Task<IActionResult> GetDepartment(int id)
         {
-            var department = await context.Departments
-                .Include(d => d.Users)
-                .FirstOrDefaultAsync(d => d.Id == id);
+            var department = await _unitOfWork.Departments.GetDepartmentWithUsersAsync(id);
 
             if (department == null)
             {
@@ -71,7 +70,7 @@ namespace SoitMed.Controllers
             }
 
             // Check if department already exists
-            if (await context.Departments.AnyAsync(d => d.Name == departmentDTO.Name))
+            if (await _unitOfWork.Departments.ExistsByNameAsync(departmentDTO.Name))
             {
                 return BadRequest($"Department '{departmentDTO.Name}' already exists");
             }
@@ -83,8 +82,8 @@ namespace SoitMed.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
-            context.Departments.Add(department);
-            await context.SaveChangesAsync();
+            await _unitOfWork.Departments.CreateAsync(department);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Department '{department.Name}' created successfully");
         }
@@ -98,14 +97,14 @@ namespace SoitMed.Controllers
                 return BadRequest(ModelState);
             }
 
-            var department = await context.Departments.FindAsync(id);
+            var department = await _unitOfWork.Departments.GetByIdAsync(id);
             if (department == null)
             {
                 return NotFound($"Department with ID {id} not found");
             }
 
             // Check if new name conflicts with existing departments
-            if (await context.Departments.AnyAsync(d => d.Name == departmentDTO.Name && d.Id != id))
+            if (await _unitOfWork.Departments.ExistsByNameExcludingIdAsync(departmentDTO.Name, id))
             {
                 return BadRequest($"Department '{departmentDTO.Name}' already exists");
             }
@@ -113,7 +112,8 @@ namespace SoitMed.Controllers
             department.Name = departmentDTO.Name;
             department.Description = departmentDTO.Description;
 
-            await context.SaveChangesAsync();
+            await _unitOfWork.Departments.UpdateAsync(department);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Department '{department.Name}' updated successfully");
         }
@@ -122,9 +122,7 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> DeleteDepartment(int id)
         {
-            var department = await context.Departments
-                .Include(d => d.Users)
-                .FirstOrDefaultAsync(d => d.Id == id);
+            var department = await _unitOfWork.Departments.GetDepartmentWithUsersAsync(id);
 
             if (department == null)
             {
@@ -136,8 +134,8 @@ namespace SoitMed.Controllers
                 return BadRequest($"Cannot delete department '{department.Name}' because it has {department.Users.Count()} users assigned to it");
             }
 
-            context.Departments.Remove(department);
-            await context.SaveChangesAsync();
+            await _unitOfWork.Departments.DeleteAsync(department);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Department '{department.Name}' deleted successfully");
         }
@@ -153,9 +151,7 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
         public async Task<IActionResult> GetDepartmentUsers(int id)
         {
-            var department = await context.Departments
-                .Include(d => d.Users)
-                .FirstOrDefaultAsync(d => d.Id == id);
+            var department = await _unitOfWork.Departments.GetDepartmentWithUsersAsync(id);
 
             if (department == null)
             {

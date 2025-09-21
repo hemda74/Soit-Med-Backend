@@ -4,6 +4,7 @@ using SoitMed.Models.Equipment;
 using SoitMed.Models.Hospital;
 using SoitMed.Models.Location;
 using SoitMed.Services;
+using SoitMed.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,12 +15,12 @@ namespace SoitMed.Controllers
     [ApiController]
     public class EquipmentController : ControllerBase
     {
-        private readonly Context context;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IQRCodeService _qrCodeService;
 
-        public EquipmentController(Context _context, IQRCodeService qrCodeService)
+        public EquipmentController(IUnitOfWork unitOfWork, IQRCodeService qrCodeService)
         {
-            context = _context;
+            _unitOfWork = unitOfWork;
             _qrCodeService = qrCodeService;
         }
 
@@ -27,42 +28,37 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin,Admin,Doctor,Technician")]
         public async Task<IActionResult> GetEquipment()
         {
-            var equipment = await context.Equipment
-                .Include(e => e.Hospital)
-                .Select(e => new EquipmentResponseDTO
-                {
-                    Id = e.Id,
-                    Name = e.Name,
-                    QRCode = e.QRCode,
-                    QRCodeImageData = e.QRCodeImageData,
-                    QRCodePdfPath = e.QRCodePdfPath,
-                    Description = e.Description,
-                    Model = e.Model,
-                    Manufacturer = e.Manufacturer,
-                    PurchaseDate = e.PurchaseDate,
-                    WarrantyExpiry = e.WarrantyExpiry,
-                    HospitalId = e.HospitalId,
-                    HospitalName = e.Hospital.Name,
-                    RepairVisitCount = e.RepairVisitCount,
-                    Status = e.Status,
-                    CreatedAt = e.CreatedAt,
-                    LastMaintenanceDate = e.LastMaintenanceDate,
-                    IsActive = e.IsActive
-                })
-                .ToListAsync();
+            var equipment = await _unitOfWork.Equipment.GetActiveEquipmentAsync();
+            
+            var response = equipment.Select(e => new EquipmentResponseDTO
+            {
+                Id = e.Id,
+                Name = e.Name,
+                QRCode = e.QRCode,
+                QRCodeImageData = e.QRCodeImageData,
+                QRCodePdfPath = e.QRCodePdfPath,
+                Description = e.Description,
+                Model = e.Model,
+                Manufacturer = e.Manufacturer,
+                PurchaseDate = e.PurchaseDate,
+                WarrantyExpiry = e.WarrantyExpiry,
+                HospitalId = e.HospitalId,
+                HospitalName = e.Hospital?.Name ?? string.Empty,
+                RepairVisitCount = e.RepairVisitCount,
+                Status = e.Status,
+                CreatedAt = e.CreatedAt,
+                LastMaintenanceDate = e.LastMaintenanceDate,
+                IsActive = e.IsActive
+            });
 
-            return Ok(equipment);
+            return Ok(response);
         }
 
         [HttpGet("{id}")]
         [Authorize(Roles = "SuperAdmin,Admin,Doctor,Technician")]
         public async Task<IActionResult> GetEquipment(int id)
         {
-            var equipment = await context.Equipment
-                .Include(e => e.Hospital)
-                .Include(e => e.RepairRequests)
-                .ThenInclude(rr => rr.AssignedEngineer)
-                .FirstOrDefaultAsync(e => e.Id == id);
+            var equipment = await _unitOfWork.Equipment.GetEquipmentWithAllDetailsAsync(id);
 
             if (equipment == null)
             {
@@ -80,7 +76,7 @@ namespace SoitMed.Controllers
                 PurchaseDate = equipment.PurchaseDate,
                 WarrantyExpiry = equipment.WarrantyExpiry,
                 HospitalId = equipment.HospitalId,
-                HospitalName = equipment.Hospital.Name,
+                HospitalName = equipment.Hospital?.Name ?? string.Empty,
                 RepairVisitCount = equipment.RepairVisitCount,
                 Status = equipment.Status,
                 CreatedAt = equipment.CreatedAt,
@@ -95,9 +91,7 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin,Admin,Doctor,Technician")]
         public async Task<IActionResult> GetEquipmentByQR(string qrCode)
         {
-            var equipment = await context.Equipment
-                .Include(e => e.Hospital)
-                .FirstOrDefaultAsync(e => e.QRCode == qrCode);
+            var equipment = await _unitOfWork.Equipment.GetByQRCodeAsync(qrCode);
 
             if (equipment == null)
             {
@@ -115,7 +109,7 @@ namespace SoitMed.Controllers
                 PurchaseDate = equipment.PurchaseDate,
                 WarrantyExpiry = equipment.WarrantyExpiry,
                 HospitalId = equipment.HospitalId,
-                HospitalName = equipment.Hospital.Name,
+                HospitalName = equipment.Hospital?.Name ?? string.Empty,
                 RepairVisitCount = equipment.RepairVisitCount,
                 Status = equipment.Status,
                 CreatedAt = equipment.CreatedAt,
@@ -130,15 +124,15 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin,Admin,Doctor,Technician")]
         public async Task<IActionResult> GetHospitalEquipment(string hospitalId)
         {
-            var hospital = await context.Hospitals.FindAsync(hospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(hospitalId);
             if (hospital == null)
             {
                 return NotFound($"Hospital with ID {hospitalId} not found");
             }
 
-            var equipment = await context.Equipment
-                .Where(e => e.HospitalId == hospitalId && e.IsActive)
-                .Select(e => new EquipmentResponseDTO
+            var equipment = await _unitOfWork.Equipment.GetByHospitalIdAsync(hospitalId);
+            
+            var response = equipment.Where(e => e.IsActive).Select(e => new EquipmentResponseDTO
                 {
                     Id = e.Id,
                     Name = e.Name,
@@ -157,14 +151,13 @@ namespace SoitMed.Controllers
                     CreatedAt = e.CreatedAt,
                     LastMaintenanceDate = e.LastMaintenanceDate,
                     IsActive = e.IsActive
-                })
-                .ToListAsync();
+                });
 
             return Ok(new
             {
                 Hospital = hospital.Name,
-                EquipmentCount = equipment.Count,
-                Equipment = equipment
+                EquipmentCount = response.Count(),
+                Equipment = response
             });
         }
 
@@ -178,7 +171,7 @@ namespace SoitMed.Controllers
             }
 
             // Check if hospital exists
-            var hospital = await context.Hospitals.FindAsync(equipmentDTO.HospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(equipmentDTO.HospitalId);
             if (hospital == null)
             {
                 return NotFound($"Hospital with ID {equipmentDTO.HospitalId} not found");
@@ -186,7 +179,7 @@ namespace SoitMed.Controllers
 
             // Check if custom QR code already exists (if provided)
             if (!string.IsNullOrEmpty(equipmentDTO.QRCode) && 
-                await context.Equipment.AnyAsync(e => e.QRCode == equipmentDTO.QRCode))
+                await _unitOfWork.Equipment.ExistsByQRCodeAsync(equipmentDTO.QRCode))
             {
                 return BadRequest($"Equipment with QR code '{equipmentDTO.QRCode}' already exists");
             }
@@ -218,8 +211,8 @@ namespace SoitMed.Controllers
             equipment.QRCodeImageData = qrResult.QRCodeImageData;
             equipment.QRCodePdfPath = qrResult.QRCodePdfPath;
 
-            context.Equipment.Add(equipment);
-            await context.SaveChangesAsync();
+            await _unitOfWork.Equipment.CreateAsync(equipment);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok(new
             {
@@ -258,20 +251,20 @@ namespace SoitMed.Controllers
                 return BadRequest(ModelState);
             }
 
-            var equipment = await context.Equipment.FindAsync(id);
+            var equipment = await _unitOfWork.Equipment.GetByIdAsync(id);
             if (equipment == null)
             {
                 return NotFound($"Equipment with ID {id} not found");
             }
 
             // Check if new QR code conflicts with existing equipment
-            if (await context.Equipment.AnyAsync(e => e.QRCode == equipmentDTO.QRCode && e.Id != id))
+            if (await _unitOfWork.Equipment.ExistsByQRCodeExcludingIdAsync(equipmentDTO.QRCode, id))
             {
                 return BadRequest($"Equipment with QR code '{equipmentDTO.QRCode}' already exists");
             }
 
             // Check if hospital exists
-            var hospital = await context.Hospitals.FindAsync(equipmentDTO.HospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(equipmentDTO.HospitalId);
             if (hospital == null)
             {
                 return NotFound($"Hospital with ID {equipmentDTO.HospitalId} not found");
@@ -287,7 +280,8 @@ namespace SoitMed.Controllers
             equipment.HospitalId = equipmentDTO.HospitalId;
             equipment.Status = equipmentDTO.Status;
 
-            await context.SaveChangesAsync();
+            await _unitOfWork.Equipment.UpdateAsync(equipment);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Equipment '{equipment.Name}' updated successfully");
         }
@@ -296,9 +290,7 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> DeleteEquipment(int id)
         {
-            var equipment = await context.Equipment
-                .Include(e => e.RepairRequests)
-                .FirstOrDefaultAsync(e => e.Id == id);
+            var equipment = await _unitOfWork.Equipment.GetEquipmentWithRepairRequestsAsync(id);
 
             if (equipment == null)
             {
@@ -312,7 +304,8 @@ namespace SoitMed.Controllers
 
             equipment.IsActive = false;
 
-            await context.SaveChangesAsync();
+            await _unitOfWork.Equipment.UpdateAsync(equipment);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Equipment '{equipment.Name}' deactivated successfully");
         }
@@ -321,14 +314,7 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin,Admin,Doctor,Technician")]
         public async Task<IActionResult> GetEquipmentRepairHistory(int id)
         {
-            var equipment = await context.Equipment
-                .Include(e => e.RepairRequests)
-                .ThenInclude(rr => rr.RequestingDoctor)
-                .Include(e => e.RepairRequests)
-                .ThenInclude(rr => rr.RequestingTechnician)
-                .Include(e => e.RepairRequests)
-                .ThenInclude(rr => rr.AssignedEngineer)
-                .FirstOrDefaultAsync(e => e.Id == id);
+            var equipment = await _unitOfWork.Equipment.GetEquipmentWithAllDetailsAsync(id);
 
             if (equipment == null)
             {
