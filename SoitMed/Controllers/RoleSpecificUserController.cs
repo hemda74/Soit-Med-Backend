@@ -111,7 +111,44 @@ namespace SoitMed.Controllers
             await _unitOfWork.Doctors.CreateAsync(doctor);
             await _unitOfWork.SaveChangesAsync();
 
-            return Ok(new CreatedDoctorResponseDTO
+            // Handle image upload if provided
+            DoctorImageInfo? profileImageInfo = null;
+            if (profileImage != null && profileImage.Length > 0)
+            {
+                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, "doctor", medicalDepartment.Name, doctorDTO.AltText);
+                if (imageResult.Success)
+                {
+                    var userImage = new UserImage
+                    {
+                        UserId = user.Id,
+                        FileName = imageResult.FileName ?? "profile.jpg",
+                        FilePath = imageResult.FilePath ?? "",
+                        ContentType = imageResult.ContentType ?? "image/jpeg",
+                        FileSize = imageResult.FileSize,
+                        AltText = imageResult.AltText,
+                        ImageType = "Profile",
+                        IsProfileImage = true,
+                        UploadedAt = DateTime.UtcNow
+                    };
+
+                    await _unitOfWork.UserImages.CreateAsync(userImage);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    profileImageInfo = new DoctorImageInfo
+                    {
+                        Id = userImage.Id,
+                        FileName = userImage.FileName,
+                        FilePath = userImage.FilePath,
+                        ContentType = userImage.ContentType,
+                        FileSize = userImage.FileSize,
+                        AltText = userImage.AltText,
+                        IsProfileImage = userImage.IsProfileImage,
+                        UploadedAt = userImage.UploadedAt
+                    };
+                }
+            }
+
+            return Ok(new CreatedDoctorWithImageResponseDTO
             {
                 UserId = user.Id,
                 Email = user.Email, // Email is now the username
@@ -121,6 +158,7 @@ namespace SoitMed.Controllers
                 DoctorId = doctor.DoctorId,
                 Specialty = doctor.Specialty,
                 HospitalName = hospital.Name,
+                ProfileImage = profileImageInfo,
                 Message = $"Doctor '{doctor.Name}' created successfully and assigned to hospital '{hospital.Name}'"
             });
         }
