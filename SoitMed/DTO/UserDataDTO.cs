@@ -19,6 +19,9 @@ namespace SoitMed.DTO
         public int? DepartmentId { get; set; }
         public string? DepartmentName { get; set; }
         public string? DepartmentDescription { get; set; }
+        
+        // User image information
+        public UserImageInfoDTO? ProfileImage { get; set; }
     }
 
     public class CurrentUserDataDTO
@@ -38,6 +41,9 @@ namespace SoitMed.DTO
         public int? DepartmentId { get; set; }
         public string? DepartmentName { get; set; }
         public string? DepartmentDescription { get; set; }
+        
+        // User image information
+        public UserImageInfoDTO? ProfileImage { get; set; }
         
         // Additional current user specific data
         public bool EmailConfirmed { get; set; }
