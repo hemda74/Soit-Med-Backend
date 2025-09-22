@@ -67,7 +67,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<bool> DeleteImageAsync(string filePath)
+        public Task<bool> DeleteImageAsync(string filePath)
         {
             try
             {
@@ -75,13 +75,13 @@ namespace SoitMed.Services
                 if (File.Exists(fullPath))
                 {
                     File.Delete(fullPath);
-                    return true;
+                    return Task.FromResult(true);
                 }
-                return false;
+                return Task.FromResult(false);
             }
             catch
             {
-                return false;
+                return Task.FromResult(false);
             }
         }
 

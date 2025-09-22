@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using SoitMed.Models.Identity;
+using System.IO;
 
 namespace SoitMed.Services
 {
@@ -58,7 +59,7 @@ namespace SoitMed.Services
 
                 // Generate unique filename
                 var fileExtension = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
-                var fileName = $"profile{fileExtension}";
+                var fileName = $"{Guid.NewGuid()}{fileExtension}";
                 var filePath = Path.Combine(uploadPath, fileName);
 
                 // Save file
@@ -73,7 +74,7 @@ namespace SoitMed.Services
                 return new ImageUploadResult
                 {
                     Success = true,
-                    FileName = imageFile.FileName,
+                    FileName = fileName,
                     FilePath = relativePath,
                     ContentType = imageFile.ContentType,
                     FileSize = imageFile.Length,
@@ -90,7 +91,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<bool> DeleteUserImageAsync(string filePath)
+        public Task<bool> DeleteUserImageAsync(string filePath)
         {
             try
             {
@@ -98,13 +99,13 @@ namespace SoitMed.Services
                 if (File.Exists(fullPath))
                 {
                     File.Delete(fullPath);
-                    return true;
+                    return Task.FromResult(true);
                 }
-                return false;
+                return Task.FromResult(false);
             }
             catch
             {
-                return false;
+                return Task.FromResult(false);
             }
         }
 

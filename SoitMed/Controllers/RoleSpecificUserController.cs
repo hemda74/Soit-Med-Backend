@@ -22,6 +22,46 @@ namespace SoitMed.Controllers
         private readonly UserIdGenerationService userIdGenerationService;
         private readonly IRoleBasedImageUploadService _imageUploadService;
 
+        // Delegate for creating role-specific image info
+        private delegate object CreateImageInfoDelegate(UserImage userImage);
+
+        /// <summary>
+        /// Generalized method to handle image upload for any role
+        /// </summary>
+        private async Task<object?> HandleImageUploadAsync(
+            IFormFile? profileImage, 
+            ApplicationUser user, 
+            string role, 
+            string departmentName, 
+            string? altText, 
+            CreateImageInfoDelegate createImageInfoDelegate)
+        {
+            if (profileImage == null || profileImage.Length == 0)
+                return null;
+
+            var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, role, departmentName, altText);
+            if (!imageResult.Success)
+                return null;
+
+            var userImage = new UserImage
+            {
+                UserId = user.Id,
+                FileName = imageResult.FileName ?? "profile.jpg",
+                FilePath = imageResult.FilePath ?? "",
+                ContentType = imageResult.ContentType ?? "image/jpeg",
+                FileSize = imageResult.FileSize,
+                AltText = imageResult.AltText,
+                ImageType = "Profile",
+                IsProfileImage = true,
+                UploadedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.UserImages.CreateAsync(userImage);
+            await _unitOfWork.SaveChangesAsync();
+
+            return createImageInfoDelegate(userImage);
+        }
+
         public RoleSpecificUserController(UserManager<ApplicationUser> _userManager, IUnitOfWork unitOfWork, UserIdGenerationService _userIdGenerationService, IRoleBasedImageUploadService imageUploadService)
         {
             userManager = _userManager;
@@ -112,41 +152,23 @@ namespace SoitMed.Controllers
             await _unitOfWork.SaveChangesAsync();
 
             // Handle image upload if provided
-            DoctorImageInfo? profileImageInfo = null;
-            if (profileImage != null && profileImage.Length > 0)
-            {
-                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, "doctor", medicalDepartment.Name, doctorDTO.AltText);
-                if (imageResult.Success)
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "doctor", 
+                medicalDepartment.Name, 
+                doctorDTO.AltText,
+                userImage => new DoctorImageInfo
                 {
-                    var userImage = new UserImage
-                    {
-                        UserId = user.Id,
-                        FileName = imageResult.FileName ?? "profile.jpg",
-                        FilePath = imageResult.FilePath ?? "",
-                        ContentType = imageResult.ContentType ?? "image/jpeg",
-                        FileSize = imageResult.FileSize,
-                        AltText = imageResult.AltText,
-                        ImageType = "Profile",
-                        IsProfileImage = true,
-                        UploadedAt = DateTime.UtcNow
-                    };
-
-                    await _unitOfWork.UserImages.CreateAsync(userImage);
-                    await _unitOfWork.SaveChangesAsync();
-
-                    profileImageInfo = new DoctorImageInfo
-                    {
-                        Id = userImage.Id,
-                        FileName = userImage.FileName,
-                        FilePath = userImage.FilePath,
-                        ContentType = userImage.ContentType,
-                        FileSize = userImage.FileSize,
-                        AltText = userImage.AltText,
-                        IsProfileImage = userImage.IsProfileImage,
-                        UploadedAt = userImage.UploadedAt
-                    };
-                }
-            }
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as DoctorImageInfo;
 
             return Ok(new CreatedDoctorWithImageResponseDTO
             {
@@ -253,16 +275,36 @@ namespace SoitMed.Controllers
             // This would need a proper repository if we want to follow the pattern completely
             // For now, we'll use the context directly for junction tables
 
-            return Ok(new CreatedEngineerResponseDTO
+            // Handle image upload if provided
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "engineer", 
+                engineeringDepartment.Name, 
+                engineerDTO.AltText,
+                userImage => new EngineerImageInfo
+                {
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as EngineerImageInfo;
+
+            return Ok(new CreatedEngineerWithImageResponseDTO
             {
                 UserId = user.Id,
                 Email = user.Email, // Email is now the username
                 Role = UserRoles.Engineer,
                 DepartmentName = engineeringDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                EngineerId = engineer.EngineerId,
+                EngineerId = engineer.EngineerId.ToString(),
                 Specialty = engineer.Specialty,
-                AssignedGovernorates = governorates.Select(g => g.Name).ToList(),
+                GovernorateNames = governorates.Select(g => g.Name).ToList(),
+                ProfileImage = profileImageInfo,
                 Message = $"Engineer '{engineer.Name}' created successfully and assigned to {governorates.Count()} governorate(s)"
             });
         }
@@ -348,7 +390,26 @@ namespace SoitMed.Controllers
             await _unitOfWork.Technicians.CreateAsync(technician);
             await _unitOfWork.SaveChangesAsync();
 
-            return Ok(new CreatedTechnicianResponseDTO
+            // Handle image upload if provided
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "technician", 
+                medicalDepartment.Name, 
+                technicianDTO.AltText,
+                userImage => new TechnicianImageInfo
+                {
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as TechnicianImageInfo;
+
+            return Ok(new CreatedTechnicianWithImageResponseDTO
             {
                 UserId = user.Id,
                 Email = user.Email, // Email is now the username
@@ -358,6 +419,7 @@ namespace SoitMed.Controllers
                 TechnicianId = technician.TechnicianId,
                 Department = technician.Department,
                 HospitalName = hospital.Name,
+                ProfileImage = profileImageInfo,
                 Message = $"Technician '{technician.Name}' created successfully and assigned to hospital '{hospital.Name}'"
             });
         }
@@ -419,42 +481,23 @@ namespace SoitMed.Controllers
             await userManager.AddToRoleAsync(user, UserRoles.Admin);
 
             // Handle image upload if provided
-            AdminImageInfo? profileImageInfo = null;
-            if (profileImage != null && profileImage.Length > 0)
-            {
-                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, "admin", adminDepartment.Name, adminDTO.AltText);
-                if (imageResult.Success)
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "admin", 
+                adminDepartment.Name, 
+                adminDTO.AltText,
+                userImage => new AdminImageInfo
                 {
-                    var userImage = new UserImage
-                    {
-                        UserId = user.Id,
-                        FileName = imageResult.FileName ?? "profile.jpg",
-                        FilePath = imageResult.FilePath ?? "",
-                        ContentType = imageResult.ContentType,
-                        FileSize = imageResult.FileSize,
-                        AltText = imageResult.AltText,
-                        IsProfileImage = true,
-                        ImageType = "profile",
-                        UploadedAt = DateTime.UtcNow,
-                        IsActive = true
-                    };
-
-                    await _unitOfWork.UserImages.CreateAsync(userImage);
-                    await _unitOfWork.SaveChangesAsync();
-
-                    profileImageInfo = new AdminImageInfo
-                    {
-                        Id = userImage.Id,
-                        FileName = userImage.FileName,
-                        FilePath = userImage.FilePath,
-                        ContentType = userImage.ContentType,
-                        FileSize = userImage.FileSize,
-                        AltText = userImage.AltText,
-                        IsProfileImage = userImage.IsProfileImage,
-                        UploadedAt = userImage.UploadedAt
-                    };
-                }
-            }
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as AdminImageInfo;
 
             return Ok(new CreatedAdminWithImageResponseDTO
             {
@@ -525,42 +568,23 @@ namespace SoitMed.Controllers
             await userManager.AddToRoleAsync(user, UserRoles.FinanceManager);
 
             // Handle image upload if provided
-            FinanceManagerImageInfo? profileImageInfo = null;
-            if (profileImage != null && profileImage.Length > 0)
-            {
-                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, "finance-manager", financeDepartment.Name, financeDTO.AltText);
-                if (imageResult.Success)
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "finance-manager", 
+                financeDepartment.Name, 
+                financeDTO.AltText,
+                userImage => new FinanceManagerImageInfo
                 {
-                    var userImage = new UserImage
-                    {
-                        UserId = user.Id,
-                        FileName = imageResult.FileName ?? "profile.jpg",
-                        FilePath = imageResult.FilePath ?? "",
-                        ContentType = imageResult.ContentType,
-                        FileSize = imageResult.FileSize,
-                        AltText = imageResult.AltText,
-                        IsProfileImage = true,
-                        ImageType = "profile",
-                        UploadedAt = DateTime.UtcNow,
-                        IsActive = true
-                    };
-
-                    await _unitOfWork.UserImages.CreateAsync(userImage);
-                    await _unitOfWork.SaveChangesAsync();
-
-                    profileImageInfo = new FinanceManagerImageInfo
-                    {
-                        Id = userImage.Id,
-                        FileName = userImage.FileName,
-                        FilePath = userImage.FilePath,
-                        ContentType = userImage.ContentType,
-                        FileSize = userImage.FileSize,
-                        AltText = userImage.AltText,
-                        IsProfileImage = userImage.IsProfileImage,
-                        UploadedAt = userImage.UploadedAt
-                    };
-                }
-            }
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as FinanceManagerImageInfo;
 
             return Ok(new CreatedFinanceManagerWithImageResponseDTO
             {
@@ -631,42 +655,23 @@ namespace SoitMed.Controllers
             await userManager.AddToRoleAsync(user, UserRoles.LegalManager);
 
             // Handle image upload if provided
-            LegalManagerImageInfo? profileImageInfo = null;
-            if (profileImage != null && profileImage.Length > 0)
-            {
-                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, "legal-manager", legalDepartment.Name, legalDTO.AltText);
-                if (imageResult.Success)
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "legal-manager", 
+                legalDepartment.Name, 
+                legalDTO.AltText,
+                userImage => new LegalManagerImageInfo
                 {
-                    var userImage = new UserImage
-                    {
-                        UserId = user.Id,
-                        FileName = imageResult.FileName ?? "profile.jpg",
-                        FilePath = imageResult.FilePath ?? "",
-                        ContentType = imageResult.ContentType,
-                        FileSize = imageResult.FileSize,
-                        AltText = imageResult.AltText,
-                        IsProfileImage = true,
-                        ImageType = "profile",
-                        UploadedAt = DateTime.UtcNow,
-                        IsActive = true
-                    };
-
-                    await _unitOfWork.UserImages.CreateAsync(userImage);
-                    await _unitOfWork.SaveChangesAsync();
-
-                    profileImageInfo = new LegalManagerImageInfo
-                    {
-                        Id = userImage.Id,
-                        FileName = userImage.FileName,
-                        FilePath = userImage.FilePath,
-                        ContentType = userImage.ContentType,
-                        FileSize = userImage.FileSize,
-                        AltText = userImage.AltText,
-                        IsProfileImage = userImage.IsProfileImage,
-                        UploadedAt = userImage.UploadedAt
-                    };
-                }
-            }
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as LegalManagerImageInfo;
 
             return Ok(new CreatedLegalManagerWithImageResponseDTO
             {
@@ -737,42 +742,23 @@ namespace SoitMed.Controllers
             await userManager.AddToRoleAsync(user, UserRoles.Salesman);
 
             // Handle image upload if provided
-            SalesmanImageInfo? profileImageInfo = null;
-            if (profileImage != null && profileImage.Length > 0)
-            {
-                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, "salesman", salesDepartment.Name, salesDTO.AltText);
-                if (imageResult.Success)
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "salesman", 
+                salesDepartment.Name, 
+                salesDTO.AltText,
+                userImage => new SalesmanImageInfo
                 {
-                    var userImage = new UserImage
-                    {
-                        UserId = user.Id,
-                        FileName = imageResult.FileName ?? "profile.jpg",
-                        FilePath = imageResult.FilePath ?? "",
-                        ContentType = imageResult.ContentType,
-                        FileSize = imageResult.FileSize,
-                        AltText = imageResult.AltText,
-                        IsProfileImage = true,
-                        ImageType = "profile",
-                        UploadedAt = DateTime.UtcNow,
-                        IsActive = true
-                    };
-
-                    await _unitOfWork.UserImages.CreateAsync(userImage);
-                    await _unitOfWork.SaveChangesAsync();
-
-                    profileImageInfo = new SalesmanImageInfo
-                    {
-                        Id = userImage.Id,
-                        FileName = userImage.FileName,
-                        FilePath = userImage.FilePath,
-                        ContentType = userImage.ContentType,
-                        FileSize = userImage.FileSize,
-                        AltText = userImage.AltText,
-                        IsProfileImage = userImage.IsProfileImage,
-                        UploadedAt = userImage.UploadedAt
-                    };
-                }
-            }
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as SalesmanImageInfo;
 
             return Ok(new CreatedSalesmanWithImageResponseDTO
             {
@@ -783,6 +769,98 @@ namespace SoitMed.Controllers
                 CreatedAt = user.CreatedAt,
                 ProfileImage = profileImageInfo,
                 Message = $"Salesman '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
+            });
+        }
+
+        // Create Sales Manager with User Account
+        [HttpPost("sales-manager")]
+        [Authorize(Roles = "SuperAdmin,Admin")]
+        [ProducesResponseType(typeof(CreatedSalesManagerWithImageResponseDTO), 200)]
+        [ProducesResponseType(400)]
+        public async Task<IActionResult> CreateSalesManager([FromForm] CreateSalesManagerWithImageDTO salesManagerDTO, [FromForm] IFormFile? profileImage = null)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+            }
+
+            // Get Sales department
+            var salesDepartment = await _unitOfWork.Departments.GetByNameAsync("Sales");
+            if (salesDepartment == null)
+            {
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Sales department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
+            }
+
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                salesManagerDTO.FirstName ?? "Unknown",
+                salesManagerDTO.LastName ?? "User",
+                UserRoles.SalesManager,
+                salesManagerDTO.DepartmentId ?? salesDepartment.Id,
+                null // Sales Managers don't use hospital ID
+            );
+
+            // Create user account
+            var user = new ApplicationUser
+            {
+                Id = customUserId, // Use custom generated ID
+                UserName = salesManagerDTO.Email, // Use email as username
+                Email = salesManagerDTO.Email,
+                FirstName = salesManagerDTO.FirstName,
+                LastName = salesManagerDTO.LastName,
+                DepartmentId = salesManagerDTO.DepartmentId ?? salesDepartment.Id,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            var result = await userManager.CreateAsync(user, salesManagerDTO.Password);
+            if (!result.Succeeded)
+            {
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
+            }
+
+            // Assign Sales Manager role
+            await userManager.AddToRoleAsync(user, UserRoles.SalesManager);
+
+            // Handle image upload if provided
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "sales-manager", 
+                salesDepartment.Name, 
+                salesManagerDTO.AltText,
+                userImage => new SalesManagerImageInfo
+                {
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as SalesManagerImageInfo;
+
+            return Ok(new CreatedSalesManagerWithImageResponseDTO
+            {
+                UserId = user.Id,
+                Email = user.Email, // Email is now the username
+                Role = UserRoles.SalesManager,
+                DepartmentName = salesDepartment.Name,
+                CreatedAt = user.CreatedAt,
+                ProfileImage = profileImageInfo,
+                Message = $"Sales Manager '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : ""),
+                SalesTerritory = salesManagerDTO.SalesTerritory,
+                SalesTeam = salesManagerDTO.SalesTeam,
+                SalesTarget = salesManagerDTO.SalesTarget
             });
         }
 
@@ -843,42 +921,23 @@ namespace SoitMed.Controllers
             await userManager.AddToRoleAsync(user, UserRoles.FinanceEmployee);
 
             // Handle image upload if provided
-            FinanceEmployeeImageInfo? profileImageInfo = null;
-            if (profileImage != null && profileImage.Length > 0)
-            {
-                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, "finance-employee", financeDepartment.Name, financeEmployeeDTO.AltText);
-                if (imageResult.Success)
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "finance-employee", 
+                financeDepartment.Name, 
+                financeEmployeeDTO.AltText,
+                userImage => new FinanceEmployeeImageInfo
                 {
-                    var userImage = new UserImage
-                    {
-                        UserId = user.Id,
-                        FileName = imageResult.FileName ?? "profile.jpg",
-                        FilePath = imageResult.FilePath ?? "",
-                        ContentType = imageResult.ContentType,
-                        FileSize = imageResult.FileSize,
-                        AltText = imageResult.AltText,
-                        IsProfileImage = true,
-                        ImageType = "profile",
-                        UploadedAt = DateTime.UtcNow,
-                        IsActive = true
-                    };
-
-                    await _unitOfWork.UserImages.CreateAsync(userImage);
-                    await _unitOfWork.SaveChangesAsync();
-
-                    profileImageInfo = new FinanceEmployeeImageInfo
-                    {
-                        Id = userImage.Id,
-                        FileName = userImage.FileName,
-                        FilePath = userImage.FilePath,
-                        ContentType = userImage.ContentType,
-                        FileSize = userImage.FileSize,
-                        AltText = userImage.AltText,
-                        IsProfileImage = userImage.IsProfileImage,
-                        UploadedAt = userImage.UploadedAt
-                    };
-                }
-            }
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as FinanceEmployeeImageInfo;
 
             return Ok(new CreatedFinanceEmployeeWithImageResponseDTO
             {
@@ -949,42 +1008,23 @@ namespace SoitMed.Controllers
             await userManager.AddToRoleAsync(user, UserRoles.LegalEmployee);
 
             // Handle image upload if provided
-            LegalEmployeeImageInfo? profileImageInfo = null;
-            if (profileImage != null && profileImage.Length > 0)
-            {
-                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, "legal-employee", legalDepartment.Name, legalEmployeeDTO.AltText);
-                if (imageResult.Success)
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "legal-employee", 
+                legalDepartment.Name, 
+                legalEmployeeDTO.AltText,
+                userImage => new LegalEmployeeImageInfo
                 {
-                    var userImage = new UserImage
-                    {
-                        UserId = user.Id,
-                        FileName = imageResult.FileName ?? "profile.jpg",
-                        FilePath = imageResult.FilePath ?? "",
-                        ContentType = imageResult.ContentType,
-                        FileSize = imageResult.FileSize,
-                        AltText = imageResult.AltText,
-                        IsProfileImage = true,
-                        ImageType = "profile",
-                        UploadedAt = DateTime.UtcNow,
-                        IsActive = true
-                    };
-
-                    await _unitOfWork.UserImages.CreateAsync(userImage);
-                    await _unitOfWork.SaveChangesAsync();
-
-                    profileImageInfo = new LegalEmployeeImageInfo
-                    {
-                        Id = userImage.Id,
-                        FileName = userImage.FileName,
-                        FilePath = userImage.FilePath,
-                        ContentType = userImage.ContentType,
-                        FileSize = userImage.FileSize,
-                        AltText = userImage.AltText,
-                        IsProfileImage = userImage.IsProfileImage,
-                        UploadedAt = userImage.UploadedAt
-                    };
-                }
-            }
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as LegalEmployeeImageInfo;
 
             return Ok(new CreatedLegalEmployeeWithImageResponseDTO
             {

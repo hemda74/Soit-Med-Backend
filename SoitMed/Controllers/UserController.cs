@@ -19,11 +19,14 @@ namespace SoitMed.Controllers
 		private readonly UserManager<ApplicationUser> userManager;
 		private readonly Context context;
 		private readonly UserIdGenerationService userIdGenerationService;
-		public UserController(UserManager<ApplicationUser> _userManager, Context _context, UserIdGenerationService _userIdGenerationService)
+		private readonly IRoleBasedImageUploadService _imageUploadService;
+		
+		public UserController(UserManager<ApplicationUser> _userManager, Context _context, UserIdGenerationService _userIdGenerationService, IRoleBasedImageUploadService imageUploadService)
 		{
 			userManager = _userManager;
 			context = _context;
 			userIdGenerationService = _userIdGenerationService;
+			_imageUploadService = imageUploadService;
 		}
 
 		// Helper method to get user profile image
@@ -49,6 +52,51 @@ namespace SoitMed.Controllers
 				UploadedAt = userImage.UploadedAt,
 				IsActive = userImage.IsActive
 			};
+		}
+
+		// Helper method to safely upsert user profile image
+		private async Task<UserImage> UpsertUserProfileImageAsync(string userId, string fileName, string filePath, string contentType, long fileSize, string? altText)
+		{
+			using var transaction = await context.Database.BeginTransactionAsync();
+			try
+			{
+				// First, deactivate any existing profile images for this user
+				var existingImages = await context.UserImages
+					.Where(ui => ui.UserId == userId && ui.IsProfileImage && ui.IsActive)
+					.ToListAsync();
+
+				foreach (var existingImage in existingImages)
+				{
+					existingImage.IsActive = false;
+					context.UserImages.Update(existingImage);
+				}
+
+				// Create new user image record
+				var userImage = new UserImage
+				{
+					UserId = userId,
+					FileName = fileName,
+					FilePath = filePath,
+					ContentType = contentType,
+					FileSize = fileSize,
+					AltText = altText,
+					ImageType = "Profile",
+					IsProfileImage = true,
+					IsActive = true,
+					UploadedAt = DateTime.UtcNow
+				};
+
+				context.UserImages.Add(userImage);
+				await context.SaveChangesAsync();
+				await transaction.CommitAsync();
+
+				return userImage;
+			}
+			catch (Exception)
+			{
+				await transaction.RollbackAsync();
+				throw;
+			}
 		}
 		[HttpDelete]
 		[Authorize(Roles = "SuperAdmin,Admin")]
@@ -671,6 +719,7 @@ namespace SoitMed.Controllers
 				));
 			}
 		}
+
 
 	}
 }

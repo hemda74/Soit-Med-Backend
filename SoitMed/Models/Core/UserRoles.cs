@@ -11,6 +11,7 @@ namespace SoitMed.Models.Core
         public const string Technician = "Technician";
         
         // Sales Department Roles
+        public const string SalesManager = "SalesManager";
         public const string Salesman = "Salesman";
         
         // Engineering Department Roles
@@ -33,6 +34,7 @@ namespace SoitMed.Models.Core
                 Admin,
                 Doctor,
                 Technician,
+                SalesManager,
                 Salesman,
                 Engineer,
                 FinanceManager,
@@ -49,7 +51,7 @@ namespace SoitMed.Models.Core
             {
                 { "Administration", new List<string> { SuperAdmin, Admin } },
                 { "Medical", new List<string> { Doctor, Technician } },
-                { "Sales", new List<string> { Salesman } },
+                { "Sales", new List<string> { SalesManager, Salesman } },
                 { "Engineering", new List<string> { Engineer } },
                 { "Finance", new List<string> { FinanceManager, FinanceEmployee } },
                 { "Legal", new List<string> { LegalManager, LegalEmployee } }
@@ -63,6 +65,7 @@ namespace SoitMed.Models.Core
             {
                 SuperAdmin,
                 Admin,
+                SalesManager,
                 FinanceManager,
                 LegalManager
             };
@@ -95,6 +98,7 @@ namespace SoitMed.Models.Core
             {
                 SuperAdmin,
                 Admin,
+                SalesManager,
                 FinanceManager,
                 LegalManager
             };
