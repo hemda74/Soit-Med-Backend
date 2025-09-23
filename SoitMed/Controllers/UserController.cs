@@ -98,24 +98,99 @@ namespace SoitMed.Controllers
 				throw;
 			}
 		}
+		/// <summary>
+		/// Delete a user by their unique identifier
+		/// </summary>
+		/// <param name="userId">The unique identifier of the user to delete</param>
+		/// <returns>Success message if user is deleted successfully</returns>
+		/// <response code="200">User deleted successfully</response>
+		/// <response code="400">Bad request - Invalid user ID or deletion failed</response>
+		/// <response code="401">Unauthorized - User is not authenticated</response>
+		/// <response code="403">Forbidden - User does not have required role (SuperAdmin or Admin)</response>
+		/// <response code="404">Not Found - User with specified ID does not exist</response>
+		/// <response code="500">Internal Server Error - An unexpected error occurred</response>
 		[HttpDelete]
 		[Authorize(Roles = "SuperAdmin,Admin")]
-		public async Task<IActionResult> DeleteUser(string Name)
+		public async Task<IActionResult> DeleteUser(string userId)
 		{
-			ApplicationUser user = await userManager.FindByNameAsync(Name);
-			if (user != null)
+			try
 			{
+				// Validate userId parameter
+				if (string.IsNullOrEmpty(userId))
+				{
+					return BadRequest(new
+					{
+						error = "User ID is required",
+						code = "MISSING_USER_ID",
+						timestamp = DateTime.UtcNow
+					});
+				}
+
+				// Find user by ID
+				ApplicationUser user = await userManager.FindByIdAsync(userId);
+				if (user == null)
+				{
+					return NotFound(new
+					{
+						error = $"User with ID '{userId}' not found",
+						code = "USER_NOT_FOUND",
+						timestamp = DateTime.UtcNow
+					});
+				}
+
+				// Check if user is SuperAdmin (prevent deleting SuperAdmin)
+				var roles = await userManager.GetRolesAsync(user);
+				if (roles.Contains("SuperAdmin"))
+				{
+					return BadRequest(new
+					{
+						error = "Cannot delete SuperAdmin user",
+						code = "SUPERADMIN_PROTECTION",
+						timestamp = DateTime.UtcNow
+					});
+				}
+
+				// Attempt to delete the user
 				IdentityResult result = await userManager.DeleteAsync(user);
 				if (result.Succeeded)
 				{
-					return Ok($"User {Name} deleted successfully");
+					return Ok(new
+					{
+						message = $"User '{user.UserName}' deleted successfully",
+						userId = user.Id,
+						userName = user.UserName,
+						email = user.Email,
+						deletedAt = DateTime.UtcNow,
+						code = "USER_DELETED_SUCCESSFULLY"
+					});
 				}
 				else
 				{
-					return BadRequest(result.Errors);
+					var errors = result.Errors.Select(e => new
+					{
+						code = e.Code,
+						description = e.Description
+					}).ToList();
+
+					return BadRequest(new
+					{
+						error = "Failed to delete user",
+						code = "USER_DELETION_FAILED",
+						details = errors,
+						timestamp = DateTime.UtcNow
+					});
 				}
 			}
-			return NotFound($"User with Name {Name} not found");
+			catch (Exception ex)
+			{
+				return StatusCode(500, new
+				{
+					error = "An unexpected error occurred while deleting the user",
+					code = "INTERNAL_SERVER_ERROR",
+					message = ex.Message,
+					timestamp = DateTime.UtcNow
+				});
+			}
 		}
 		[HttpPut]
 		[Authorize(Roles = "SuperAdmin,Admin")]
