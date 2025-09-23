@@ -87,6 +87,9 @@ namespace SoitMed
             builder.Services.AddScoped<ISalesReportRepository, SalesReportRepository>();
             builder.Services.AddScoped<ISalesReportService, SalesReportService>();
             
+            // Register Data Seeding Services
+            builder.Services.AddScoped<FinanceSalesReportSeedingService>();
+            
             // Register Image Upload Services
             builder.Services.AddScoped<IImageUploadService, ImageUploadService>();
             builder.Services.AddScoped<IRoleBasedImageUploadService, RoleBasedImageUploadService>();
