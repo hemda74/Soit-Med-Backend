@@ -34,6 +34,8 @@ namespace SoitMed.Services
                 return;
             }
 
+            Console.WriteLine($"Found {financeEmployees.Count} FinanceEmployee users for seeding reports.");
+
             var reportsCreated = 0;
             var random = new Random();
 
@@ -105,10 +107,15 @@ namespace SoitMed.Services
                                 reportsCreated++;
                                 Console.WriteLine($"Created finance sales report: {result.Title} for {employee.FirstName} {employee.LastName}");
                             }
+                            else
+                            {
+                                Console.WriteLine($"Failed to create report (duplicate or validation error) for {employee.FirstName} {employee.LastName} - {createDto.Title}");
+                            }
                         }
                         catch (Exception ex)
                         {
                             Console.WriteLine($"Error creating report for {employee.FirstName} {employee.LastName}: {ex.Message}");
+                            Console.WriteLine($"Report details: Title={createDto.Title}, Type={createDto.Type}, Date={createDto.ReportDate}");
                         }
                     }
                 }
@@ -128,12 +135,14 @@ namespace SoitMed.Services
                 return;
             }
 
+            // Get all finance employees first
+            var financeEmployees = await _userManager.GetUsersInRoleAsync(UserRoles.FinanceEmployee);
+            var financeEmployeeIds = financeEmployees.Select(e => e.Id).ToList();
+
             // Get all finance sales reports
             var allReports = await _context.SalesReports
-                .Where(sr => sr.IsActive)
+                .Where(sr => sr.IsActive && financeEmployeeIds.Contains(sr.EmployeeId))
                 .Include(sr => sr.Employee)
-                .Where(sr => sr.Employee != null && 
-                           _userManager.IsInRoleAsync(sr.Employee, UserRoles.FinanceEmployee).Result)
                 .ToListAsync();
 
             var random = new Random();

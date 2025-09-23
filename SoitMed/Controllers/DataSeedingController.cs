@@ -82,8 +82,17 @@ namespace SoitMed.Controllers
         {
             try
             {
+                Console.WriteLine("Starting finance data seeding...");
+                
+                // First seed the reports
+                Console.WriteLine("Seeding finance sales reports...");
                 await _financeSeedingService.SeedFinanceSalesReportsAsync();
+                
+                // Then seed the ratings
+                Console.WriteLine("Seeding finance manager ratings...");
                 await _financeSeedingService.SeedFinanceManagerRatingsAsync();
+                
+                Console.WriteLine("Finance data seeding completed successfully.");
                 
                 return Ok(new
                 {
@@ -94,11 +103,15 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error in finance data seeding: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                
                 return BadRequest(new
                 {
                     success = false,
                     message = "Error seeding finance data",
                     error = ex.Message,
+                    innerError = ex.InnerException?.Message,
                     timestamp = DateTime.UtcNow
                 });
             }
