@@ -32,7 +32,7 @@ namespace SoitMed.Services
                 return null;
 
             var userRoles = await _userManager.GetRolesAsync(employee);
-            if (!userRoles.Contains("SalesEmployee"))
+            if (!userRoles.Contains("Salesman"))
                 return null;
 
             // Check for duplicate report (same employee, date, and type)

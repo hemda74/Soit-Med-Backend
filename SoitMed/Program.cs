@@ -16,12 +16,13 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using SoitMed.Models.Core;
 
 namespace SoitMed
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             // Configure logging
             var logger = LoggerFactory.Create(builder => builder.AddConsole().AddDebug()).CreateLogger("SoitMed");
@@ -86,9 +87,6 @@ namespace SoitMed
             // Register Sales Report Services
             builder.Services.AddScoped<ISalesReportRepository, SalesReportRepository>();
             builder.Services.AddScoped<ISalesReportService, SalesReportService>();
-            
-            // Register Data Seeding Services
-            builder.Services.AddScoped<FinanceSalesReportSeedingService>();
             
             // Register Image Upload Services
             builder.Services.AddScoped<IImageUploadService, ImageUploadService>();
@@ -178,6 +176,21 @@ namespace SoitMed
 
 			var app = builder.Build();
 
+            // Seed roles
+            using (var scope = app.Services.CreateScope())
+            {
+                var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+                var roles = UserRoles.GetAllRoles();
+                
+                foreach (var role in roles)
+                {
+                    if (!await roleManager.RoleExistsAsync(role))
+                    {
+                        await roleManager.CreateAsync(new IdentityRole { Name = role });
+                        logger.LogInformation($"Created role: {role}");
+                    }
+                }
+            }
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
@@ -239,7 +252,7 @@ namespace SoitMed
             app.MapControllers();
 
             logger.LogInformation("Application configured successfully. Starting server...");
-            app.Run();
+            await app.RunAsync();
             }
             catch (Exception ex)
             {
