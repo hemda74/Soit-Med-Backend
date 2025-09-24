@@ -55,26 +55,6 @@ POST /api/Account/login
 
 **Response:** JWT token with 5-year validity
 
-### Register
-
-```http
-POST /api/Account/register
-```
-
-**Body:**
-
-```json
-{
-	"userName": "string",
-	"email": "string",
-	"password": "string",
-	"role": "string",
-	"firstName": "string (optional)",
-	"lastName": "string (optional)",
-	"departmentId": "integer (optional)"
-}
-```
-
 ---
 
 ## User Management APIs

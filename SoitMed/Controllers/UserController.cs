@@ -98,67 +98,177 @@ namespace SoitMed.Controllers
 				throw;
 			}
 		}
-		[HttpDelete]
+		[HttpDelete("{userId}")]
 		[Authorize(Roles = "SuperAdmin,Admin")]
-		public async Task<IActionResult> DeleteUser(string Name)
+		public async Task<IActionResult> DeleteUser(string userId)
 		{
-			ApplicationUser user = await userManager.FindByNameAsync(Name);
-			if (user != null)
+			if (string.IsNullOrEmpty(userId))
 			{
-				IdentityResult result = await userManager.DeleteAsync(user);
-				if (result.Succeeded)
+				return BadRequest(new
 				{
-					return Ok($"User {Name} deleted successfully");
-				}
-				else
-				{
-					return BadRequest(result.Errors);
-				}
+					success = false,
+					message = "User ID is required",
+					timestamp = DateTime.UtcNow
+				});
 			}
-			return NotFound($"User with Name {Name} not found");
+
+			// Find user by ID
+			ApplicationUser? user = await userManager.FindByIdAsync(userId);
+			if (user == null)
+			{
+				return NotFound(new
+				{
+					success = false,
+					message = $"User with ID '{userId}' not found",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
+			// Check if user is SuperAdmin (prevent deleting SuperAdmin)
+			var roles = await userManager.GetRolesAsync(user);
+			if (roles.Contains("SuperAdmin"))
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "Cannot delete SuperAdmin user",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
+			// Check if user is trying to delete themselves
+			var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+			if (currentUserId == userId)
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "Cannot delete your own account",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
+			// Delete user
+			IdentityResult result = await userManager.DeleteAsync(user);
+			if (result.Succeeded)
+			{
+				return Ok(new
+				{
+					success = true,
+					message = $"User '{user.UserName}' deleted successfully",
+					deletedUserId = userId,
+					deletedUserName = user.UserName,
+					timestamp = DateTime.UtcNow
+				});
+			}
+			else
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "Failed to delete user",
+					errors = result.Errors.Select(e => e.Description).ToList(),
+					timestamp = DateTime.UtcNow
+				});
+			}
 		}
-		[HttpPut]
+		[HttpPatch("{userId}")]
 		[Authorize(Roles = "SuperAdmin,Admin")]
-		public async Task<IActionResult> UpdateUser(string userName, RegisterUserDTO userDTO)
+		public async Task<IActionResult> UpdateUser(string userId, UpdateUserDTO userDTO)
 		{
+			if (string.IsNullOrEmpty(userId))
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "User ID is required",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
 			// Check if role is provided
 			if (string.IsNullOrEmpty(userDTO.Role))
 			{
-				return BadRequest("Role field is required.");
+				return BadRequest(new
+				{
+					success = false,
+					message = "Role field is required",
+					timestamp = DateTime.UtcNow
+				});
 			}
 
 			// Validate the role
 			if (!UserRoles.IsValidRole(userDTO.Role))
 			{
-				return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
+				return BadRequest(new
+				{
+					success = false,
+					message = $"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}",
+					timestamp = DateTime.UtcNow
+				});
 			}
 
-			ApplicationUser user = await userManager.FindByNameAsync(userName);
-			if (user != null)
+			// Find user by ID
+			ApplicationUser? user = await userManager.FindByIdAsync(userId);
+			if (user == null)
 			{
-				user.UserName = userDTO.Email; // Use email as username
-				user.PasswordHash = userDTO.Password;
-				user.Email = userDTO.Email;
-
-				IdentityResult result = await userManager.UpdateAsync(user);
-				if (result.Succeeded)
+				return NotFound(new
 				{
-					// Update user roles - remove all current roles and add the new one
-					var currentRoles = await userManager.GetRolesAsync(user);
-					if (currentRoles.Any())
-					{
-						await userManager.RemoveFromRolesAsync(user, currentRoles);
-					}
-					await userManager.AddToRoleAsync(user, userDTO.Role);
-
-					return Ok($"User {userName} updated successfully with role: {userDTO.Role}");
-				}
-				else
-				{
-					return BadRequest(result.Errors);
-				}
+					success = false,
+					message = $"User with ID '{userId}' not found",
+					timestamp = DateTime.UtcNow
+				});
 			}
-			return NotFound($"User with Name {userName} not found");
+
+			// Check if user is SuperAdmin (prevent updating SuperAdmin)
+			var currentRoles = await userManager.GetRolesAsync(user);
+			if (currentRoles.Contains("SuperAdmin"))
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "Cannot update SuperAdmin user",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
+			// Update user properties
+			user.UserName = userDTO.Email; // Use email as username
+			user.Email = userDTO.Email;
+			user.FirstName = userDTO.FirstName;
+			user.LastName = userDTO.LastName;
+
+			// Update user
+			IdentityResult result = await userManager.UpdateAsync(user);
+			if (result.Succeeded)
+			{
+				// Update user roles - remove all current roles and add the new one
+				if (currentRoles.Any())
+				{
+					await userManager.RemoveFromRolesAsync(user, currentRoles);
+				}
+				await userManager.AddToRoleAsync(user, userDTO.Role);
+
+				return Ok(new
+				{
+					success = true,
+					message = $"User '{user.UserName}' updated successfully",
+					updatedUserId = userId,
+					updatedUserName = user.UserName,
+					newRole = userDTO.Role,
+					timestamp = DateTime.UtcNow
+				});
+			}
+			else
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "Failed to update user",
+					errors = result.Errors.Select(e => e.Description).ToList(),
+					timestamp = DateTime.UtcNow
+				});
+			}
 		}
 
 		// Get current logged-in user's data

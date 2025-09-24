@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using SoitMed.Common;
 using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Identity;
@@ -27,36 +28,14 @@ namespace SoitMed.Services
         public async Task<SalesReportResponseDto?> CreateReportAsync(CreateSalesReportDto createDto, string employeeId, CancellationToken cancellationToken = default)
         {
             // Verify employee exists and has correct role
-            var employee = await _userManager.FindByIdAsync(employeeId);
-            if (employee == null)
-                return null;
-
-            var userRoles = await _userManager.GetRolesAsync(employee);
-            if (!userRoles.Contains("Salesman"))
+            if (!await ServiceHelper.ValidateUserRoleAsync(employeeId, "Salesman", _userManager))
                 return null;
 
             // Check for duplicate report (same employee, date, and type)
-            var existingReport = await _context.SalesReports
-                .FirstOrDefaultAsync(sr => sr.EmployeeId == employeeId 
-                    && sr.ReportDate == createDto.ReportDate 
-                    && sr.Type.ToLower() == createDto.Type.ToLower() 
-                    && sr.IsActive, cancellationToken);
+            if (await HasDuplicateReportAsync(employeeId, createDto.ReportDate, createDto.Type, null, cancellationToken))
+                return null;
 
-            if (existingReport != null)
-                return null; // Duplicate report exists
-
-            var salesReport = new SalesReport
-            {
-                Title = createDto.Title,
-                Body = createDto.Body,
-                Type = createDto.Type.ToLower(),
-                ReportDate = createDto.ReportDate,
-                EmployeeId = employeeId,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                IsActive = true
-            };
-
+            var salesReport = CreateSalesReportEntity(createDto, employeeId);
             var createdReport = await _salesReportRepository.CreateAsync(salesReport, cancellationToken);
             return MapToResponseDto(createdReport);
         }
@@ -68,22 +47,10 @@ namespace SoitMed.Services
                 return null;
 
             // Check for duplicate report (excluding current one)
-            var duplicateReport = await _context.SalesReports
-                .FirstOrDefaultAsync(sr => sr.EmployeeId == employeeId 
-                    && sr.ReportDate == updateDto.ReportDate 
-                    && sr.Type.ToLower() == updateDto.Type.ToLower() 
-                    && sr.Id != id
-                    && sr.IsActive, cancellationToken);
+            if (await HasDuplicateReportAsync(employeeId, updateDto.ReportDate, updateDto.Type, id, cancellationToken))
+                return null;
 
-            if (duplicateReport != null)
-                return null; // Duplicate report exists
-
-            existingReport.Title = updateDto.Title;
-            existingReport.Body = updateDto.Body;
-            existingReport.Type = updateDto.Type.ToLower();
-            existingReport.ReportDate = updateDto.ReportDate;
-            existingReport.UpdatedAt = DateTime.UtcNow;
-
+            UpdateSalesReportEntity(existingReport, updateDto);
             var updatedReport = await _salesReportRepository.UpdateAsync(existingReport, cancellationToken);
             return MapToResponseDto(updatedReport);
         }
@@ -247,6 +214,53 @@ namespace SoitMed.Services
             {
                 return node == _oldParameter ? _newParameter : base.VisitParameter(node);
             }
+        }
+
+        /// <summary>
+        /// Checks if a duplicate report exists for the same employee, date, and type
+        /// </summary>
+        private async Task<bool> HasDuplicateReportAsync(string employeeId, DateOnly reportDate, string type, int? excludeId, CancellationToken cancellationToken)
+        {
+            var query = _context.SalesReports
+                .Where(sr => sr.EmployeeId == employeeId 
+                    && sr.ReportDate == reportDate 
+                    && sr.Type.ToLower() == type.ToLower() 
+                    && sr.IsActive);
+
+            if (excludeId.HasValue)
+                query = query.Where(sr => sr.Id != excludeId.Value);
+
+            return await query.AnyAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Creates a new SalesReport entity from DTO
+        /// </summary>
+        private static SalesReport CreateSalesReportEntity(CreateSalesReportDto createDto, string employeeId)
+        {
+            return new SalesReport
+            {
+                Title = createDto.Title,
+                Body = createDto.Body,
+                Type = createDto.Type.ToLower(),
+                ReportDate = createDto.ReportDate,
+                EmployeeId = employeeId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+        }
+
+        /// <summary>
+        /// Updates an existing SalesReport entity from DTO
+        /// </summary>
+        private static void UpdateSalesReportEntity(SalesReport existingReport, UpdateSalesReportDto updateDto)
+        {
+            existingReport.Title = updateDto.Title;
+            existingReport.Body = updateDto.Body;
+            existingReport.Type = updateDto.Type.ToLower();
+            existingReport.ReportDate = updateDto.ReportDate;
+            existingReport.UpdatedAt = DateTime.UtcNow;
         }
     }
 }
