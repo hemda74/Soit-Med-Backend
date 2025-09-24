@@ -41,7 +41,7 @@ namespace SoitMed.Controllers
         /// Create a new sales report (SalesEmployee only)
         /// </summary>
         [HttpPost]
-        [Authorize(Roles = "SalesEmployee")]
+        [Authorize(Roles = "Salesman")]
         public async Task<IActionResult> CreateReport([FromBody] CreateSalesReportDto createDto, CancellationToken cancellationToken = default)
         {
             var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
@@ -85,7 +85,7 @@ namespace SoitMed.Controllers
         /// Update an existing sales report (SalesEmployee only - own reports)
         /// </summary>
         [HttpPut("{id}")]
-        [Authorize(Roles = "SalesEmployee")]
+        [Authorize(Roles = "Salesman")]
         public async Task<IActionResult> UpdateReport(int id, [FromBody] UpdateSalesReportDto updateDto, CancellationToken cancellationToken = default)
         {
             var validationResult = await _updateValidator.ValidateAsync(updateDto, cancellationToken);
@@ -129,7 +129,7 @@ namespace SoitMed.Controllers
         /// Delete a sales report (SalesEmployee only - own reports)
         /// </summary>
         [HttpDelete("{id}")]
-        [Authorize(Roles = "SalesEmployee")]
+        [Authorize(Roles = "Salesman")]
         public async Task<IActionResult> DeleteReport(int id, CancellationToken cancellationToken = default)
         {
             var userId = _userManager.GetUserId(User);
@@ -170,7 +170,7 @@ namespace SoitMed.Controllers
                 return Unauthorized();
 
             var userRoles = await _userManager.GetRolesAsync(user);
-            var isManager = userRoles.Contains("SalesManager");
+            var isManager = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin");
 
             var canAccess = await _salesReportService.CanAccessReportAsync(id, userId, isManager, cancellationToken);
             if (!canAccess)
@@ -204,7 +204,7 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
-        /// Get sales reports with optional filtering (SalesManager: all reports, SalesEmployee: own reports)
+        /// Get sales reports with optional filtering (SalesManager/SuperAdmin: all reports, SalesEmployee: own reports)
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetReports([FromQuery] FilterSalesReportsDto filterDto, CancellationToken cancellationToken = default)
@@ -231,7 +231,7 @@ namespace SoitMed.Controllers
                 return Unauthorized();
 
             var userRoles = await _userManager.GetRolesAsync(user);
-            var isManager = userRoles.Contains("SalesManager");
+            var isManager = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin");
 
             PaginatedSalesReportsResponseDto result;
 
@@ -256,10 +256,10 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
-        /// Rate a sales report (SalesManager only)
+        /// Rate a sales report (SalesManager and SuperAdmin only)
         /// </summary>
         [HttpPost("{id}/rate")]
-        [Authorize(Roles = "SalesManager")]
+        [Authorize(Roles = "SalesManager,SuperAdmin")]
         public async Task<IActionResult> RateReport(int id, [FromBody] RateSalesReportDto rateDto, CancellationToken cancellationToken = default)
         {
             var validationResult = await _rateValidator.ValidateAsync(rateDto, cancellationToken);
