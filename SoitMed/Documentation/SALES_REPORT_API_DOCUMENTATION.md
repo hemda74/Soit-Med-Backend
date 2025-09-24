@@ -2,299 +2,111 @@
 
 ## Overview
 
-The Sales Report API provides a complete cycle for managing sales reports in the SoitMed system. It supports creating, reading, updating, deleting, and rating sales reports with role-based access control. Sales employees can manage their own reports, while sales managers can view all reports and rate them.
+The Sales Report API provides comprehensive functionality for managing sales reports in the Soit-Med hospital management system. The API supports two main user roles:
 
-## System Architecture
+- **Salesman** (Sales Employee): Can create, read, update, and delete their own reports
+- **SalesManager**: Can view all reports and rate them
 
-### Roles and Permissions
+## Base URL
 
-- **SalesEmployee**: Can create, read, update, and delete their own reports
-- **SalesManager**: Can view all reports and rate any report
-- **Other Roles**: No access to sales report functionality
+```
+http://localhost:5117/api/SalesReport
+```
 
-### Report Types
+## Authentication
 
-- `daily`: Daily sales reports
-- `weekly`: Weekly sales reports
-- `monthly`: Monthly sales reports
-- `custom`: Custom period reports
+All endpoints require JWT authentication. Include the token in the Authorization header:
 
-## API Endpoints
+```
+Authorization: Bearer {your-jwt-token}
+```
+
+---
+
+## Endpoints
 
 ### 1. Create Sales Report
 
-**Endpoint**: `POST /api/SalesReport`  
-**Authorization**: SalesEmployee only  
-**Description**: Creates a new sales report for the authenticated employee.
+**POST** `/api/SalesReport`
 
-#### Request Body
+**Authorization:** Salesman only
 
-```typescript
-interface CreateSalesReportDto {
-	title: string; // Required, max 100 characters
-	body: string; // Required, max 2000 characters
-	type: string; // Required, one of: "daily", "weekly", "monthly", "custom"
-	reportDate: string; // Required, format: "YYYY-MM-DD", cannot be future date
-}
-```
+**Description:** Creates a new sales report. Sales employees can only create reports for themselves.
 
-#### Example Request
+**Request Body:**
 
-```http
-POST /api/SalesReport
-Authorization: Bearer <jwt-token>
-Content-Type: application/json
-
+```json
 {
-  "title": "Daily Sales Report - January 15, 2024",
-  "body": "Today we achieved 85% of our daily target. Key highlights include...",
-  "type": "daily",
-  "reportDate": "2024-01-15"
+	"title": "Daily Sales Report",
+	"body": "Today we achieved excellent sales results...",
+	"type": "daily",
+	"reportDate": "2024-01-15"
 }
 ```
 
-#### Response Codes
+**Field Validation:**
 
-**201 Created - Success**
+- `title`: Required, max 100 characters
+- `body`: Required, max 2000 characters
+- `type`: Required, must be one of: "daily", "weekly", "monthly", "custom"
+- `reportDate`: Required, cannot be in the future
+
+**Success Response (201):**
 
 ```json
 {
 	"success": true,
 	"data": {
-		"id": 123,
-		"title": "Daily Sales Report - January 15, 2024",
-		"body": "Today we achieved 85% of our daily target...",
+		"id": 1,
+		"title": "Daily Sales Report",
+		"body": "Today we achieved excellent sales results...",
 		"type": "daily",
 		"reportDate": "2024-01-15",
-		"employeeId": "user-123",
-		"employeeName": "John Doe",
+		"employeeId": "Nada_Nada_Sales_001",
+		"employeeName": "Nada Nada",
 		"rating": null,
 		"comment": null,
-		"createdAt": "2024-01-15T10:30:00.000Z",
-		"updatedAt": "2024-01-15T10:30:00.000Z",
+		"createdAt": "2025-09-24T00:12:57.4636856Z",
+		"updatedAt": "2025-09-24T00:12:57.4637054Z",
 		"isActive": true
 	},
 	"message": "Report created successfully",
-	"timestamp": "2024-01-15T10:30:00.000Z"
+	"timestamp": "2025-09-24T00:12:57.7219161Z"
 }
 ```
 
-**400 Bad Request - Validation Error**
+**Error Responses:**
 
-```json
-{
-	"success": false,
-	"message": "Validation failed. Please check the following fields:",
-	"errors": {
-		"title": ["Title is required."],
-		"type": [
-			"Type must be one of: daily, weekly, monthly, custom."
-		],
-		"reportDate": ["Report date cannot be in the future."]
-	},
-	"timestamp": "2024-01-15T10:30:00.000Z"
-}
-```
-
-**409 Conflict - Duplicate Report**
-
-```json
-{
-	"success": false,
-	"message": "A report with the same type and date already exists for this employee.",
-	"timestamp": "2024-01-15T10:30:00.000Z"
-}
-```
+- `400 Bad Request`: Validation errors
+- `403 Forbidden`: User doesn't have Salesman role
+- `409 Conflict`: Duplicate report (same type and date for employee)
 
 ---
 
-### 2. Update Sales Report
+### 2. Get All Sales Reports
 
-**Endpoint**: `PUT /api/SalesReport/{id}`  
-**Authorization**: SalesEmployee only (own reports)  
-**Description**: Updates an existing sales report.
+**GET** `/api/SalesReport`
 
-#### Request Body
+**Authorization:** Salesman (own reports) or SalesManager (all reports)
 
-```typescript
-interface UpdateSalesReportDto {
-	title: string; // Required, max 100 characters
-	body: string; // Required, max 2000 characters
-	type: string; // Required, one of: "daily", "weekly", "monthly", "custom"
-	reportDate: string; // Required, format: "YYYY-MM-DD", cannot be future date
-}
+**Description:** Retrieves sales reports with optional filtering and pagination.
+
+**Query Parameters:**
+
+- `employeeId` (optional): Filter by specific employee ID
+- `startDate` (optional): Filter reports from this date (YYYY-MM-DD)
+- `endDate` (optional): Filter reports to this date (YYYY-MM-DD)
+- `type` (optional): Filter by report type (daily, weekly, monthly, custom)
+- `page` (optional): Page number (default: 1)
+- `pageSize` (optional): Items per page (default: 10, max: 100)
+
+**Example Request:**
+
 ```
-
-#### Example Request
-
-```http
-PUT /api/SalesReport/123
-Authorization: Bearer <jwt-token>
-Content-Type: application/json
-
-{
-  "title": "Updated Daily Sales Report - January 15, 2024",
-  "body": "Updated report content with more details...",
-  "type": "daily",
-  "reportDate": "2024-01-15"
-}
-```
-
-#### Response Codes
-
-**200 OK - Success**
-
-```json
-{
-	"success": true,
-	"data": {
-		"id": 123,
-		"title": "Updated Daily Sales Report - January 15, 2024",
-		"body": "Updated report content with more details...",
-		"type": "daily",
-		"reportDate": "2024-01-15",
-		"employeeId": "user-123",
-		"employeeName": "John Doe",
-		"rating": null,
-		"comment": null,
-		"createdAt": "2024-01-15T10:30:00.000Z",
-		"updatedAt": "2024-01-15T11:45:00.000Z",
-		"isActive": true
-	},
-	"message": "Report updated successfully",
-	"timestamp": "2024-01-15T11:45:00.000Z"
-}
-```
-
-**404 Not Found - Report Not Found or No Permission**
-
-```json
-{
-	"success": false,
-	"message": "Report not found or you don't have permission to update it.",
-	"timestamp": "2024-01-15T11:45:00.000Z"
-}
-```
-
----
-
-### 3. Delete Sales Report
-
-**Endpoint**: `DELETE /api/SalesReport/{id}`  
-**Authorization**: SalesEmployee only (own reports)  
-**Description**: Soft deletes a sales report (sets IsActive to false).
-
-#### Example Request
-
-```http
-DELETE /api/SalesReport/123
-Authorization: Bearer <jwt-token>
-```
-
-#### Response Codes
-
-**200 OK - Success**
-
-```json
-{
-	"success": true,
-	"message": "Report deleted successfully",
-	"timestamp": "2024-01-15T12:00:00.000Z"
-}
-```
-
-**404 Not Found - Report Not Found or No Permission**
-
-```json
-{
-	"success": false,
-	"message": "Report not found or you don't have permission to delete it.",
-	"timestamp": "2024-01-15T12:00:00.000Z"
-}
-```
-
----
-
-### 4. Get Sales Report by ID
-
-**Endpoint**: `GET /api/SalesReport/{id}`  
-**Authorization**: Authenticated users  
-**Description**: Retrieves a specific sales report by ID. Sales employees can only view their own reports, while sales managers can view any report.
-
-#### Example Request
-
-```http
-GET /api/SalesReport/123
-Authorization: Bearer <jwt-token>
-```
-
-#### Response Codes
-
-**200 OK - Success**
-
-```json
-{
-	"success": true,
-	"data": {
-		"id": 123,
-		"title": "Daily Sales Report - January 15, 2024",
-		"body": "Today we achieved 85% of our daily target...",
-		"type": "daily",
-		"reportDate": "2024-01-15",
-		"employeeId": "user-123",
-		"employeeName": "John Doe",
-		"rating": 4,
-		"comment": "Good work on the daily targets!",
-		"createdAt": "2024-01-15T10:30:00.000Z",
-		"updatedAt": "2024-01-15T10:30:00.000Z",
-		"isActive": true
-	},
-	"message": "Report retrieved successfully",
-	"timestamp": "2024-01-15T10:30:00.000Z"
-}
-```
-
-**404 Not Found - Report Not Found or No Permission**
-
-```json
-{
-	"success": false,
-	"message": "Report not found or you don't have permission to view it.",
-	"timestamp": "2024-01-15T10:30:00.000Z"
-}
-```
-
----
-
-### 5. Get Sales Reports (List with Filtering)
-
-**Endpoint**: `GET /api/SalesReport`  
-**Authorization**: Authenticated users  
-**Description**: Retrieves a paginated list of sales reports with optional filtering. Sales employees see only their own reports, while sales managers see all reports.
-
-#### Query Parameters
-
-```typescript
-interface FilterSalesReportsDto {
-	employeeId?: string; // Optional, filter by specific employee
-	startDate?: string; // Optional, format: "YYYY-MM-DD"
-	endDate?: string; // Optional, format: "YYYY-MM-DD"
-	type?: string; // Optional, one of: "daily", "weekly", "monthly", "custom"
-	page?: number; // Optional, default: 1, must be > 0
-	pageSize?: number; // Optional, default: 10, must be 1-100
-}
-```
-
-#### Example Request
-
-```http
 GET /api/SalesReport?type=daily&startDate=2024-01-01&endDate=2024-01-31&page=1&pageSize=10
-Authorization: Bearer <jwt-token>
 ```
 
-#### Response Codes
-
-**200 OK - Success**
+**Success Response (200):**
 
 ```json
 {
@@ -302,102 +114,225 @@ Authorization: Bearer <jwt-token>
 	"data": {
 		"data": [
 			{
-				"id": 123,
-				"title": "Daily Sales Report - January 15, 2024",
-				"body": "Today we achieved 85% of our daily target...",
+				"id": 1,
+				"title": "Daily Sales Report",
+				"body": "Today we achieved excellent sales results...",
 				"type": "daily",
 				"reportDate": "2024-01-15",
-				"employeeId": "user-123",
-				"employeeName": "John Doe",
+				"employeeId": "Nada_Nada_Sales_001",
+				"employeeName": "Nada Nada",
 				"rating": 4,
-				"comment": "Good work!",
-				"createdAt": "2024-01-15T10:30:00.000Z",
-				"updatedAt": "2024-01-15T10:30:00.000Z",
+				"comment": "Good work on this report",
+				"createdAt": "2025-09-24T00:12:57.4636856Z",
+				"updatedAt": "2025-09-24T00:12:58.0295151Z",
 				"isActive": true
 			}
 		],
-		"totalCount": 25,
+		"totalCount": 1,
 		"page": 1,
 		"pageSize": 10,
-		"totalPages": 3,
-		"hasNextPage": true,
+		"totalPages": 1,
+		"hasNextPage": false,
 		"hasPreviousPage": false
 	},
-	"message": "Found 25 report(s)",
-	"timestamp": "2024-01-15T10:30:00.000Z"
+	"message": "Found 1 report(s)",
+	"timestamp": "2025-09-24T00:12:57.9356761Z"
 }
 ```
+
+**Error Responses:**
+
+- `400 Bad Request`: Validation errors
+- `401 Unauthorized`: Invalid or missing token
 
 ---
 
-### 6. Rate Sales Report
+### 3. Get Sales Report by ID
 
-**Endpoint**: `POST /api/SalesReport/{id}/rate`  
-**Authorization**: SalesManager only  
-**Description**: Rates a sales report with optional comment.
+**GET** `/api/SalesReport/{id}`
 
-#### Request Body
+**Authorization:** Salesman (own reports) or SalesManager (all reports)
 
-```typescript
-interface RateSalesReportDto {
-	rating?: number; // Optional, 1-5 stars
-	comment?: string; // Optional, max 500 characters
-	// Note: At least one of rating or comment must be provided
-}
-```
+**Description:** Retrieves a specific sales report by its ID.
 
-#### Example Request
+**Path Parameters:**
 
-```http
-POST /api/SalesReport/123/rate
-Authorization: Bearer <jwt-token>
-Content-Type: application/json
+- `id`: The report ID
 
-{
-  "rating": 4,
-  "comment": "Excellent work on meeting the daily targets. Keep it up!"
-}
-```
-
-#### Response Codes
-
-**200 OK - Success**
+**Success Response (200):**
 
 ```json
 {
 	"success": true,
 	"data": {
-		"id": 123,
-		"title": "Daily Sales Report - January 15, 2024",
-		"body": "Today we achieved 85% of our daily target...",
+		"id": 1,
+		"title": "Daily Sales Report",
+		"body": "Today we achieved excellent sales results...",
 		"type": "daily",
 		"reportDate": "2024-01-15",
-		"employeeId": "user-123",
-		"employeeName": "John Doe",
+		"employeeId": "Nada_Nada_Sales_001",
+		"employeeName": "Nada Nada",
 		"rating": 4,
-		"comment": "Excellent work on meeting the daily targets. Keep it up!",
-		"createdAt": "2024-01-15T10:30:00.000Z",
-		"updatedAt": "2024-01-15T10:30:00.000Z",
+		"comment": "Good work on this report",
+		"createdAt": "2025-09-24T00:12:57.4636856Z",
+		"updatedAt": "2025-09-24T00:12:58.0295151Z",
 		"isActive": true
 	},
-	"message": "Report rated successfully",
-	"timestamp": "2024-01-15T10:30:00.000Z"
+	"message": "Report retrieved successfully",
+	"timestamp": "2025-09-24T00:12:58.137769Z"
 }
 ```
 
-**400 Bad Request - Validation Error**
+**Error Responses:**
+
+- `401 Unauthorized`: Invalid or missing token
+- `404 Not Found`: Report not found or no permission to view
+
+---
+
+### 4. Update Sales Report
+
+**PUT** `/api/SalesReport/{id}`
+
+**Authorization:** Salesman only (own reports)
+
+**Description:** Updates an existing sales report. Only the report creator can update it.
+
+**Path Parameters:**
+
+- `id`: The report ID
+
+**Request Body:**
 
 ```json
 {
-	"success": false,
-	"message": "Validation failed. Please check the following fields:",
-	"errors": {
-		"rating": ["Rating must be between 1 and 5."],
-		"": ["Either rating or comment must be provided."]
-	},
-	"timestamp": "2024-01-15T10:30:00.000Z"
+	"title": "Updated Daily Sales Report",
+	"body": "Updated report content...",
+	"type": "daily",
+	"reportDate": "2024-01-15"
 }
 ```
+
+**Success Response (200):**
+
+```json
+{
+	"success": true,
+	"data": {
+		"id": 1,
+		"title": "Updated Daily Sales Report",
+		"body": "Updated report content...",
+		"type": "daily",
+		"reportDate": "2024-01-15",
+		"employeeId": "Nada_Nada_Sales_001",
+		"employeeName": "Nada Nada",
+		"rating": null,
+		"comment": null,
+		"createdAt": "2025-09-24T00:12:57.4636856Z",
+		"updatedAt": "2025-09-24T00:12:58.0295151Z",
+		"isActive": true
+	},
+	"message": "Report updated successfully",
+	"timestamp": "2025-09-24T00:12:58.047882Z"
+}
+```
+
+**Error Responses:**
+
+- `400 Bad Request`: Validation errors
+- `403 Forbidden`: User doesn't have Salesman role
+- `404 Not Found`: Report not found or no permission to update
+- `409 Conflict`: Duplicate report (same type and date for employee)
+
+---
+
+### 5. Delete Sales Report
+
+**DELETE** `/api/SalesReport/{id}`
+
+**Authorization:** Salesman only (own reports)
+
+**Description:** Soft deletes a sales report. Only the report creator can delete it.
+
+**Path Parameters:**
+
+- `id`: The report ID
+
+**Success Response (200):**
+
+```json
+{
+	"success": true,
+	"message": "Report deleted successfully",
+	"timestamp": "2025-09-24T00:12:58.137769Z"
+}
+```
+
+**Error Responses:**
+
+- `401 Unauthorized`: Invalid or missing token
+- `403 Forbidden`: User doesn't have Salesman role
+- `404 Not Found`: Report not found or no permission to delete
+
+---
+
+### 6. Rate Sales Report
+
+**POST** `/api/SalesReport/{id}/rate`
+
+**Authorization:** SalesManager only
+
+**Description:** Rates and comments on a sales report. Only sales managers can rate reports.
+
+**Path Parameters:**
+
+- `id`: The report ID
+
+**Request Body:**
+
+```json
+{
+	"rating": 4,
+	"comment": "Good work on this report. Keep it up!"
+}
+```
+
+**Field Validation:**
+
+- `rating`: Optional, must be between 1-5
+- `comment`: Optional, max 500 characters
+- At least one of rating or comment must be provided
+
+**Success Response (200):**
+
+```json
+{
+	"success": true,
+	"data": {
+		"id": 1,
+		"title": "Daily Sales Report",
+		"body": "Today we achieved excellent sales results...",
+		"type": "daily",
+		"reportDate": "2024-01-15",
+		"employeeId": "Nada_Nada_Sales_001",
+		"employeeName": "Nada Nada",
+		"rating": 4,
+		"comment": "Good work on this report. Keep it up!",
+		"createdAt": "2025-09-24T00:12:57.4636856Z",
+		"updatedAt": "2025-09-24T00:12:58.137769Z",
+		"isActive": true
+	},
+	"message": "Report rated successfully",
+	"timestamp": "2025-09-24T00:12:58.137769Z"
+}
+```
+
+**Error Responses:**
+
+- `400 Bad Request`: Validation errors
+- `401 Unauthorized`: Invalid or missing token
+- `403 Forbidden`: User doesn't have SalesManager role
+- `404 Not Found`: Report not found
 
 ---
 
@@ -405,672 +340,200 @@ Content-Type: application/json
 
 ### SalesReportResponseDto
 
-```typescript
-interface SalesReportResponseDto {
-	id: number;
-	title: string;
-	body: string;
-	type: string;
-	reportDate: string; // Format: "YYYY-MM-DD"
-	employeeId: string;
-	employeeName: string;
-	rating: number | null; // 1-5 stars, null if not rated
-	comment: string | null; // Manager's comment, null if not provided
-	createdAt: string; // ISO 8601 format
-	updatedAt: string; // ISO 8601 format
-	isActive: boolean;
+```json
+{
+    "id": 1,
+    "title": "string",
+    "body": "string",
+    "type": "daily|weekly|monthly|custom",
+    "reportDate": "2024-01-15",
+    "employeeId": "string",
+    "employeeName": "string",
+    "rating": 1-5,
+    "comment": "string",
+    "createdAt": "2025-09-24T00:12:57.4636856Z",
+    "updatedAt": "2025-09-24T00:12:58.0295151Z",
+    "isActive": true
 }
 ```
 
-### PaginatedSalesReportsResponseDto
+### CreateSalesReportDto
 
-```typescript
-interface PaginatedSalesReportsResponseDto {
-	data: SalesReportResponseDto[];
-	totalCount: number;
-	page: number;
-	pageSize: number;
-	totalPages: number;
-	hasNextPage: boolean;
-	hasPreviousPage: boolean;
+```json
+{
+	"title": "string (required, max 100 chars)",
+	"body": "string (required, max 2000 chars)",
+	"type": "string (required, daily|weekly|monthly|custom)",
+	"reportDate": "2024-01-15 (required, not future)"
+}
+```
+
+### UpdateSalesReportDto
+
+```json
+{
+	"title": "string (required, max 100 chars)",
+	"body": "string (required, max 2000 chars)",
+	"type": "string (required, daily|weekly|monthly|custom)",
+	"reportDate": "2024-01-15 (required, not future)"
+}
+```
+
+### RateSalesReportDto
+
+```json
+{
+    "rating": 1-5,
+    "comment": "string (max 500 chars)"
+}
+```
+
+### FilterSalesReportsDto
+
+```json
+{
+	"employeeId": "string (optional)",
+	"startDate": "2024-01-01 (optional)",
+	"endDate": "2024-01-31 (optional)",
+	"type": "daily|weekly|monthly|custom (optional)",
+	"page": 1,
+	"pageSize": 10
 }
 ```
 
 ---
 
-## Frontend Integration Examples
+## Role-Based Access Control
 
-### React Hook for Sales Reports
+### Salesman (Sales Employee)
 
-```typescript
-import { useState, useEffect } from 'react';
+- ✅ Create reports
+- ✅ Read own reports
+- ✅ Update own reports
+- ✅ Delete own reports
+- ❌ Rate reports
+- ❌ View other employees' reports
 
-interface UseSalesReportsReturn {
-	reports: SalesReportResponseDto[];
-	loading: boolean;
-	error: string | null;
-	pagination: {
-		page: number;
-		pageSize: number;
-		totalPages: number;
-		hasNextPage: boolean;
-		hasPreviousPage: boolean;
-	};
-	createReport: (data: CreateSalesReportDto) => Promise<void>;
-	updateReport: (id: number, data: UpdateSalesReportDto) => Promise<void>;
-	deleteReport: (id: number) => Promise<void>;
-	rateReport: (id: number, data: RateSalesReportDto) => Promise<void>;
-	fetchReports: (filters?: FilterSalesReportsDto) => Promise<void>;
-}
+### SalesManager
 
-export function useSalesReports(): UseSalesReportsReturn {
-	const [reports, setReports] = useState<SalesReportResponseDto[]>([]);
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [pagination, setPagination] = useState({
-		page: 1,
-		pageSize: 10,
-		totalPages: 0,
-		hasNextPage: false,
-		hasPreviousPage: false,
-	});
-
-	const apiCall = async (url: string, options: RequestInit = {}) => {
-		const token = localStorage.getItem('authToken');
-		const response = await fetch(url, {
-			...options,
-			headers: {
-				Authorization: `Bearer ${token}`,
-				'Content-Type': 'application/json',
-				...options.headers,
-			},
-		});
-
-		if (!response.ok) {
-			const errorData = await response.json();
-			throw new Error(
-				errorData.message || 'API request failed'
-			);
-		}
-
-		return response.json();
-	};
-
-	const createReport = async (data: CreateSalesReportDto) => {
-		setLoading(true);
-		setError(null);
-		try {
-			const result = await apiCall('/api/SalesReport', {
-				method: 'POST',
-				body: JSON.stringify(data),
-			});
-			await fetchReports(); // Refresh the list
-		} catch (err) {
-			setError(
-				err instanceof Error
-					? err.message
-					: 'Failed to create report'
-			);
-			throw err;
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const updateReport = async (id: number, data: UpdateSalesReportDto) => {
-		setLoading(true);
-		setError(null);
-		try {
-			await apiCall(`/api/SalesReport/${id}`, {
-				method: 'PUT',
-				body: JSON.stringify(data),
-			});
-			await fetchReports(); // Refresh the list
-		} catch (err) {
-			setError(
-				err instanceof Error
-					? err.message
-					: 'Failed to update report'
-			);
-			throw err;
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const deleteReport = async (id: number) => {
-		setLoading(true);
-		setError(null);
-		try {
-			await apiCall(`/api/SalesReport/${id}`, {
-				method: 'DELETE',
-			});
-			await fetchReports(); // Refresh the list
-		} catch (err) {
-			setError(
-				err instanceof Error
-					? err.message
-					: 'Failed to delete report'
-			);
-			throw err;
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const rateReport = async (id: number, data: RateSalesReportDto) => {
-		setLoading(true);
-		setError(null);
-		try {
-			await apiCall(`/api/SalesReport/${id}/rate`, {
-				method: 'POST',
-				body: JSON.stringify(data),
-			});
-			await fetchReports(); // Refresh the list
-		} catch (err) {
-			setError(
-				err instanceof Error
-					? err.message
-					: 'Failed to rate report'
-			);
-			throw err;
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const fetchReports = async (filters: FilterSalesReportsDto = {}) => {
-		setLoading(true);
-		setError(null);
-		try {
-			const queryParams = new URLSearchParams();
-			if (filters.employeeId)
-				queryParams.append(
-					'employeeId',
-					filters.employeeId
-				);
-			if (filters.startDate)
-				queryParams.append(
-					'startDate',
-					filters.startDate
-				);
-			if (filters.endDate)
-				queryParams.append('endDate', filters.endDate);
-			if (filters.type)
-				queryParams.append('type', filters.type);
-			if (filters.page)
-				queryParams.append(
-					'page',
-					filters.page.toString()
-				);
-			if (filters.pageSize)
-				queryParams.append(
-					'pageSize',
-					filters.pageSize.toString()
-				);
-
-			const result = await apiCall(
-				`/api/SalesReport?${queryParams.toString()}`
-			);
-			setReports(result.data.data);
-			setPagination({
-				page: result.data.page,
-				pageSize: result.data.pageSize,
-				totalPages: result.data.totalPages,
-				hasNextPage: result.data.hasNextPage,
-				hasPreviousPage: result.data.hasPreviousPage,
-			});
-		} catch (err) {
-			setError(
-				err instanceof Error
-					? err.message
-					: 'Failed to fetch reports'
-			);
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	useEffect(() => {
-		fetchReports();
-	}, []);
-
-	return {
-		reports,
-		loading,
-		error,
-		pagination,
-		createReport,
-		updateReport,
-		deleteReport,
-		rateReport,
-		fetchReports,
-	};
-}
-```
-
-### React Component Example
-
-```typescript
-import React, { useState } from 'react';
-import { useSalesReports } from './hooks/useSalesReports';
-
-const SalesReportsPage: React.FC = () => {
-	const {
-		reports,
-		loading,
-		error,
-		pagination,
-		createReport,
-		updateReport,
-		deleteReport,
-		rateReport,
-		fetchReports,
-	} = useSalesReports();
-
-	const [showCreateForm, setShowCreateForm] = useState(false);
-	const [editingReport, setEditingReport] =
-		useState<SalesReportResponseDto | null>(null);
-	const [filters, setFilters] = useState<FilterSalesReportsDto>({});
-
-	const handleCreateReport = async (data: CreateSalesReportDto) => {
-		try {
-			await createReport(data);
-			setShowCreateForm(false);
-		} catch (error) {
-			console.error('Failed to create report:', error);
-		}
-	};
-
-	const handleUpdateReport = async (data: UpdateSalesReportDto) => {
-		if (!editingReport) return;
-		try {
-			await updateReport(editingReport.id, data);
-			setEditingReport(null);
-		} catch (error) {
-			console.error('Failed to update report:', error);
-		}
-	};
-
-	const handleDeleteReport = async (id: number) => {
-		if (
-			window.confirm(
-				'Are you sure you want to delete this report?'
-			)
-		) {
-			try {
-				await deleteReport(id);
-			} catch (error) {
-				console.error(
-					'Failed to delete report:',
-					error
-				);
-			}
-		}
-	};
-
-	const handleRateReport = async (
-		id: number,
-		rating: number,
-		comment: string
-	) => {
-		try {
-			await rateReport(id, { rating, comment });
-		} catch (error) {
-			console.error('Failed to rate report:', error);
-		}
-	};
-
-	const handleFilterChange = (newFilters: FilterSalesReportsDto) => {
-		setFilters(newFilters);
-		fetchReports(newFilters);
-	};
-
-	if (loading) return <div>Loading...</div>;
-	if (error) return <div>Error: {error}</div>;
-
-	return (
-		<div className="sales-reports-page">
-			<h1>Sales Reports</h1>
-
-			{/* Filter Controls */}
-			<div className="filters">
-				<select
-					value={filters.type || ''}
-					onChange={(e) =>
-						handleFilterChange({
-							...filters,
-							type:
-								e.target
-									.value ||
-								undefined,
-						})
-					}
-				>
-					<option value="">All Types</option>
-					<option value="daily">Daily</option>
-					<option value="weekly">Weekly</option>
-					<option value="monthly">Monthly</option>
-					<option value="custom">Custom</option>
-				</select>
-
-				<input
-					type="date"
-					value={filters.startDate || ''}
-					onChange={(e) =>
-						handleFilterChange({
-							...filters,
-							startDate:
-								e.target
-									.value ||
-								undefined,
-						})
-					}
-					placeholder="Start Date"
-				/>
-
-				<input
-					type="date"
-					value={filters.endDate || ''}
-					onChange={(e) =>
-						handleFilterChange({
-							...filters,
-							endDate:
-								e.target
-									.value ||
-								undefined,
-						})
-					}
-					placeholder="End Date"
-				/>
-			</div>
-
-			{/* Create Report Button */}
-			<button onClick={() => setShowCreateForm(true)}>
-				Create New Report
-			</button>
-
-			{/* Reports List */}
-			<div className="reports-list">
-				{reports.map((report) => (
-					<div
-						key={report.id}
-						className="report-card"
-					>
-						<h3>{report.title}</h3>
-						<p>
-							<strong>Type:</strong>{' '}
-							{report.type}
-						</p>
-						<p>
-							<strong>Date:</strong>{' '}
-							{report.reportDate}
-						</p>
-						<p>
-							<strong>
-								Employee:
-							</strong>{' '}
-							{report.employeeName}
-						</p>
-						<p>
-							<strong>Body:</strong>{' '}
-							{report.body}
-						</p>
-
-						{report.rating && (
-							<div className="rating">
-								<p>
-									<strong>
-										Rating:
-									</strong>{' '}
-									{
-										report.rating
-									}
-									/5
-								</p>
-								{report.comment && (
-									<p>
-										<strong>
-											Comment:
-										</strong>{' '}
-										{
-											report.comment
-										}
-									</p>
-								)}
-							</div>
-						)}
-
-						<div className="actions">
-							<button
-								onClick={() =>
-									setEditingReport(
-										report
-									)
-								}
-							>
-								Edit
-							</button>
-							<button
-								onClick={() =>
-									handleDeleteReport(
-										report.id
-									)
-								}
-							>
-								Delete
-							</button>
-							{/* Rating form for managers */}
-							<RatingForm
-								reportId={
-									report.id
-								}
-								onRate={
-									handleRateReport
-								}
-							/>
-						</div>
-					</div>
-				))}
-			</div>
-
-			{/* Pagination */}
-			<div className="pagination">
-				<button
-					disabled={!pagination.hasPreviousPage}
-					onClick={() =>
-						handleFilterChange({
-							...filters,
-							page:
-								pagination.page -
-								1,
-						})
-					}
-				>
-					Previous
-				</button>
-				<span>
-					Page {pagination.page} of{' '}
-					{pagination.totalPages}
-				</span>
-				<button
-					disabled={!pagination.hasNextPage}
-					onClick={() =>
-						handleFilterChange({
-							...filters,
-							page:
-								pagination.page +
-								1,
-						})
-					}
-				>
-					Next
-				</button>
-			</div>
-
-			{/* Create/Edit Forms */}
-			{showCreateForm && (
-				<CreateReportForm
-					onSubmit={handleCreateReport}
-					onCancel={() =>
-						setShowCreateForm(false)
-					}
-				/>
-			)}
-
-			{editingReport && (
-				<EditReportForm
-					report={editingReport}
-					onSubmit={handleUpdateReport}
-					onCancel={() => setEditingReport(null)}
-				/>
-			)}
-		</div>
-	);
-};
-
-export default SalesReportsPage;
-```
-
----
-
-## Error Handling
-
-### Common Error Scenarios
-
-1. **Validation Errors (400)**
-
-      - Missing required fields
-      - Invalid field formats
-      - Field length violations
-      - Invalid enum values
-
-2. **Authentication Errors (401)**
-
-      - Missing or invalid JWT token
-      - Expired token
-
-3. **Authorization Errors (403)**
-
-      - Insufficient role permissions
-      - Attempting to access/modify other users' reports
-
-4. **Not Found Errors (404)**
-
-      - Report doesn't exist
-      - User doesn't have permission to access report
-
-5. **Conflict Errors (409)**
-      - Duplicate report (same employee, date, and type)
-
-### Error Response Format
-
-```typescript
-interface ApiErrorResponse {
-	success: false;
-	message: string;
-	errors?: Record<string, string[]>; // For validation errors
-	timestamp: string;
-}
-```
+- ❌ Create reports
+- ✅ Read all reports
+- ❌ Update reports
+- ❌ Delete reports
+- ✅ Rate reports
+- ✅ View all employees' reports
 
 ---
 
 ## Business Rules
 
-### Report Creation
-
-- Only SalesEmployee role can create reports
-- Each employee can have only one report per type per date
-- Report date cannot be in the future
-- All fields are required and have length limits
-
-### Report Management
-
-- Employees can only modify their own reports
-- Managers can view all reports but cannot modify them
-- Reports are soft-deleted (IsActive = false)
-
-### Report Rating
-
-- Only SalesManager role can rate reports
-- Rating must be between 1-5 stars
-- Either rating or comment (or both) must be provided
-- Rating can be updated by managers
-
-### Data Filtering
-
-- Employees see only their own reports
-- Managers see all reports
-- Filtering by date range, type, and employee is supported
-- Pagination is required for large datasets
+1. **Duplicate Prevention**: A sales employee cannot create multiple reports of the same type for the same date
+2. **Date Validation**: Report dates cannot be in the future
+3. **Type Validation**: Report types must be one of: daily, weekly, monthly, custom
+4. **Ownership**: Sales employees can only modify their own reports
+5. **Soft Delete**: Reports are soft deleted (marked as inactive) rather than physically removed
+6. **Rating**: Only sales managers can rate reports
+7. **Pagination**: Default page size is 10, maximum is 100
 
 ---
 
-## Performance Considerations
+## Error Handling
 
-- Pagination is implemented to handle large datasets efficiently
-- Database queries are optimized with proper indexing
-- Soft deletion preserves data integrity
-- Caching can be implemented for frequently accessed reports
+All endpoints return consistent error responses:
 
----
+```json
+{
+	"success": false,
+	"message": "Error description",
+	"errors": {
+		"fieldName": ["Error message 1", "Error message 2"]
+	},
+	"timestamp": "2025-09-24T00:12:58.137769Z"
+}
+```
 
-## Security Considerations
+Common HTTP status codes:
 
-- JWT token authentication required for all endpoints
-- Role-based authorization enforced
-- Input validation prevents malicious data
-- SQL injection protection through Entity Framework
-- XSS protection through proper data encoding
+- `200 OK`: Success
+- `201 Created`: Resource created successfully
+- `400 Bad Request`: Validation errors
+- `401 Unauthorized`: Authentication required
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: Resource not found
+- `409 Conflict`: Duplicate resource
+- `500 Internal Server Error`: Server error
 
 ---
 
 ## Testing Examples
 
-### cURL Commands
+### Test User Credentials
 
-**Create Report**
+- **Sales Employee**: `Nada@Nada.Nada3` / `Nada@Nada.Nada3`
+- **Sales Manager**: `f@f.com123A5` / `f@f.com123A5`
 
-```bash
-curl -X POST "https://your-api-domain.com/api/SalesReport" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Daily Sales Report",
-    "body": "Report content here",
-    "type": "daily",
-    "reportDate": "2024-01-15"
-  }'
-```
+### Sample Test Flow
 
-**Get Reports with Filter**
+1. **Login as Sales Employee**
 
-```bash
-curl -X GET "https://your-api-domain.com/api/SalesReport?type=daily&page=1&pageSize=10" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
+      ```bash
+      POST /api/Account/login
+      {
+          "userName": "Nada@Nada.Nada3",
+          "password": "Nada@Nada.Nada3"
+      }
+      ```
 
-**Rate Report**
+2. **Create a Report**
 
-```bash
-curl -X POST "https://your-api-domain.com/api/SalesReport/123/rate" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "rating": 4,
-    "comment": "Great work!"
-  }'
-```
+      ```bash
+      POST /api/SalesReport
+      {
+          "title": "Daily Sales Report",
+          "body": "Today we achieved excellent results...",
+          "type": "daily",
+          "reportDate": "2024-01-15"
+      }
+      ```
+
+3. **Login as Sales Manager**
+
+      ```bash
+      POST /api/Account/login
+      {
+          "userName": "f@f.com123A5",
+          "password": "f@f.com123A5"
+      }
+      ```
+
+4. **View All Reports**
+
+      ```bash
+      GET /api/SalesReport
+      ```
+
+5. **Rate a Report**
+      ```bash
+      POST /api/SalesReport/1/rate
+      {
+          "rating": 4,
+          "comment": "Good work!"
+      }
+      ```
 
 ---
 
-## Version History
+## Known Issues
 
-- **v1.0** (2024-01-15): Initial implementation with full CRUD operations and rating system
+1. **Role Assignment**: The original sales manager user (`f@f.com123A5`) may not have the SalesManager role properly assigned in the database. This prevents them from seeing all reports.
+
+2. **Database Consistency**: There may be issues with role assignment during user creation that need to be addressed.
+
+3. **Token Refresh**: JWT tokens may need to be refreshed to reflect role changes.
 
 ---
 
 ## Support
 
-For additional support or to report issues with the Sales Report API, please contact the development team or refer to the main API documentation.
+For technical support or questions about the Sales Report API, please contact the development team or refer to the main API documentation.
+
