@@ -38,13 +38,6 @@ namespace SoitMed.DTO
         public bool IsProfileImage { get; set; } = false;
     }
 
-    public class UpdateUserImageDTO
-    {
-        [MaxLength(500)]
-        public string? AltText { get; set; }
-
-        public bool? IsProfileImage { get; set; }
-    }
 
     public class UploadUserImageDTO
     {

@@ -1,6 +1,7 @@
 using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Hospital;
+using SoitMed.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,43 +12,40 @@ namespace SoitMed.Controllers
     [ApiController]
     public class HospitalController : ControllerBase
     {
-        private readonly Context context;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public HospitalController(Context _context)
+        public HospitalController(IUnitOfWork unitOfWork)
         {
-            context = _context;
+            _unitOfWork = unitOfWork;
         }
 
         [HttpGet]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetHospitals()
         {
-            var hospitals = await context.Hospitals
-                .Select(h => new HospitalResponseDTO
-                {
-                    HospitalId = h.HospitalId,
-                    Name = h.Name,
-                    Location = h.Location,
-                    Address = h.Address,
-                    PhoneNumber = h.PhoneNumber,
-                    CreatedAt = h.CreatedAt,
-                    IsActive = h.IsActive,
-                    DoctorCount = h.Doctors.Count(),
-                    TechnicianCount = h.Technicians.Count()
-                })
-                .ToListAsync();
+            var hospitals = await _unitOfWork.Hospitals.GetActiveHospitalsAsync();
+            
+            var response = hospitals.Select(h => new HospitalResponseDTO
+            {
+                HospitalId = h.HospitalId,
+                Name = h.Name,
+                Location = h.Location,
+                Address = h.Address,
+                PhoneNumber = h.PhoneNumber,
+                CreatedAt = h.CreatedAt,
+                IsActive = h.IsActive,
+                DoctorCount = h.Doctors.Count(),
+                TechnicianCount = h.Technicians.Count()
+            });
 
-            return Ok(hospitals);
+            return Ok(response);
         }
 
         [HttpGet("{hospitalId}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetHospital(string hospitalId)
         {
-            var hospital = await context.Hospitals
-                .Include(h => h.Doctors)
-                .Include(h => h.Technicians)
-                .FirstOrDefaultAsync(h => h.HospitalId == hospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetHospitalWithAllDetailsAsync(hospitalId);
 
             if (hospital == null)
             {
@@ -80,7 +78,7 @@ namespace SoitMed.Controllers
             }
 
             // Check if hospital ID already exists
-            if (await context.Hospitals.AnyAsync(h => h.HospitalId == hospitalDTO.HospitalId))
+            if (await _unitOfWork.Hospitals.ExistsByHospitalIdAsync(hospitalDTO.HospitalId))
             {
                 return BadRequest($"Hospital with ID '{hospitalDTO.HospitalId}' already exists");
             }
@@ -96,8 +94,8 @@ namespace SoitMed.Controllers
                 IsActive = true
             };
 
-            context.Hospitals.Add(hospital);
-            await context.SaveChangesAsync();
+            await _unitOfWork.Hospitals.CreateAsync(hospital);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Hospital '{hospital.Name}' created successfully with ID: {hospital.HospitalId}");
         }
@@ -111,7 +109,7 @@ namespace SoitMed.Controllers
                 return BadRequest(ModelState);
             }
 
-            var hospital = await context.Hospitals.FindAsync(hospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(hospitalId);
             if (hospital == null)
             {
                 return NotFound($"Hospital with ID {hospitalId} not found");
@@ -122,7 +120,8 @@ namespace SoitMed.Controllers
             hospital.Address = hospitalDTO.Address;
             hospital.PhoneNumber = hospitalDTO.PhoneNumber;
 
-            await context.SaveChangesAsync();
+            await _unitOfWork.Hospitals.UpdateAsync(hospital);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Hospital '{hospital.Name}' updated successfully");
         }
@@ -131,10 +130,7 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> DeleteHospital(string hospitalId)
         {
-            var hospital = await context.Hospitals
-                .Include(h => h.Doctors)
-                .Include(h => h.Technicians)
-                .FirstOrDefaultAsync(h => h.HospitalId == hospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetHospitalWithAllDetailsAsync(hospitalId);
 
             if (hospital == null)
             {
@@ -146,8 +142,8 @@ namespace SoitMed.Controllers
                 return BadRequest($"Cannot delete hospital '{hospital.Name}' because it has {hospital.Doctors.Count()} doctors and {hospital.Technicians.Count()} technicians assigned to it");
             }
 
-            context.Hospitals.Remove(hospital);
-            await context.SaveChangesAsync();
+            await _unitOfWork.Hospitals.DeleteAsync(hospital);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Hospital '{hospital.Name}' deleted successfully");
         }
@@ -162,7 +158,7 @@ namespace SoitMed.Controllers
                 return BadRequest(ModelState);
             }
 
-            var hospital = await context.Hospitals.FindAsync(hospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(hospitalId);
             if (hospital == null)
             {
                 return NotFound($"Hospital with ID {hospitalId} not found");
@@ -178,8 +174,8 @@ namespace SoitMed.Controllers
                 IsActive = true
             };
 
-            context.Doctors.Add(doctor);
-            await context.SaveChangesAsync();
+            await _unitOfWork.Doctors.CreateAsync(doctor);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Doctor '{doctor.Name}' added to hospital '{hospital.Name}' successfully");
         }
@@ -188,10 +184,7 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetHospitalDoctors(string hospitalId)
         {
-            var hospital = await context.Hospitals
-                .Include(h => h.Doctors)
-                .ThenInclude(d => d.User)
-                .FirstOrDefaultAsync(h => h.HospitalId == hospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetHospitalWithDoctorsAsync(hospitalId);
 
             if (hospital == null)
             {
@@ -226,7 +219,7 @@ namespace SoitMed.Controllers
                 return BadRequest(ModelState);
             }
 
-            var hospital = await context.Hospitals.FindAsync(hospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(hospitalId);
             if (hospital == null)
             {
                 return NotFound($"Hospital with ID {hospitalId} not found");
@@ -242,8 +235,8 @@ namespace SoitMed.Controllers
                 IsActive = true
             };
 
-            context.Technicians.Add(technician);
-            await context.SaveChangesAsync();
+            await _unitOfWork.Technicians.CreateAsync(technician);
+            await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Technician '{technician.Name}' added to hospital '{hospital.Name}' successfully");
         }
@@ -252,10 +245,7 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetHospitalTechnicians(string hospitalId)
         {
-            var hospital = await context.Hospitals
-                .Include(h => h.Technicians)
-                .ThenInclude(t => t.User)
-                .FirstOrDefaultAsync(h => h.HospitalId == hospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetHospitalWithTechniciansAsync(hospitalId);
 
             if (hospital == null)
             {
