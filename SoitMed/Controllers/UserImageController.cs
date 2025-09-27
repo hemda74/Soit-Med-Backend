@@ -6,394 +6,381 @@ using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Identity;
 using SoitMed.Services;
+using System.Security.Claims;
 
 namespace SoitMed.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
-    [Authorize]
+    [Route("api/User")]
     public class UserImageController : ControllerBase
     {
-        private readonly Context _context;
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _environment;
+        private readonly Context _context;
+        private readonly IRoleBasedImageUploadService _imageUploadService;
 
         public UserImageController(
-            Context context, 
             UserManager<ApplicationUser> userManager,
-            IWebHostEnvironment environment)
+            Context context,
+            IRoleBasedImageUploadService imageUploadService)
         {
-            _context = context;
             _userManager = userManager;
-            _environment = environment;
+            _context = context;
+            _imageUploadService = imageUploadService;
         }
 
-        /// <summary>
-        /// Get all images for the current user
-        /// </summary>
-        [HttpGet("my-images")]
-        public async Task<IActionResult> GetMyImages()
+        // Upload user profile image (POST)
+        [HttpPost("image")]
+        [Authorize]
+        [ProducesResponseType(typeof(UpdateUserImageResponseDTO), 200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(404)]
+        public async Task<IActionResult> UploadProfileImage([FromForm] IFormFile profileImage, [FromForm] string? altText = null)
         {
-            var userId = _userManager.GetUserId(User);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var images = await _context.UserImages
-                .Where(ui => ui.UserId == userId && ui.IsActive)
-                .OrderByDescending(ui => ui.UploadedAt)
-                .Select(ui => new UserImageDTO
-                {
-                    Id = ui.Id,
-                    UserId = ui.UserId,
-                    FileName = ui.FileName,
-                    FilePath = ui.FilePath,
-                    ContentType = ui.ContentType,
-                    FileSize = ui.FileSize,
-                    AltText = ui.AltText,
-                    UploadedAt = ui.UploadedAt,
-                    IsActive = ui.IsActive,
-                    IsProfileImage = ui.IsProfileImage
-                })
-                .ToListAsync();
-
-            return Ok(new
-            {
-                data = images,
-                message = $"Found {images.Count} image(s)",
-                timestamp = DateTime.UtcNow
-            });
-        }
-
-        /// <summary>
-        /// Get profile image for the current user
-        /// </summary>
-        [HttpGet("my-profile-image")]
-        public async Task<IActionResult> GetMyProfileImage()
-        {
-            var userId = _userManager.GetUserId(User);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var profileImage = await _context.UserImages
-                .Where(ui => ui.UserId == userId && ui.IsProfileImage && ui.IsActive)
-                .Select(ui => new UserImageDTO
-                {
-                    Id = ui.Id,
-                    UserId = ui.UserId,
-                    FileName = ui.FileName,
-                    FilePath = ui.FilePath,
-                    ContentType = ui.ContentType,
-                    FileSize = ui.FileSize,
-                    AltText = ui.AltText,
-                    UploadedAt = ui.UploadedAt,
-                    IsActive = ui.IsActive,
-                    IsProfileImage = ui.IsProfileImage
-                })
-                .FirstOrDefaultAsync();
-
-            if (profileImage == null)
-                return NotFound(new
-                {
-                    message = "No profile image found",
-                    timestamp = DateTime.UtcNow
-                });
-
-            return Ok(new
-            {
-                data = profileImage,
-                message = "Profile image retrieved successfully",
-                timestamp = DateTime.UtcNow
-            });
-        }
-
-        /// <summary>
-        /// Upload a new image for the current user
-        /// </summary>
-        [HttpPost("upload")]
-        public async Task<IActionResult> UploadImage([FromForm] UploadUserImageDTO model)
-        {
-            var userId = _userManager.GetUserId(User);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
-            }
-
-            var file = model.File;
-            if (file == null || file.Length == 0)
-                return BadRequest(ValidationHelperService.CreateBusinessLogicError("No file provided", "File"));
-
-            // Validate file type
-            var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp" };
-            if (!allowedTypes.Contains(file.ContentType.ToLower()))
-                return BadRequest(ValidationHelperService.CreateBusinessLogicError("Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed", "File"));
-
-            // Validate file size (max 10MB)
-            if (file.Length > 10 * 1024 * 1024)
-                return BadRequest(ValidationHelperService.CreateBusinessLogicError("File size cannot exceed 10MB", "File"));
-
             try
             {
-                // Create uploads directory if it doesn't exist
-                var uploadsPath = Path.Combine(_environment.WebRootPath, "uploads", "user-images", userId);
-                Directory.CreateDirectory(uploadsPath);
-
-                // Generate unique filename
-                var fileExtension = Path.GetExtension(file.FileName);
-                var fileName = $"{Guid.NewGuid()}{fileExtension}";
-                var filePath = Path.Combine(uploadsPath, fileName);
-
-                // Save file
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                // Validate input
+                if (profileImage == null || profileImage.Length == 0)
                 {
-                    await file.CopyToAsync(stream);
+                    return BadRequest(new { error = "Profile image is required", code = "IMAGE_REQUIRED" });
                 }
 
-                // Always unset any existing profile images when uploading a new image
-                var existingProfileImages = await _context.UserImages
-                    .Where(ui => ui.UserId == userId && ui.IsProfileImage && ui.IsActive)
-                    .ToListAsync();
-
-                foreach (var existingImage in existingProfileImages)
+                if (profileImage.Length > 5 * 1024 * 1024) // 5MB limit
                 {
-                    existingImage.IsProfileImage = false;
+                    return BadRequest(new { error = "Image file size cannot exceed 5MB", code = "IMAGE_TOO_LARGE" });
                 }
 
-                // Create database record - always set as profile image
-                var userImage = new UserImage
+                var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/gif" };
+                if (!allowedTypes.Contains(profileImage.ContentType?.ToLower()))
                 {
-                    UserId = userId,
-                    FileName = file.FileName,
-                    FilePath = Path.Combine("uploads", "user-images", userId, fileName).Replace("\\", "/"),
-                    ContentType = file.ContentType,
-                    FileSize = file.Length,
-                    AltText = model.AltText,
-                    IsProfileImage = true, // Always set as profile image
-                    UploadedAt = DateTime.UtcNow,
-                    IsActive = true
-                };
+                    return BadRequest(new { error = "Only JPEG, PNG, and GIF images are allowed", code = "INVALID_IMAGE_TYPE" });
+                }
 
-                _context.UserImages.Add(userImage);
+                // Get user
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return BadRequest(new { error = "User ID not found in token", code = "USER_ID_NOT_FOUND" });
+                }
+
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    return NotFound(new { error = "User not found", code = "USER_NOT_FOUND" });
+                }
+
+                // Get user roles and department
+                var roles = await _userManager.GetRolesAsync(user);
+                var role = roles.FirstOrDefault() ?? "user";
+                var departmentName = user.Department?.Name ?? "default";
+
+                // Upload image file
+                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, role, departmentName, altText);
+                if (!imageResult.Success)
+                {
+                    return BadRequest(new { error = $"Failed to upload image: {imageResult.ErrorMessage}", code = "UPLOAD_FAILED" });
+                }
+
+                // Find existing profile image (regardless of IsActive status)
+                var existingUserImage = await _context.UserImages
+                    .FirstOrDefaultAsync(ui => ui.UserId == userId && ui.IsProfileImage);
+
+                UserImage userImage;
+                if (existingUserImage != null)
+                {
+                    // Update existing record
+                    existingUserImage.FileName = imageResult.FileName ?? "profile.jpg";
+                    existingUserImage.FilePath = imageResult.FilePath ?? "";
+                    existingUserImage.ContentType = imageResult.ContentType ?? "image/jpeg";
+                    existingUserImage.FileSize = imageResult.FileSize;
+                    existingUserImage.AltText = imageResult.AltText;
+                    existingUserImage.IsActive = true; // Ensure it's active
+                    existingUserImage.UploadedAt = DateTime.UtcNow;
+                    
+                    _context.UserImages.Update(existingUserImage);
+                    userImage = existingUserImage;
+                }
+                else
+                {
+                    // Create new user image record
+                    userImage = new UserImage
+                    {
+                        UserId = user.Id,
+                        FileName = imageResult.FileName ?? "profile.jpg",
+                        FilePath = imageResult.FilePath ?? "",
+                        ContentType = imageResult.ContentType ?? "image/jpeg",
+                        FileSize = imageResult.FileSize,
+                        AltText = imageResult.AltText,
+                        ImageType = "Profile",
+                        IsProfileImage = true,
+                        IsActive = true,
+                        UploadedAt = DateTime.UtcNow
+                    };
+
+                    _context.UserImages.Add(userImage);
+                }
+
                 await _context.SaveChangesAsync();
 
-                var response = new UserImageUploadResponseDTO
+                // Return success response
+                var profileImageInfo = new UserImageInfoDTO
                 {
                     Id = userImage.Id,
-                    UserId = userImage.UserId,
                     FileName = userImage.FileName,
                     FilePath = userImage.FilePath,
                     ContentType = userImage.ContentType,
                     FileSize = userImage.FileSize,
                     AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt,
-                    IsProfileImage = true, // Always true for uploaded images
-                    Message = "Image uploaded and set as profile image successfully"
+                    IsActive = userImage.IsActive
                 };
 
-                return Ok(new
+                return Ok(new UpdateUserImageResponseDTO
                 {
-                    data = response,
-                    message = "Image uploaded and set as profile image successfully",
-                    timestamp = DateTime.UtcNow
+                    UserId = user.Id,
+                    Message = "Profile image uploaded successfully",
+                    ProfileImage = profileImageInfo,
+                    UpdatedAt = DateTime.UtcNow
                 });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new
-                {
-                    error = "Failed to upload image",
-                    details = ex.Message,
-                    timestamp = DateTime.UtcNow
-                });
+                // Log the exception for debugging
+                Console.WriteLine($"Error in UploadProfileImage: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                return StatusCode(500, new { error = "An unexpected error occurred while uploading the image. Please try again.", code = "UPLOAD_ERROR" });
             }
         }
 
-        /// <summary>
-        /// Set an existing image as profile image
-        /// </summary>
-        [HttpPut("{imageId}/set-profile")]
-        public async Task<IActionResult> SetAsProfileImage(int imageId)
+        // Get user profile image
+        [HttpGet("image")]
+        [Authorize]
+        [ProducesResponseType(typeof(UserImageInfoDTO), 200)]
+        [ProducesResponseType(404)]
+        public async Task<IActionResult> GetProfileImage()
         {
-            var userId = _userManager.GetUserId(User);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var image = await _context.UserImages
-                .FirstOrDefaultAsync(ui => ui.Id == imageId && ui.UserId == userId && ui.IsActive);
-
-            if (image == null)
-                return NotFound(new
-                {
-                    error = "Image not found",
-                    timestamp = DateTime.UtcNow
-                });
-
             try
             {
-                // Unset any existing profile image
-                var existingProfileImages = await _context.UserImages
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return BadRequest(new { error = "User ID not found in token", code = "USER_ID_NOT_FOUND" });
+                }
+
+                var userImage = await _context.UserImages
+                    .Where(ui => ui.UserId == userId && ui.IsProfileImage && ui.IsActive)
+                    .OrderByDescending(ui => ui.UploadedAt)
+                    .FirstOrDefaultAsync();
+
+                if (userImage == null)
+                {
+                    return NotFound(new { error = "No profile image found", code = "NO_IMAGE_FOUND" });
+                }
+
+                var profileImageInfo = new UserImageInfoDTO
+                {
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt,
+                    IsActive = userImage.IsActive
+                };
+
+                return Ok(profileImageInfo);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetProfileImage: {ex.Message}");
+                return StatusCode(500, new { error = "An unexpected error occurred while retrieving the image.", code = "GET_ERROR" });
+            }
+        }
+
+        // Update user profile image (PUT)
+        [HttpPut("image")]
+        [Authorize]
+        [ProducesResponseType(typeof(UpdateUserImageResponseDTO), 200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(404)]
+        public async Task<IActionResult> UpdateProfileImage([FromForm] IFormFile profileImage, [FromForm] string? altText = null)
+        {
+            try
+            {
+                // Validate input
+                if (profileImage == null || profileImage.Length == 0)
+                {
+                    return BadRequest(new { error = "Profile image is required", code = "IMAGE_REQUIRED" });
+                }
+
+                if (profileImage.Length > 5 * 1024 * 1024) // 5MB limit
+                {
+                    return BadRequest(new { error = "Image file size cannot exceed 5MB", code = "IMAGE_TOO_LARGE" });
+                }
+
+                var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/gif" };
+                if (!allowedTypes.Contains(profileImage.ContentType?.ToLower()))
+                {
+                    return BadRequest(new { error = "Only JPEG, PNG, and GIF images are allowed", code = "INVALID_IMAGE_TYPE" });
+                }
+
+                // Get user
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return BadRequest(new { error = "User ID not found in token", code = "USER_ID_NOT_FOUND" });
+                }
+
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    return NotFound(new { error = "User not found", code = "USER_NOT_FOUND" });
+                }
+
+                // Get user roles and department
+                var roles = await _userManager.GetRolesAsync(user);
+                var role = roles.FirstOrDefault() ?? "user";
+                var departmentName = user.Department?.Name ?? "default";
+
+                // Upload image file
+                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, role, departmentName, altText);
+                if (!imageResult.Success)
+                {
+                    return BadRequest(new { error = $"Failed to upload image: {imageResult.ErrorMessage}", code = "UPLOAD_FAILED" });
+                }
+
+                // Find existing profile image (regardless of IsActive status)
+                var existingUserImage = await _context.UserImages
+                    .FirstOrDefaultAsync(ui => ui.UserId == userId && ui.IsProfileImage);
+
+                UserImage userImage;
+                if (existingUserImage != null)
+                {
+                    // Update existing record
+                    existingUserImage.FileName = imageResult.FileName ?? "profile.jpg";
+                    existingUserImage.FilePath = imageResult.FilePath ?? "";
+                    existingUserImage.ContentType = imageResult.ContentType ?? "image/jpeg";
+                    existingUserImage.FileSize = imageResult.FileSize;
+                    existingUserImage.AltText = imageResult.AltText;
+                    existingUserImage.IsActive = true; // Ensure it's active
+                    existingUserImage.UploadedAt = DateTime.UtcNow;
+                    
+                    _context.UserImages.Update(existingUserImage);
+                    userImage = existingUserImage;
+                }
+                else
+                {
+                    // Create new user image record
+                    userImage = new UserImage
+                    {
+                        UserId = user.Id,
+                        FileName = imageResult.FileName ?? "profile.jpg",
+                        FilePath = imageResult.FilePath ?? "",
+                        ContentType = imageResult.ContentType ?? "image/jpeg",
+                        FileSize = imageResult.FileSize,
+                        AltText = imageResult.AltText,
+                        ImageType = "Profile",
+                        IsProfileImage = true,
+                        IsActive = true,
+                        UploadedAt = DateTime.UtcNow
+                    };
+
+                    _context.UserImages.Add(userImage);
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Return success response
+                var profileImageInfo = new UserImageInfoDTO
+                {
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt,
+                    IsActive = userImage.IsActive
+                };
+
+                return Ok(new UpdateUserImageResponseDTO
+                {
+                    UserId = user.Id,
+                    Message = "Profile image updated successfully",
+                    ProfileImage = profileImageInfo,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                // Log the exception for debugging
+                Console.WriteLine($"Error in UpdateProfileImage: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                return StatusCode(500, new { error = "An unexpected error occurred while updating the image. Please try again.", code = "UPDATE_ERROR" });
+            }
+        }
+
+        // Delete user profile image
+        [HttpDelete("image")]
+        [Authorize]
+        [ProducesResponseType(typeof(DeleteUserImageResponseDTO), 200)]
+        [ProducesResponseType(404)]
+        public async Task<IActionResult> DeleteProfileImage()
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return BadRequest(new { error = "User ID not found in token", code = "USER_ID_NOT_FOUND" });
+                }
+
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    return NotFound(new { error = "User not found", code = "USER_NOT_FOUND" });
+                }
+
+                var existingImages = await _context.UserImages
                     .Where(ui => ui.UserId == userId && ui.IsProfileImage && ui.IsActive)
                     .ToListAsync();
 
-                foreach (var existingImage in existingProfileImages)
+                if (!existingImages.Any())
                 {
-                    existingImage.IsProfileImage = false;
+                    return NotFound(new { error = "No profile image found to delete", code = "NO_IMAGE_FOUND" });
                 }
 
-                // Set this image as profile image
-                image.IsProfileImage = true;
+                // Deactivate all profile images
+                foreach (var existingImage in existingImages)
+                {
+                    existingImage.IsActive = false;
+                    _context.UserImages.Update(existingImage);
+                }
+
                 await _context.SaveChangesAsync();
 
-                return Ok(new
+                return Ok(new DeleteUserImageResponseDTO
                 {
-                    message = "Profile image updated successfully",
-                    timestamp = DateTime.UtcNow
+                    UserId = user.Id,
+                    Message = "Profile image deleted successfully",
+                    DeletedAt = DateTime.UtcNow
                 });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new
                 {
-                    error = "Failed to update profile image",
-                    details = ex.Message,
+                    success = false,
+                    message = "An error occurred while deleting the profile image",
+                    error = ex.Message,
                     timestamp = DateTime.UtcNow
                 });
             }
-        }
-
-        /// <summary>
-        /// Update image metadata
-        /// </summary>
-        [HttpPut("{imageId}")]
-        public async Task<IActionResult> UpdateImage(int imageId, [FromBody] UpdateUserImageDTO updateDto)
-        {
-            var userId = _userManager.GetUserId(User);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var image = await _context.UserImages
-                .FirstOrDefaultAsync(ui => ui.Id == imageId && ui.UserId == userId && ui.IsActive);
-
-            if (image == null)
-                return NotFound(new
-                {
-                    error = "Image not found",
-                    timestamp = DateTime.UtcNow
-                });
-
-            try
-            {
-                if (updateDto.AltText != null)
-                    image.AltText = updateDto.AltText;
-
-                if (updateDto.IsProfileImage.HasValue && updateDto.IsProfileImage.Value)
-                {
-                    // Unset any existing profile image
-                    var existingProfileImages = await _context.UserImages
-                        .Where(ui => ui.UserId == userId && ui.IsProfileImage && ui.IsActive)
-                        .ToListAsync();
-
-                    foreach (var existingImage in existingProfileImages)
-                    {
-                        existingImage.IsProfileImage = false;
-                    }
-
-                    image.IsProfileImage = true;
-                }
-
-                await _context.SaveChangesAsync();
-
-                return Ok(new
-                {
-                    message = "Image updated successfully",
-                    timestamp = DateTime.UtcNow
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new
-                {
-                    error = "Failed to update image",
-                    details = ex.Message,
-                    timestamp = DateTime.UtcNow
-                });
-            }
-        }
-
-        /// <summary>
-        /// Delete an image
-        /// </summary>
-        [HttpDelete("{imageId}")]
-        public async Task<IActionResult> DeleteImage(int imageId)
-        {
-            var userId = _userManager.GetUserId(User);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var image = await _context.UserImages
-                .FirstOrDefaultAsync(ui => ui.Id == imageId && ui.UserId == userId && ui.IsActive);
-
-            if (image == null)
-                return NotFound(new
-                {
-                    error = "Image not found",
-                    timestamp = DateTime.UtcNow
-                });
-
-            try
-            {
-                // Delete physical file
-                var fullPath = Path.Combine(_environment.WebRootPath, image.FilePath);
-                if (System.IO.File.Exists(fullPath))
-                {
-                    System.IO.File.Delete(fullPath);
-                }
-
-                // Soft delete from database
-                image.IsActive = false;
-                await _context.SaveChangesAsync();
-
-                return Ok(new
-                {
-                    message = "Image deleted successfully",
-                    timestamp = DateTime.UtcNow
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new
-                {
-                    error = "Failed to delete image",
-                    details = ex.Message,
-                    timestamp = DateTime.UtcNow
-                });
-            }
-        }
-
-        /// <summary>
-        /// Serve image file
-        /// </summary>
-        [HttpGet("serve/{imageId}")]
-        public async Task<IActionResult> ServeImage(int imageId)
-        {
-            var userId = _userManager.GetUserId(User);
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var image = await _context.UserImages
-                .FirstOrDefaultAsync(ui => ui.Id == imageId && ui.UserId == userId && ui.IsActive);
-
-            if (image == null)
-                return NotFound();
-
-            var fullPath = Path.Combine(_environment.WebRootPath, image.FilePath);
-            if (!System.IO.File.Exists(fullPath))
-                return NotFound();
-
-            var fileBytes = await System.IO.File.ReadAllBytesAsync(fullPath);
-            return File(fileBytes, image.ContentType ?? "application/octet-stream", image.FileName);
         }
     }
 }

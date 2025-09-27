@@ -20,9 +20,8 @@ namespace SoitMed.DTO
         public string? DepartmentName { get; set; }
         public string? DepartmentDescription { get; set; }
         
-        // Profile image information
-        public UserImageDTO? ProfileImage { get; set; }
-        public List<UserImageDTO> UserImages { get; set; } = new List<UserImageDTO>();
+        // User image information
+        public UserImageInfoDTO? ProfileImage { get; set; }
     }
 
     public class CurrentUserDataDTO
@@ -43,14 +42,13 @@ namespace SoitMed.DTO
         public string? DepartmentName { get; set; }
         public string? DepartmentDescription { get; set; }
         
+        // User image information
+        public UserImageInfoDTO? ProfileImage { get; set; }
+        
         // Additional current user specific data
         public bool EmailConfirmed { get; set; }
         public bool PhoneNumberConfirmed { get; set; }
         public string? PhoneNumber { get; set; }
-        
-        // Profile image information
-        public UserImageDTO? ProfileImage { get; set; }
-        public List<UserImageDTO> UserImages { get; set; } = new List<UserImageDTO>();
     }
 }
 

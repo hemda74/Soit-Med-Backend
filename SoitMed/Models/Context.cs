@@ -31,6 +31,8 @@ namespace SoitMed.Models
         // User image entities
         public DbSet<UserImage> UserImages { get; set; }
 
+        // Sales report entities
+        public DbSet<SalesReport> SalesReports { get; set; }
         public Context(DbContextOptions options) : base(options)
         {
 

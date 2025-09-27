@@ -19,98 +19,256 @@ namespace SoitMed.Controllers
 		private readonly UserManager<ApplicationUser> userManager;
 		private readonly Context context;
 		private readonly UserIdGenerationService userIdGenerationService;
-		public UserController(UserManager<ApplicationUser> _userManager, Context _context, UserIdGenerationService _userIdGenerationService)
+		private readonly IRoleBasedImageUploadService _imageUploadService;
+		
+		public UserController(UserManager<ApplicationUser> _userManager, Context _context, UserIdGenerationService _userIdGenerationService, IRoleBasedImageUploadService imageUploadService)
 		{
 			userManager = _userManager;
 			context = _context;
 			userIdGenerationService = _userIdGenerationService;
+			_imageUploadService = imageUploadService;
 		}
 
-		// Helper method to get user images
-		private async Task<(UserImageDTO? profileImage, List<UserImageDTO> allImages)> GetUserImagesAsync(string userId)
+		// Helper method to get user profile image
+		private async Task<UserImageInfoDTO?> GetUserProfileImageAsync(string userId)
 		{
-			var images = await context.UserImages
-				.Where(ui => ui.UserId == userId && ui.IsActive)
+			var profileImage = await context.UserImages
+				.Where(ui => ui.UserId == userId && ui.IsActive && ui.IsProfileImage)
 				.OrderByDescending(ui => ui.UploadedAt)
-				.Select(ui => new UserImageDTO
-				{
-					Id = ui.Id,
-					UserId = ui.UserId,
-					FileName = ui.FileName,
-					FilePath = ui.FilePath,
-					ContentType = ui.ContentType,
-					FileSize = ui.FileSize,
-					AltText = ui.AltText,
-					UploadedAt = ui.UploadedAt,
-					IsActive = ui.IsActive,
-					IsProfileImage = ui.IsProfileImage
-				})
-				.ToListAsync();
+				.FirstOrDefaultAsync();
 
-			var profileImage = images.FirstOrDefault(img => img.IsProfileImage);
-			return (profileImage, images);
-		}
-		[HttpDelete]
-		[Authorize(Roles = "SuperAdmin,Admin")]
-		public async Task<IActionResult> DeleteUser(string Name)
-		{
-			ApplicationUser user = await userManager.FindByNameAsync(Name);
-			if (user != null)
+			if (profileImage == null)
+				return null;
+
+			return new UserImageInfoDTO
 			{
-				IdentityResult result = await userManager.DeleteAsync(user);
-				if (result.Succeeded)
-				{
-					return Ok($"User {Name} deleted successfully");
-				}
-				else
-				{
-					return BadRequest(result.Errors);
-				}
-			}
-			return NotFound($"User with Name {Name} not found");
+				Id = profileImage.Id,
+				FileName = profileImage.FileName,
+				FilePath = profileImage.FilePath,
+				ContentType = profileImage.ContentType,
+				FileSize = profileImage.FileSize,
+				AltText = profileImage.AltText,
+				IsProfileImage = profileImage.IsProfileImage,
+				UploadedAt = profileImage.UploadedAt,
+				IsActive = profileImage.IsActive
+			};
 		}
-		[HttpPut]
-		[Authorize(Roles = "SuperAdmin,Admin")]
-		public async Task<IActionResult> UpdateUser(string userName, RegisterUserDTO userDTO)
+
+		// Helper method to safely upsert user profile image
+		private async Task<UserImage> UpsertUserProfileImageAsync(string userId, string fileName, string filePath, string contentType, long fileSize, string? altText)
 		{
+			using var transaction = await context.Database.BeginTransactionAsync();
+			try
+			{
+				// First, deactivate any existing profile images for this user
+				var existingImages = await context.UserImages
+					.Where(ui => ui.UserId == userId && ui.IsProfileImage && ui.IsActive)
+					.ToListAsync();
+
+				foreach (var existingImage in existingImages)
+				{
+					existingImage.IsActive = false;
+					context.UserImages.Update(existingImage);
+				}
+
+				// Create new user image record
+				var userImage = new UserImage
+				{
+					UserId = userId,
+					FileName = fileName,
+					FilePath = filePath,
+					ContentType = contentType,
+					FileSize = fileSize,
+					AltText = altText,
+					ImageType = "Profile",
+					IsProfileImage = true,
+					IsActive = true,
+					UploadedAt = DateTime.UtcNow
+				};
+
+				context.UserImages.Add(userImage);
+				await context.SaveChangesAsync();
+				await transaction.CommitAsync();
+
+				return userImage;
+			}
+			catch (Exception)
+			{
+				await transaction.RollbackAsync();
+				throw;
+			}
+		}
+		[HttpDelete("{userId}")]
+		[Authorize(Roles = "SuperAdmin,Admin")]
+		public async Task<IActionResult> DeleteUser(string userId)
+		{
+			if (string.IsNullOrEmpty(userId))
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "User ID is required",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
+			// Find user by ID
+			ApplicationUser? user = await userManager.FindByIdAsync(userId);
+			if (user == null)
+			{
+				return NotFound(new
+				{
+					success = false,
+					message = $"User with ID '{userId}' not found",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
+			// Check if user is SuperAdmin (prevent deleting SuperAdmin)
+			var roles = await userManager.GetRolesAsync(user);
+			if (roles.Contains("SuperAdmin"))
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "Cannot delete SuperAdmin user",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
+			// Check if user is trying to delete themselves
+			var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+			if (currentUserId == userId)
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "Cannot delete your own account",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
+			// Delete user
+			IdentityResult result = await userManager.DeleteAsync(user);
+			if (result.Succeeded)
+			{
+				return Ok(new
+				{
+					success = true,
+					message = $"User '{user.UserName}' deleted successfully",
+					deletedUserId = userId,
+					deletedUserName = user.UserName,
+					timestamp = DateTime.UtcNow
+				});
+			}
+			else
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "Failed to delete user",
+					errors = result.Errors.Select(e => e.Description).ToList(),
+					timestamp = DateTime.UtcNow
+				});
+			}
+		}
+		[HttpPatch("{userId}")]
+		[Authorize(Roles = "SuperAdmin,Admin")]
+		public async Task<IActionResult> UpdateUser(string userId, UpdateUserDTO userDTO)
+		{
+			if (string.IsNullOrEmpty(userId))
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "User ID is required",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
 			// Check if role is provided
 			if (string.IsNullOrEmpty(userDTO.Role))
 			{
-				return BadRequest("Role field is required.");
+				return BadRequest(new
+				{
+					success = false,
+					message = "Role field is required",
+					timestamp = DateTime.UtcNow
+				});
 			}
 
 			// Validate the role
 			if (!UserRoles.IsValidRole(userDTO.Role))
 			{
-				return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
+				return BadRequest(new
+				{
+					success = false,
+					message = $"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}",
+					timestamp = DateTime.UtcNow
+				});
 			}
 
-			ApplicationUser user = await userManager.FindByNameAsync(userName);
-			if (user != null)
+			// Find user by ID
+			ApplicationUser? user = await userManager.FindByIdAsync(userId);
+			if (user == null)
 			{
-				user.UserName = userDTO.Email; // Use email as username
-				user.PasswordHash = userDTO.Password;
-				user.Email = userDTO.Email;
-
-				IdentityResult result = await userManager.UpdateAsync(user);
-				if (result.Succeeded)
+				return NotFound(new
 				{
-					// Update user roles - remove all current roles and add the new one
-					var currentRoles = await userManager.GetRolesAsync(user);
-					if (currentRoles.Any())
-					{
-						await userManager.RemoveFromRolesAsync(user, currentRoles);
-					}
-					await userManager.AddToRoleAsync(user, userDTO.Role);
-
-					return Ok($"User {userName} updated successfully with role: {userDTO.Role}");
-				}
-				else
-				{
-					return BadRequest(result.Errors);
-				}
+					success = false,
+					message = $"User with ID '{userId}' not found",
+					timestamp = DateTime.UtcNow
+				});
 			}
-			return NotFound($"User with Name {userName} not found");
+
+			// Check if user is SuperAdmin (prevent updating SuperAdmin)
+			var currentRoles = await userManager.GetRolesAsync(user);
+			if (currentRoles.Contains("SuperAdmin"))
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "Cannot update SuperAdmin user",
+					timestamp = DateTime.UtcNow
+				});
+			}
+
+			// Update user properties
+			user.UserName = userDTO.Email; // Use email as username
+			user.Email = userDTO.Email;
+			user.FirstName = userDTO.FirstName;
+			user.LastName = userDTO.LastName;
+
+			// Update user
+			IdentityResult result = await userManager.UpdateAsync(user);
+			if (result.Succeeded)
+			{
+				// Update user roles - remove all current roles and add the new one
+				if (currentRoles.Any())
+				{
+					await userManager.RemoveFromRolesAsync(user, currentRoles);
+				}
+				await userManager.AddToRoleAsync(user, userDTO.Role);
+
+				return Ok(new
+				{
+					success = true,
+					message = $"User '{user.UserName}' updated successfully",
+					updatedUserId = userId,
+					updatedUserName = user.UserName,
+					newRole = userDTO.Role,
+					timestamp = DateTime.UtcNow
+				});
+			}
+			else
+			{
+				return BadRequest(new
+				{
+					success = false,
+					message = "Failed to update user",
+					errors = result.Errors.Select(e => e.Description).ToList(),
+					timestamp = DateTime.UtcNow
+				});
+			}
 		}
 
 		// Get current logged-in user's data
@@ -134,7 +292,7 @@ namespace SoitMed.Controllers
 			}
 
 			var roles = await userManager.GetRolesAsync(user);
-			var (profileImage, allImages) = await GetUserImagesAsync(user.Id);
+			var profileImage = await GetUserProfileImageAsync(user.Id);
 
 			var userData = new CurrentUserDataDTO
 			{
@@ -151,11 +309,10 @@ namespace SoitMed.Controllers
 				DepartmentId = user.DepartmentId,
 				DepartmentName = user.Department?.Name,
 				DepartmentDescription = user.Department?.Description,
+				ProfileImage = profileImage,
 				EmailConfirmed = user.EmailConfirmed,
 				PhoneNumberConfirmed = user.PhoneNumberConfirmed,
-				PhoneNumber = user.PhoneNumber,
-				ProfileImage = profileImage,
-				UserImages = allImages
+				PhoneNumber = user.PhoneNumber
 			};
 
 			return Ok(userData);
@@ -177,7 +334,7 @@ namespace SoitMed.Controllers
 			}
 
 			var roles = await userManager.GetRolesAsync(user);
-			var (profileImage, allImages) = await GetUserImagesAsync(user.Id);
+			var profileImage = await GetUserProfileImageAsync(user.Id);
 
 			var userData = new UserDataDTO
 			{
@@ -194,8 +351,7 @@ namespace SoitMed.Controllers
 				DepartmentId = user.DepartmentId,
 				DepartmentName = user.Department?.Name,
 				DepartmentDescription = user.Department?.Description,
-				ProfileImage = profileImage,
-				UserImages = allImages
+				ProfileImage = profileImage
 			};
 
 			return Ok(userData);
@@ -262,7 +418,7 @@ namespace SoitMed.Controllers
 							continue;
 						}
 
-						var (profileImage, allImages) = await GetUserImagesAsync(userWithDepartment.Id);
+						var profileImage = await GetUserProfileImageAsync(userWithDepartment.Id);
 
 						allUsersData.Add(new UserDataDTO
 						{
@@ -279,8 +435,7 @@ namespace SoitMed.Controllers
 							DepartmentId = userWithDepartment.DepartmentId,
 							DepartmentName = userWithDepartment.Department?.Name,
 							DepartmentDescription = userWithDepartment.Department?.Description,
-							ProfileImage = profileImage,
-							UserImages = allImages
+							ProfileImage = profileImage
 						});
 					}
 				}
@@ -380,7 +535,7 @@ namespace SoitMed.Controllers
 			foreach (var user in users)
 			{
 				var roles = await userManager.GetRolesAsync(user);
-				var (profileImage, allImages) = await GetUserImagesAsync(user.Id);
+				var profileImage = await GetUserProfileImageAsync(user.Id);
 
 				usersData.Add(new UserDataDTO
 				{
@@ -397,8 +552,7 @@ namespace SoitMed.Controllers
 					DepartmentId = user.DepartmentId,
 					DepartmentName = user.Department?.Name,
 					DepartmentDescription = user.Department?.Description,
-					ProfileImage = profileImage,
-					UserImages = allImages
+					ProfileImage = profileImage
 				});
 			}
 
@@ -442,7 +596,7 @@ namespace SoitMed.Controllers
 				if (userWithDepartment != null)
 				{
 					var roles = await userManager.GetRolesAsync(userWithDepartment);
-					var (profileImage, allImages) = await GetUserImagesAsync(userWithDepartment.Id);
+					var profileImage = await GetUserProfileImageAsync(userWithDepartment.Id);
 
 					usersData.Add(new UserDataDTO
 					{
@@ -459,8 +613,7 @@ namespace SoitMed.Controllers
 						DepartmentId = userWithDepartment.DepartmentId,
 						DepartmentName = userWithDepartment.Department?.Name,
 						DepartmentDescription = userWithDepartment.Department?.Description,
-						ProfileImage = profileImage,
-						UserImages = allImages
+						ProfileImage = profileImage
 					});
 				}
 			}
@@ -489,7 +642,7 @@ namespace SoitMed.Controllers
 			foreach (var user in users)
 			{
 				var roles = await userManager.GetRolesAsync(user);
-				var (profileImage, allImages) = await GetUserImagesAsync(user.Id);
+				var profileImage = await GetUserProfileImageAsync(user.Id);
 
 				usersData.Add(new UserDataDTO
 				{
@@ -506,8 +659,7 @@ namespace SoitMed.Controllers
 					DepartmentId = user.DepartmentId,
 					DepartmentName = user.Department?.Name,
 					DepartmentDescription = user.Department?.Description,
-					ProfileImage = profileImage,
-					UserImages = allImages
+					ProfileImage = profileImage
 				});
 			}
 
@@ -676,6 +828,7 @@ namespace SoitMed.Controllers
 				));
 			}
 		}
+
 
 	}
 }
