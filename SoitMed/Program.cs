@@ -92,6 +92,10 @@ namespace SoitMed
             builder.Services.AddScoped<IImageUploadService, ImageUploadService>();
             builder.Services.AddScoped<IRoleBasedImageUploadService, RoleBasedImageUploadService>();
             
+            // Register Email and Verification Services
+            builder.Services.AddScoped<IEmailService, EmailService>();
+            builder.Services.AddScoped<IVerificationCodeService, VerificationCodeService>();
+            
             // Register FluentValidation
             builder.Services.AddFluentValidationAutoValidation();
             builder.Services.AddValidatorsFromAssemblyContaining<CreateSalesReportDtoValidator>();
