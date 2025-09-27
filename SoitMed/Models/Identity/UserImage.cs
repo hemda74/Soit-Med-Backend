@@ -25,7 +25,6 @@ namespace SoitMed.Models.Identity
 
         [MaxLength(50)]
         public string? ImageType { get; set; }
-
         public long FileSize { get; set; }
 
         [MaxLength(500)]

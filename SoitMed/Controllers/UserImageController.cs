@@ -373,8 +373,13 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in DeleteProfileImage: {ex.Message}");
-                return StatusCode(500, new { error = "An unexpected error occurred while deleting the image.", code = "DELETE_ERROR" });
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while deleting the profile image",
+                    error = ex.Message,
+                    timestamp = DateTime.UtcNow
+                });
             }
         }
     }

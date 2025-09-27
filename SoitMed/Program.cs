@@ -16,7 +16,6 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using SoitMed.Models.Core;
 
 namespace SoitMed
 {

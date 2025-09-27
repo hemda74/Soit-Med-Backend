@@ -21,6 +21,7 @@ namespace SoitMed.Controllers
         private readonly IUnitOfWork _unitOfWork;
         private readonly UserIdGenerationService userIdGenerationService;
         private readonly IRoleBasedImageUploadService _imageUploadService;
+        private readonly IWebHostEnvironment _environment;
 
         // Delegate for creating role-specific image info
         private delegate object CreateImageInfoDelegate(UserImage userImage);
@@ -62,12 +63,13 @@ namespace SoitMed.Controllers
             return createImageInfoDelegate(userImage);
         }
 
-        public RoleSpecificUserController(UserManager<ApplicationUser> _userManager, IUnitOfWork unitOfWork, UserIdGenerationService _userIdGenerationService, IRoleBasedImageUploadService imageUploadService)
+        public RoleSpecificUserController(UserManager<ApplicationUser> _userManager, IUnitOfWork unitOfWork, UserIdGenerationService _userIdGenerationService, IRoleBasedImageUploadService imageUploadService, IWebHostEnvironment environment)
         {
             userManager = _userManager;
             _unitOfWork = unitOfWork;
             userIdGenerationService = _userIdGenerationService;
             _imageUploadService = imageUploadService;
+            _environment = environment;
         }
 
         // Create Doctor with User Account and Optional Image
@@ -303,7 +305,7 @@ namespace SoitMed.Controllers
                 CreatedAt = user.CreatedAt,
                 EngineerId = engineer.EngineerId.ToString(),
                 Specialty = engineer.Specialty,
-                GovernorateNames = governorates.Select(g => g.Name).ToList(),
+                GovernorateNames = governorates?.Select(g => g.Name).ToList() ?? new List<string>(),
                 ProfileImage = profileImageInfo,
                 Message = $"Engineer '{engineer.Name}' created successfully and assigned to {governorates.Count()} governorate(s)"
             });
