@@ -32,25 +32,25 @@ namespace SoitMed.Controllers
 		// Helper method to get user profile image
 		private async Task<UserImageInfoDTO?> GetUserProfileImageAsync(string userId)
 		{
-			var userImage = await context.UserImages
-				.Where(ui => ui.UserId == userId && ui.IsProfileImage && ui.IsActive)
+			var profileImage = await context.UserImages
+				.Where(ui => ui.UserId == userId && ui.IsActive && ui.IsProfileImage)
 				.OrderByDescending(ui => ui.UploadedAt)
 				.FirstOrDefaultAsync();
 
-			if (userImage == null)
+			if (profileImage == null)
 				return null;
 
 			return new UserImageInfoDTO
 			{
-				Id = userImage.Id,
-				FileName = userImage.FileName,
-				FilePath = userImage.FilePath,
-				ContentType = userImage.ContentType,
-				FileSize = userImage.FileSize,
-				AltText = userImage.AltText,
-				IsProfileImage = userImage.IsProfileImage,
-				UploadedAt = userImage.UploadedAt,
-				IsActive = userImage.IsActive
+				Id = profileImage.Id,
+				FileName = profileImage.FileName,
+				FilePath = profileImage.FilePath,
+				ContentType = profileImage.ContentType,
+				FileSize = profileImage.FileSize,
+				AltText = profileImage.AltText,
+				IsProfileImage = profileImage.IsProfileImage,
+				UploadedAt = profileImage.UploadedAt,
+				IsActive = profileImage.IsActive
 			};
 		}
 
@@ -292,7 +292,6 @@ namespace SoitMed.Controllers
 			}
 
 			var roles = await userManager.GetRolesAsync(user);
-
 			var profileImage = await GetUserProfileImageAsync(user.Id);
 
 			var userData = new CurrentUserDataDTO

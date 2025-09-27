@@ -21,5 +21,11 @@ namespace SoitMed.Models.Identity
 
 		// Computed property for full name
 		public string FullName => $"{FirstName} {LastName}".Trim();
+
+		// Navigation property for user images
+		public virtual ICollection<UserImage> UserImages { get; set; } = new List<UserImage>();
+
+		// Navigation property for profile image
+		public virtual UserImage? ProfileImage => UserImages.FirstOrDefault(img => img.IsProfileImage && img.IsActive);
 	}
 }

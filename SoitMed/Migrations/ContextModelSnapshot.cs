@@ -606,7 +606,6 @@ namespace SoitMed.Migrations
                     b.Property<string>("ImageType")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -991,6 +990,11 @@ namespace SoitMed.Migrations
             modelBuilder.Entity("SoitMed.Models.Hospital.Technician", b =>
                 {
                     b.Navigation("RepairRequests");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Identity.ApplicationUser", b =>
+                {
+                    b.Navigation("UserImages");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Location.Engineer", b =>

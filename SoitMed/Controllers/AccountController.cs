@@ -36,10 +36,10 @@ namespace SoitMed.Controllers
 			IVerificationCodeService _verificationCodeService,
 			ILogger<AccountController> _logger)
 		{
-		userManager = _userManager;
-	    this.config = config;
-		context = _context;
-		userIdGenerationService = _userIdGenerationService;
+			userManager = _userManager;
+			this.config = config;
+			context = _context;
+			userIdGenerationService = _userIdGenerationService;
 			emailService = _emailService;
 			verificationCodeService = _verificationCodeService;
 			logger = _logger;
