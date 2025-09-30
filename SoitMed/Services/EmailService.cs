@@ -56,7 +56,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<bool> SendPasswordResetEmailAsync(string to, string resetCode, string userName)
+        public async Task<bool> SendPasswordResetEmailAsync(string to, string resetCode, string firstName, string lastName)
         {
             var subject = "Password Reset Request - SoitMed";
             var body = $@"
@@ -64,7 +64,7 @@ namespace SoitMed.Services
                 <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
                     <div style='max-width: 600px; margin: 0 auto; padding: 20px;'>
                         <h2 style='color: #2c5aa0; text-align: center;'>SoitMed Password Reset</h2>
-                        <p>Hello {userName},</p>
+                        <p>Hello {firstName} {lastName},</p>
                         <p>You have requested to reset your password for your SoitMed account.</p>
                         <p>Please use the following verification code to reset your password:</p>
                         <div style='background-color: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0; border-radius: 5px;'>
@@ -88,7 +88,7 @@ namespace SoitMed.Services
             return await SendEmailAsync(to, subject, body);
         }
 
-        public async Task<bool> SendEmailVerificationCodeAsync(string to, string verificationCode, string userName)
+        public async Task<bool> SendEmailVerificationCodeAsync(string to, string verificationCode, string firstName, string lastName)
         {
             var subject = "Email Verification Code - SoitMed";
             var body = $@"
@@ -96,7 +96,7 @@ namespace SoitMed.Services
                 <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
                     <div style='max-width: 600px; margin: 0 auto; padding: 20px;'>
                         <h2 style='color: #2c5aa0; text-align: center;'>SoitMed Email Verification</h2>
-                        <p>Hello {userName},</p>
+                        <p>Hello {firstName} {lastName},</p>
                         <p>Please verify your email address using the following code:</p>
                         <div style='background-color: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0; border-radius: 5px;'>
                             <h1 style='color: #2c5aa0; font-size: 32px; letter-spacing: 5px; margin: 0;'>{verificationCode}</h1>
