@@ -305,7 +305,8 @@ namespace SoitMed.Controllers
 				var emailSent = await emailService.SendPasswordResetEmailAsync(
 					forgotPasswordDTO.Email, 
 					verificationCode, 
-					user.UserName ?? "User");
+					user.FirstName ?? "User",
+                    user.LastName ?? "User");
 
 				if (!emailSent)
 				{
