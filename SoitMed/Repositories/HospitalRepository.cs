@@ -38,7 +38,8 @@ namespace SoitMed.Repositories
         public async Task<Hospital?> GetHospitalWithDoctorsAsync(string hospitalId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .Include(h => h.Doctors)
+                .Include(h => h.DoctorHospitals)
+                .ThenInclude(dh => dh.Doctor)
                 .FirstOrDefaultAsync(h => h.HospitalId == hospitalId, cancellationToken);
         }
 
@@ -59,10 +60,26 @@ namespace SoitMed.Repositories
         public async Task<Hospital?> GetHospitalWithAllDetailsAsync(string hospitalId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .Include(h => h.Doctors)
+                .Include(h => h.DoctorHospitals)
+                .ThenInclude(dh => dh.Doctor)
                 .Include(h => h.Technicians)
                 .Include(h => h.Equipment)
                 .FirstOrDefaultAsync(h => h.HospitalId == hospitalId, cancellationToken);
+        }
+
+        public async Task<IEnumerable<Hospital>> GetHospitalsWithDoctorsAsync(CancellationToken cancellationToken = default)
+        {
+            return await _dbSet
+                .Include(h => h.DoctorHospitals)
+                .ThenInclude(dh => dh.Doctor)
+                .Where(h => h.IsActive)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<bool> IsHospitalAssignedToDoctorAsync(string hospitalId, int doctorId, CancellationToken cancellationToken = default)
+        {
+            return await _context.DoctorHospitals
+                .AnyAsync(dh => dh.HospitalId == hospitalId && dh.DoctorId == doctorId && dh.IsActive, cancellationToken);
         }
     }
 }

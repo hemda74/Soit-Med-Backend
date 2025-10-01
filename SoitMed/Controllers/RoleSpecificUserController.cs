@@ -121,6 +121,7 @@ namespace SoitMed.Controllers
                 Email = doctorDTO.Email,
                 FirstName = doctorDTO.FirstName,
                 LastName = doctorDTO.LastName,
+                PhoneNumber = doctorDTO.PhoneNumber,
                 DepartmentId = doctorDTO.DepartmentId ?? medicalDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -144,13 +145,23 @@ namespace SoitMed.Controllers
             {
                 Name = $"{doctorDTO.FirstName} {doctorDTO.LastName}".Trim(),
                 Specialty = doctorDTO.Specialty,
-                HospitalId = doctorDTO.HospitalId,
                 UserId = user.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
             await _unitOfWork.Doctors.CreateAsync(doctor);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Create Doctor-Hospital relationship
+            var doctorHospital = new DoctorHospital
+            {
+                DoctorId = doctor.DoctorId,
+                HospitalId = doctorDTO.HospitalId,
+                IsActive = true,
+                AssignedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.DoctorHospitals.CreateAsync(doctorHospital);
             await _unitOfWork.SaveChangesAsync();
 
             // Handle image upload if provided
@@ -240,6 +251,7 @@ namespace SoitMed.Controllers
                 Email = engineerDTO.Email,
                 FirstName = engineerDTO.FirstName,
                 LastName = engineerDTO.LastName,
+                PhoneNumber = engineerDTO.PhoneNumber,
                 DepartmentId = engineerDTO.DepartmentId ?? engineeringDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -360,6 +372,7 @@ namespace SoitMed.Controllers
                 Email = technicianDTO.Email,
                 FirstName = technicianDTO.FirstName,
                 LastName = technicianDTO.LastName,
+                PhoneNumber = technicianDTO.PhoneNumber,
                 DepartmentId = technicianDTO.DepartmentId ?? medicalDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -464,6 +477,7 @@ namespace SoitMed.Controllers
                 Email = adminDTO.Email,
                 FirstName = adminDTO.FirstName,
                 LastName = adminDTO.LastName,
+                PhoneNumber = adminDTO.PhoneNumber,
                 DepartmentId = adminDTO.DepartmentId ?? adminDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -551,6 +565,7 @@ namespace SoitMed.Controllers
                 Email = financeDTO.Email,
                 FirstName = financeDTO.FirstName,
                 LastName = financeDTO.LastName,
+                PhoneNumber = financeDTO.PhoneNumber,
                 DepartmentId = financeDTO.DepartmentId ?? financeDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -638,6 +653,7 @@ namespace SoitMed.Controllers
                 Email = legalDTO.Email,
                 FirstName = legalDTO.FirstName,
                 LastName = legalDTO.LastName,
+                PhoneNumber = legalDTO.PhoneNumber,
                 DepartmentId = legalDTO.DepartmentId ?? legalDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -725,6 +741,7 @@ namespace SoitMed.Controllers
                 Email = salesDTO.Email,
                 FirstName = salesDTO.FirstName,
                 LastName = salesDTO.LastName,
+                PhoneNumber = salesDTO.PhoneNumber,
                 DepartmentId = salesDTO.DepartmentId ?? salesDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -814,6 +831,7 @@ namespace SoitMed.Controllers
                 Email = salesManagerDTO.Email,
                 FirstName = salesManagerDTO.FirstName,
                 LastName = salesManagerDTO.LastName,
+                PhoneNumber = salesManagerDTO.PhoneNumber,
                 DepartmentId = salesManagerDTO.DepartmentId ?? salesDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -904,6 +922,7 @@ namespace SoitMed.Controllers
                 Email = financeEmployeeDTO.Email,
                 FirstName = financeEmployeeDTO.FirstName,
                 LastName = financeEmployeeDTO.LastName,
+                PhoneNumber = financeEmployeeDTO.PhoneNumber,
                 DepartmentId = financeEmployeeDTO.DepartmentId ?? financeDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -991,6 +1010,7 @@ namespace SoitMed.Controllers
                 Email = legalEmployeeDTO.Email,
                 FirstName = legalEmployeeDTO.FirstName,
                 LastName = legalEmployeeDTO.LastName,
+                PhoneNumber = legalEmployeeDTO.PhoneNumber,
                 DepartmentId = legalEmployeeDTO.DepartmentId ?? legalDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -1037,6 +1057,182 @@ namespace SoitMed.Controllers
                 CreatedAt = user.CreatedAt,
                 ProfileImage = profileImageInfo,
                 Message = $"Legal Employee '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
+            });
+        }
+
+        // Create Maintenance Manager with User Account
+        [HttpPost("maintenance-manager")]
+        [Authorize(Roles = "SuperAdmin,Admin")]
+        public async Task<IActionResult> CreateMaintenanceManager([FromForm] CreateMaintenanceManagerWithImageDTO maintenanceManagerDTO, [FromForm] IFormFile? profileImage = null)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+            }
+
+            // Get Engineering department
+            var engineeringDepartment = await _unitOfWork.Departments.GetByNameAsync("Engineering");
+            if (engineeringDepartment == null)
+            {
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Engineering department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
+            }
+
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                maintenanceManagerDTO.FirstName ?? "Unknown",
+                maintenanceManagerDTO.LastName ?? "User",
+                UserRoles.MaintenanceManager,
+                maintenanceManagerDTO.DepartmentId ?? engineeringDepartment.Id,
+                null // Maintenance Managers don't use hospital ID
+            );
+
+            // Create user account
+            var user = new ApplicationUser
+            {
+                Id = customUserId, // Use custom generated ID
+                UserName = maintenanceManagerDTO.Email, // Use email as username
+                Email = maintenanceManagerDTO.Email,
+                FirstName = maintenanceManagerDTO.FirstName,
+                LastName = maintenanceManagerDTO.LastName,
+                PhoneNumber = maintenanceManagerDTO.PhoneNumber,
+                DepartmentId = maintenanceManagerDTO.DepartmentId ?? engineeringDepartment.Id,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            var result = await userManager.CreateAsync(user, maintenanceManagerDTO.Password);
+            if (!result.Succeeded)
+            {
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
+            }
+
+            // Assign MaintenanceManager role
+            await userManager.AddToRoleAsync(user, UserRoles.MaintenanceManager);
+
+            // Handle image upload if provided
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "maintenance-manager", 
+                engineeringDepartment.Name, 
+                maintenanceManagerDTO.AltText,
+                userImage => new MaintenanceManagerImageInfo
+                {
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as MaintenanceManagerImageInfo;
+
+            return Ok(new CreatedMaintenanceManagerWithImageResponseDTO
+            {
+                UserId = user.Id,
+                Email = user.Email, // Email is now the username
+                Role = UserRoles.MaintenanceManager,
+                DepartmentName = engineeringDepartment.Name,
+                CreatedAt = user.CreatedAt,
+                ProfileImage = profileImageInfo,
+                Message = $"Maintenance Manager '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
+            });
+        }
+
+        // Create Maintenance Support with User Account
+        [HttpPost("maintenance-support")]
+        [Authorize(Roles = "SuperAdmin,Admin,MaintenanceManager")]
+        public async Task<IActionResult> CreateMaintenanceSupport([FromForm] CreateMaintenanceSupportWithImageDTO maintenanceSupportDTO, [FromForm] IFormFile? profileImage = null)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+            }
+
+            // Get Engineering department
+            var engineeringDepartment = await _unitOfWork.Departments.GetByNameAsync("Engineering");
+            if (engineeringDepartment == null)
+            {
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Engineering department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
+            }
+
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                maintenanceSupportDTO.FirstName ?? "Unknown",
+                maintenanceSupportDTO.LastName ?? "User",
+                UserRoles.MaintenanceSupport,
+                maintenanceSupportDTO.DepartmentId ?? engineeringDepartment.Id,
+                null // Maintenance Support don't use hospital ID
+            );
+
+            // Create user account
+            var user = new ApplicationUser
+            {
+                Id = customUserId, // Use custom generated ID
+                UserName = maintenanceSupportDTO.Email, // Use email as username
+                Email = maintenanceSupportDTO.Email,
+                FirstName = maintenanceSupportDTO.FirstName,
+                LastName = maintenanceSupportDTO.LastName,
+                PhoneNumber = maintenanceSupportDTO.PhoneNumber,
+                DepartmentId = maintenanceSupportDTO.DepartmentId ?? engineeringDepartment.Id,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            var result = await userManager.CreateAsync(user, maintenanceSupportDTO.Password);
+            if (!result.Succeeded)
+            {
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
+            }
+
+            // Assign MaintenanceSupport role
+            await userManager.AddToRoleAsync(user, UserRoles.MaintenanceSupport);
+
+            // Handle image upload if provided
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "maintenance-support", 
+                engineeringDepartment.Name, 
+                maintenanceSupportDTO.AltText,
+                userImage => new MaintenanceSupportImageInfo
+                {
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as MaintenanceSupportImageInfo;
+
+            return Ok(new CreatedMaintenanceSupportWithImageResponseDTO
+            {
+                UserId = user.Id,
+                Email = user.Email, // Email is now the username
+                Role = UserRoles.MaintenanceSupport,
+                DepartmentName = engineeringDepartment.Name,
+                CreatedAt = user.CreatedAt,
+                ProfileImage = profileImageInfo,
+                Message = $"Maintenance Support '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
             });
         }
     }

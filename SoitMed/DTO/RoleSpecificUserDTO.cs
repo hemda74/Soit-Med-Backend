@@ -21,6 +21,14 @@ namespace SoitMed.DTO
         [MaxLength(100, ErrorMessage = "Last name cannot exceed 100 characters")]
         public string? LastName { get; set; }
 
+        [Phone(ErrorMessage = "Invalid phone number format")]
+        [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
+        public string? PhoneNumber { get; set; }
+
+        [EmailAddress(ErrorMessage = "Please provide a valid personal email address")]
+        [MaxLength(200, ErrorMessage = "Personal mail cannot exceed 200 characters")]
+        public string? PersonalMail { get; set; }
+
         [Range(1, int.MaxValue, ErrorMessage = "Department ID must be a positive number")]
         public int? DepartmentId { get; set; }
 
@@ -108,6 +116,26 @@ namespace SoitMed.DTO
         
         [MaxLength(100, ErrorMessage = "Legal specialty cannot exceed 100 characters")]
         public string? LegalSpecialty { get; set; } // Optional: contracts, compliance, etc.
+    }
+
+    // Maintenance Manager creation DTO
+    public class CreateMaintenanceManagerDTO : BaseUserCreationDTO
+    {
+        [MaxLength(100, ErrorMessage = "Maintenance specialty cannot exceed 100 characters")]
+        public string? MaintenanceSpecialty { get; set; } // Optional: Equipment, HVAC, Electrical, etc.
+        
+        [MaxLength(100, ErrorMessage = "Certification cannot exceed 100 characters")]
+        public string? Certification { get; set; } // Optional: Professional certifications
+    }
+
+    // Maintenance Support creation DTO
+    public class CreateMaintenanceSupportDTO : BaseUserCreationDTO
+    {
+        [MaxLength(100, ErrorMessage = "Job title cannot exceed 100 characters")]
+        public string? JobTitle { get; set; } // Optional: Maintenance Technician, Support Specialist, etc.
+        
+        [MaxLength(100, ErrorMessage = "Technical skills cannot exceed 100 characters")]
+        public string? TechnicalSkills { get; set; } // Optional: Specific technical skills
     }
 
     // Response DTOs for created users

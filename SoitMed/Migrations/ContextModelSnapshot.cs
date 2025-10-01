@@ -381,10 +381,6 @@ namespace SoitMed.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("HospitalId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -403,11 +399,40 @@ namespace SoitMed.Migrations
 
                     b.HasKey("DoctorId");
 
-                    b.HasIndex("HospitalId");
-
                     b.HasIndex("UserId");
 
                     b.ToTable("Doctors");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Hospital.DoctorHospital", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DoctorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("HospitalId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HospitalId");
+
+                    b.HasIndex("DoctorId", "HospitalId")
+                        .IsUnique();
+
+                    b.ToTable("DoctorHospitals");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Hospital", b =>
@@ -543,6 +568,9 @@ namespace SoitMed.Migrations
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PersonalMail")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("nvarchar(max)");
 
@@ -606,6 +634,7 @@ namespace SoitMed.Migrations
                     b.Property<string>("ImageType")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -622,7 +651,9 @@ namespace SoitMed.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "IsProfileImage")
+                        .IsUnique()
+                        .HasFilter("[IsProfileImage] = 1");
 
                     b.ToTable("UserImages");
                 });
@@ -643,6 +674,10 @@ namespace SoitMed.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PersonalMail")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
@@ -868,20 +903,31 @@ namespace SoitMed.Migrations
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Doctor", b =>
                 {
-                    b.HasOne("SoitMed.Models.Hospital.Hospital", "Hospital")
-                        .WithMany("Doctors")
-                        .HasForeignKey("HospitalId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("Hospital");
-
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Hospital.DoctorHospital", b =>
+                {
+                    b.HasOne("SoitMed.Models.Hospital.Doctor", "Doctor")
+                        .WithMany("DoctorHospitals")
+                        .HasForeignKey("DoctorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Hospital.Hospital", "Hospital")
+                        .WithMany("DoctorHospitals")
+                        .HasForeignKey("HospitalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Doctor");
+
+                    b.Navigation("Hospital");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Technician", b =>
@@ -915,7 +961,7 @@ namespace SoitMed.Migrations
             modelBuilder.Entity("SoitMed.Models.Identity.UserImage", b =>
                 {
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "User")
-                        .WithMany()
+                        .WithMany("UserImages")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -975,12 +1021,14 @@ namespace SoitMed.Migrations
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Doctor", b =>
                 {
+                    b.Navigation("DoctorHospitals");
+
                     b.Navigation("RepairRequests");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Hospital", b =>
                 {
-                    b.Navigation("Doctors");
+                    b.Navigation("DoctorHospitals");
 
                     b.Navigation("Equipment");
 
