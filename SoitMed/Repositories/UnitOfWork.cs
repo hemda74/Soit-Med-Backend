@@ -16,6 +16,7 @@ namespace SoitMed.Repositories
         private IHospitalRepository? _hospitals;
         private IDoctorRepository? _doctors;
         private ITechnicianRepository? _technicians;
+        private IDoctorHospitalRepository? _doctorHospitals;
 
         // Location repositories
         private IEngineerRepository? _engineers;
@@ -53,6 +54,9 @@ namespace SoitMed.Repositories
 
         public ITechnicianRepository Technicians => 
             _technicians ??= new TechnicianRepository(_context);
+
+        public IDoctorHospitalRepository DoctorHospitals => 
+            _doctorHospitals ??= new DoctorHospitalRepository(_context);
 
         // Location repositories
         public IEngineerRepository Engineers => 

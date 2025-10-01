@@ -11,7 +11,7 @@ namespace SoitMed.Common
         /// <summary>
         /// Manager roles that can access all resources
         /// </summary>
-        public static readonly string[] ManagerRoles = { "SalesManager", "SuperAdmin" };
+        public static readonly string[] ManagerRoles = { "SalesManager", "SuperAdmin", "MaintenanceManager" };
 
         /// <summary>
         /// Checks if a user has manager-level access

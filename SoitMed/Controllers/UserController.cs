@@ -237,6 +237,7 @@ namespace SoitMed.Controllers
 			user.Email = userDTO.Email;
 			user.FirstName = userDTO.FirstName;
 			user.LastName = userDTO.LastName;
+			user.PhoneNumber = userDTO.PhoneNumber;
 
 			// Update user
 			IdentityResult result = await userManager.UpdateAsync(user);
@@ -351,7 +352,9 @@ namespace SoitMed.Controllers
 				DepartmentId = user.DepartmentId,
 				DepartmentName = user.Department?.Name,
 				DepartmentDescription = user.Department?.Description,
-				ProfileImage = profileImage
+				ProfileImage = profileImage,
+				PhoneNumber = user.PhoneNumber,
+				PhoneNumberConfirmed = user.PhoneNumberConfirmed
 			};
 
 			return Ok(userData);
@@ -435,7 +438,9 @@ namespace SoitMed.Controllers
 							DepartmentId = userWithDepartment.DepartmentId,
 							DepartmentName = userWithDepartment.Department?.Name,
 							DepartmentDescription = userWithDepartment.Department?.Description,
-							ProfileImage = profileImage
+							ProfileImage = profileImage,
+							PhoneNumber = userWithDepartment.PhoneNumber,
+							PhoneNumberConfirmed = userWithDepartment.PhoneNumberConfirmed
 						});
 					}
 				}
@@ -552,7 +557,9 @@ namespace SoitMed.Controllers
 					DepartmentId = user.DepartmentId,
 					DepartmentName = user.Department?.Name,
 					DepartmentDescription = user.Department?.Description,
-					ProfileImage = profileImage
+					ProfileImage = profileImage,
+					PhoneNumber = user.PhoneNumber,
+					PhoneNumberConfirmed = user.PhoneNumberConfirmed
 				});
 			}
 
@@ -598,23 +605,25 @@ namespace SoitMed.Controllers
 					var roles = await userManager.GetRolesAsync(userWithDepartment);
 					var profileImage = await GetUserProfileImageAsync(userWithDepartment.Id);
 
-					usersData.Add(new UserDataDTO
-					{
-						Id = userWithDepartment.Id,
-						UserName = userWithDepartment.UserName ?? "",
-						Email = userWithDepartment.Email ?? "",
-						FirstName = userWithDepartment.FirstName,
-						LastName = userWithDepartment.LastName,
-						FullName = userWithDepartment.FullName,
-						IsActive = userWithDepartment.IsActive,
-						CreatedAt = userWithDepartment.CreatedAt,
-						LastLoginAt = userWithDepartment.LastLoginAt,
-						Roles = roles.ToList(),
-						DepartmentId = userWithDepartment.DepartmentId,
-						DepartmentName = userWithDepartment.Department?.Name,
-						DepartmentDescription = userWithDepartment.Department?.Description,
-						ProfileImage = profileImage
-					});
+				usersData.Add(new UserDataDTO
+				{
+					Id = userWithDepartment.Id,
+					UserName = userWithDepartment.UserName ?? "",
+					Email = userWithDepartment.Email ?? "",
+					FirstName = userWithDepartment.FirstName,
+					LastName = userWithDepartment.LastName,
+					FullName = userWithDepartment.FullName,
+					IsActive = userWithDepartment.IsActive,
+					CreatedAt = userWithDepartment.CreatedAt,
+					LastLoginAt = userWithDepartment.LastLoginAt,
+					Roles = roles.ToList(),
+					DepartmentId = userWithDepartment.DepartmentId,
+					DepartmentName = userWithDepartment.Department?.Name,
+					DepartmentDescription = userWithDepartment.Department?.Description,
+					ProfileImage = profileImage,
+					PhoneNumber = userWithDepartment.PhoneNumber,
+					PhoneNumberConfirmed = userWithDepartment.PhoneNumberConfirmed
+				});
 				}
 			}
 
@@ -659,7 +668,9 @@ namespace SoitMed.Controllers
 					DepartmentId = user.DepartmentId,
 					DepartmentName = user.Department?.Name,
 					DepartmentDescription = user.Department?.Description,
-					ProfileImage = profileImage
+					ProfileImage = profileImage,
+					PhoneNumber = user.PhoneNumber,
+					PhoneNumberConfirmed = user.PhoneNumberConfirmed
 				});
 			}
 
