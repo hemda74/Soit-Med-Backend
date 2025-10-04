@@ -276,6 +276,52 @@ Roles: SuperAdmin, Admin
 }
 ```
 
+### Create Maintenance Manager
+
+```http
+POST /api/RoleSpecificUser/maintenance-manager
+Authorization: Bearer {token}
+Roles: SuperAdmin, Admin
+```
+
+**Body:**
+
+```json
+{
+	"userName": "string",
+	"email": "string",
+	"password": "string",
+	"firstName": "string (optional)",
+	"lastName": "string (optional)",
+	"departmentId": "integer (optional)",
+	"maintenanceSpecialty": "string (optional)",
+	"certification": "string (optional)"
+}
+```
+
+### Create Maintenance Support
+
+```http
+POST /api/RoleSpecificUser/maintenance-support
+Authorization: Bearer {token}
+Roles: SuperAdmin, Admin, MaintenanceManager
+```
+
+**Body:**
+
+```json
+{
+	"userName": "string",
+	"email": "string",
+	"password": "string",
+	"firstName": "string (optional)",
+	"lastName": "string (optional)",
+	"departmentId": "integer (optional)",
+	"jobTitle": "string (optional)",
+	"technicalSkills": "string (optional)"
+}
+```
+
 ---
 
 ## Department Management
@@ -592,7 +638,9 @@ GET /api/Role/available
 		"FinanceManager",
 		"FinanceEmployee",
 		"LegalManager",
-		"LegalEmployee"
+		"LegalEmployee",
+		"MaintenanceManager",
+		"MaintenanceSupport"
 	]
 }
 ```
@@ -655,6 +703,19 @@ Roles: SuperAdmin, Admin
 
 - Basic user access
 - Sales-specific permissions
+
+### MaintenanceManager
+
+- Access to maintenance and user data
+- Can view departments and users
+- Can create maintenance support users
+- Limited creation permissions
+
+### MaintenanceSupport
+
+- Basic user access
+- Maintenance-specific permissions
+- Can assist with maintenance tasks
 
 ---
 

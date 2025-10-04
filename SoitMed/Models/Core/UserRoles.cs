@@ -16,6 +16,8 @@ namespace SoitMed.Models.Core
         
         // Engineering Department Roles
         public const string Engineer = "Engineer";
+        public const string MaintenanceManager = "MaintenanceManager";
+        public const string MaintenanceSupport = "MaintenanceSupport";
         
         // Finance Department Roles
         public const string FinanceManager = "FinanceManager";
@@ -40,7 +42,9 @@ namespace SoitMed.Models.Core
                 FinanceManager,
                 FinanceEmployee,
                 LegalManager,
-                LegalEmployee
+                LegalEmployee,
+                MaintenanceManager,
+                MaintenanceSupport
             };
         }
 
@@ -52,7 +56,7 @@ namespace SoitMed.Models.Core
                 { "Administration", new List<string> { SuperAdmin, Admin } },
                 { "Medical", new List<string> { Doctor, Technician } },
                 { "Sales", new List<string> { SalesManager, Salesman } },
-                { "Engineering", new List<string> { Engineer } },
+                { "Engineering", new List<string> { Engineer, MaintenanceManager, MaintenanceSupport } },
                 { "Finance", new List<string> { FinanceManager, FinanceEmployee } },
                 { "Legal", new List<string> { LegalManager, LegalEmployee } }
             };
@@ -67,7 +71,8 @@ namespace SoitMed.Models.Core
                 Admin,
                 SalesManager,
                 FinanceManager,
-                LegalManager
+                LegalManager,
+                MaintenanceManager
             };
         }
 
@@ -100,7 +105,8 @@ namespace SoitMed.Models.Core
                 Admin,
                 SalesManager,
                 FinanceManager,
-                LegalManager
+                LegalManager,
+                MaintenanceManager
             };
         }
 

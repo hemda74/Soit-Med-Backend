@@ -18,6 +18,7 @@ namespace SoitMed.Models
         public DbSet<Hospital.Hospital> Hospitals { get; set; }
         public DbSet<Doctor> Doctors { get; set; }
         public DbSet<Technician> Technicians { get; set; }
+        public DbSet<DoctorHospital> DoctorHospitals { get; set; }
 
         // Location entities
         public DbSet<Governorate> Governorates { get; set; }
@@ -54,12 +55,23 @@ namespace SoitMed.Models
                 .HasIndex(d => d.Name)
                 .IsUnique();
 
-            // Configure Hospital relationships
-            modelBuilder.Entity<Doctor>()
-                .HasOne(d => d.Hospital)
-                .WithMany(h => h.Doctors)
-                .HasForeignKey(d => d.HospitalId)
+            // Configure Doctor-Hospital many-to-many relationship
+            modelBuilder.Entity<DoctorHospital>()
+                .HasOne(dh => dh.Doctor)
+                .WithMany(d => d.DoctorHospitals)
+                .HasForeignKey(dh => dh.DoctorId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<DoctorHospital>()
+                .HasOne(dh => dh.Hospital)
+                .WithMany(h => h.DoctorHospitals)
+                .HasForeignKey(dh => dh.HospitalId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Ensure unique combination of Doctor-Hospital
+            modelBuilder.Entity<DoctorHospital>()
+                .HasIndex(dh => new { dh.DoctorId, dh.HospitalId })
+                .IsUnique();
 
             modelBuilder.Entity<Technician>()
                 .HasOne(t => t.Hospital)

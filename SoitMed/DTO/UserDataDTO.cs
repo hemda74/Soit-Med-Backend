@@ -22,6 +22,13 @@ namespace SoitMed.DTO
         
         // User image information
         public UserImageInfoDTO? ProfileImage { get; set; }
+        
+        // Phone number information
+        public string? PhoneNumber { get; set; }
+        public bool PhoneNumberConfirmed { get; set; }
+        
+        // Personal mail information
+        public string? PersonalMail { get; set; }
     }
 
     public class CurrentUserDataDTO
@@ -49,6 +56,9 @@ namespace SoitMed.DTO
         public bool EmailConfirmed { get; set; }
         public bool PhoneNumberConfirmed { get; set; }
         public string? PhoneNumber { get; set; }
+        
+        // Personal mail information
+        public string? PersonalMail { get; set; }
     }
 }
 

@@ -15,11 +15,11 @@ This document provides comprehensive information about the password reset functi
 
 ## API Endpoints
 
-### 1. Forgot Password
+### Step 1: Forgot Password (Check Email & Send Code)
 
 **Endpoint:** `POST /api/Account/forgot-password`
 
-**Description:** Initiates a password reset process by sending a verification code to the user's email.
+**Description:** Checks if email exists in database and sends verification code if found.
 
 **Request Body:**
 
@@ -29,26 +29,36 @@ This document provides comprehensive information about the password reset functi
 }
 ```
 
-**Response:**
+**Response (Email Found):**
 
 ```json
 {
 	"success": true,
-	"message": "If the email address exists in our system, you will receive a password reset code."
+	"message": "Verification code sent to your email address.",
+	"email": "user@example.com"
+}
+```
+
+**Response (Email Not Found):**
+
+```json
+{
+	"success": false,
+	"message": "Email address not found in our system."
 }
 ```
 
 **Status Codes:**
 
-- `200 OK` - Request processed successfully
-- `400 Bad Request` - Invalid request data
+- `200 OK` - Email found, code sent successfully
+- `400 Bad Request` - Email not found or invalid request data
 - `500 Internal Server Error` - Server error
 
-### 2. Verify Code
+### Step 2: Verify Code (Unlock Password Change)
 
 **Endpoint:** `POST /api/Account/verify-code`
 
-**Description:** Verifies if a verification code is valid without consuming it.
+**Description:** Verifies the code and returns a reset token to allow password change.
 
 **Request Body:**
 
@@ -59,34 +69,44 @@ This document provides comprehensive information about the password reset functi
 }
 ```
 
-**Response:**
+**Response (Valid Code):**
 
 ```json
 {
 	"success": true,
-	"isValid": true,
-	"message": "Verification code is valid"
+	"message": "Verification code is valid. You can now change your password.",
+	"resetToken": "CfDJ8...",
+	"email": "user@example.com"
+}
+```
+
+**Response (Invalid Code):**
+
+```json
+{
+	"success": false,
+	"message": "Invalid or expired verification code. Please request a new code."
 }
 ```
 
 **Status Codes:**
 
-- `200 OK` - Code verification completed
-- `400 Bad Request` - Invalid request data
+- `200 OK` - Code verified, reset token provided
+- `400 Bad Request` - Invalid or expired code
 - `500 Internal Server Error` - Server error
 
-### 3. Reset Password
+### Step 3: Reset Password (Change Password)
 
 **Endpoint:** `POST /api/Account/reset-password`
 
-**Description:** Resets the user's password using the verification code.
+**Description:** Changes the user's password using the reset token from step 2.
 
 **Request Body:**
 
 ```json
 {
 	"email": "user@example.com",
-	"verificationCode": "123456",
+	"resetToken": "CfDJ8...",
 	"newPassword": "NewPassword123!",
 	"confirmPassword": "NewPassword123!"
 }
@@ -104,7 +124,7 @@ This document provides comprehensive information about the password reset functi
 **Status Codes:**
 
 - `200 OK` - Password reset successfully
-- `400 Bad Request` - Invalid request data or verification code
+- `400 Bad Request` - Invalid token or password requirements not met
 - `500 Internal Server Error` - Server error
 
 ### 4. Change Password (Existing)
@@ -138,7 +158,7 @@ This document provides comprehensive information about the password reset functi
 
 ### Complete Password Reset Flow
 
-#### Step 1: Request Password Reset
+#### Step 1: Check Email & Send Code
 
 ```bash
 curl -X POST "http://localhost:5117/api/Account/forgot-password" \
@@ -146,7 +166,17 @@ curl -X POST "http://localhost:5117/api/Account/forgot-password" \
   -d '{"email": "user@example.com"}'
 ```
 
-#### Step 2: Verify Code (Optional)
+**Expected Response:**
+
+```json
+{
+	"success": true,
+	"message": "Verification code sent to your email address.",
+	"email": "user@example.com"
+}
+```
+
+#### Step 2: Verify Code & Get Reset Token
 
 ```bash
 curl -X POST "http://localhost:5117/api/Account/verify-code" \
@@ -154,17 +184,37 @@ curl -X POST "http://localhost:5117/api/Account/verify-code" \
   -d '{"email": "user@example.com", "code": "123456"}'
 ```
 
-#### Step 3: Reset Password
+**Expected Response:**
+
+```json
+{
+	"success": true,
+	"message": "Verification code is valid. You can now change your password.",
+	"resetToken": "CfDJ8...",
+	"email": "user@example.com"
+}
+```
+
+#### Step 3: Reset Password with Token
 
 ```bash
 curl -X POST "http://localhost:5117/api/Account/reset-password" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
-    "verificationCode": "123456",
+    "resetToken": "CfDJ8...",
     "newPassword": "NewPassword123!",
     "confirmPassword": "NewPassword123!"
   }'
+```
+
+**Expected Response:**
+
+```json
+{
+	"success": true,
+	"message": "Password has been reset successfully. You can now login with your new password."
+}
 ```
 
 ## Email Configuration

@@ -291,11 +291,10 @@ namespace SoitMed.Controllers
 				var user = await userManager.FindByEmailAsync(forgotPasswordDTO.Email);
 				if (user == null)
 				{
-					// For security reasons, don't reveal if email exists or not
-					return Ok(new
+					return BadRequest(new
 					{
-						success = true,
-						message = "If the email address exists in our system, you will receive a password reset code."
+						success = false,
+						message = "Email address not found in our system."
 					});
 				}
 
@@ -306,7 +305,8 @@ namespace SoitMed.Controllers
 				var emailSent = await emailService.SendPasswordResetEmailAsync(
 					forgotPasswordDTO.Email, 
 					verificationCode, 
-					user.UserName ?? "User");
+					user.FirstName ?? "User",
+                    user.LastName ?? "User");
 
 				if (!emailSent)
 				{
@@ -322,7 +322,8 @@ namespace SoitMed.Controllers
 				return Ok(new
 				{
 					success = true,
-					message = "If the email address exists in our system, you will receive a password reset code."
+					message = "Verification code sent to your email address.",
+					email = forgotPasswordDTO.Email
 				});
 			}
 			catch (Exception ex)
@@ -337,7 +338,7 @@ namespace SoitMed.Controllers
 		}
 
 		[HttpPost("reset-password")]
-		public async Task<IActionResult> ResetPassword(ResetPasswordDTO resetPasswordDTO)
+		public async Task<IActionResult> ResetPassword(ResetPasswordWithTokenDTO resetPasswordDTO)
 		{
 			try
 			{
@@ -358,24 +359,12 @@ namespace SoitMed.Controllers
 					return BadRequest(new
 					{
 						success = false,
-						message = "Invalid email address or verification code."
+						message = "User not found."
 					});
 				}
 
-				// Verify the code
-				var isCodeValid = await verificationCodeService.VerifyCodeAsync(resetPasswordDTO.Email, resetPasswordDTO.VerificationCode);
-				if (!isCodeValid)
-				{
-					return BadRequest(new
-					{
-						success = false,
-						message = "Invalid or expired verification code. Please request a new code."
-					});
-				}
-
-				// Generate password reset token and reset password
-				var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
-				var result = await userManager.ResetPasswordAsync(user, resetToken, resetPasswordDTO.NewPassword);
+				// Reset password using the token from step 2
+				var result = await userManager.ResetPasswordAsync(user, resetPasswordDTO.ResetToken, resetPasswordDTO.NewPassword);
 
 				if (result.Succeeded)
 				{
@@ -423,13 +412,40 @@ namespace SoitMed.Controllers
 					});
 				}
 
-				var isCodeValid = await verificationCodeService.IsCodeValidAsync(verifyCodeDTO.Email, verifyCodeDTO.Code);
+				// Verify the code and consume it if valid
+				var isCodeValid = await verificationCodeService.VerifyCodeAsync(verifyCodeDTO.Email, verifyCodeDTO.Code);
 				
+				if (!isCodeValid)
+				{
+					return BadRequest(new
+					{
+						success = false,
+						message = "Invalid or expired verification code. Please request a new code."
+					});
+				}
+
+				// Generate a temporary token for password change
+				var user = await userManager.FindByEmailAsync(verifyCodeDTO.Email);
+				if (user == null)
+				{
+					return BadRequest(new
+					{
+						success = false,
+						message = "User not found."
+					});
+				}
+
+				// Generate a temporary token that allows password reset
+				var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
+				
+				// Store the token temporarily (you could use cache or database)
+				// For now, we'll return it to the frontend
 				return Ok(new
 				{
 					success = true,
-					isValid = isCodeValid,
-					message = isCodeValid ? "Verification code is valid" : "Invalid or expired verification code"
+					message = "Verification code is valid. You can now change your password.",
+					resetToken = resetToken,
+					email = verifyCodeDTO.Email
 				});
 			}
 			catch (Exception ex)

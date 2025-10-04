@@ -15,6 +15,7 @@ namespace SoitMed.Models.Identity
 		// Additional user properties
 		public string? FirstName { get; set; }
 		public string? LastName { get; set; }
+		public string? PersonalMail { get; set; }
 		public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 		public DateTime? LastLoginAt { get; set; }
 		public bool IsActive { get; set; } = true;

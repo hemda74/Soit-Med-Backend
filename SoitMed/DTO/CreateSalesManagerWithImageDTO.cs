@@ -25,6 +25,16 @@ namespace SoitMed.DTO
         [Description("Last name of the Sales Manager")]
         public string? LastName { get; set; }
 
+        [Phone(ErrorMessage = "Invalid phone number format")]
+        [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
+        [Description("Phone number of the Sales Manager")]
+        public string? PhoneNumber { get; set; }
+
+        [EmailAddress(ErrorMessage = "Please provide a valid personal email address")]
+        [MaxLength(200, ErrorMessage = "Personal mail cannot exceed 200 characters")]
+        [Description("Personal email address of the Sales Manager")]
+        public string? PersonalMail { get; set; }
+
         [Range(1, int.MaxValue, ErrorMessage = "Department ID must be a positive number")]
         [Description("Department ID (optional - will auto-assign to Sales department)")]
         public int? DepartmentId { get; set; }
