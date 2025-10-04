@@ -20,6 +20,10 @@ namespace SoitMed.DTO
         [MaxLength(100, ErrorMessage = "Last name cannot exceed 100 characters")]
         public string? LastName { get; set; }
 
+        [Phone(ErrorMessage = "Invalid phone number format")]
+        [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
+        public string? PhoneNumber { get; set; }
+
         [Required(ErrorMessage = "Medical specialty is required")]
         [MaxLength(100, ErrorMessage = "Specialty cannot exceed 100 characters")]
         public required string Specialty { get; set; }

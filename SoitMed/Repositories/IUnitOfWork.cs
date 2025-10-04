@@ -12,6 +12,7 @@ namespace SoitMed.Repositories
         IHospitalRepository Hospitals { get; }
         IDoctorRepository Doctors { get; }
         ITechnicianRepository Technicians { get; }
+        IDoctorHospitalRepository DoctorHospitals { get; }
 
         // Location repositories
         IEngineerRepository Engineers { get; }

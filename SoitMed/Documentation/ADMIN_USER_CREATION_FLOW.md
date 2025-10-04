@@ -29,7 +29,9 @@ Authorization: Bearer {admin-token}
 		"FinanceManager",
 		"FinanceEmployee",
 		"LegalManager",
-		"LegalEmployee"
+		"LegalEmployee",
+		"MaintenanceManager",
+		"MaintenanceSupport"
 	]
 }
 ```

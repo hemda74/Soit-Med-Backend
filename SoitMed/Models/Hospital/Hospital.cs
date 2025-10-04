@@ -28,7 +28,7 @@ namespace SoitMed.Models.Hospital
         public bool IsActive { get; set; } = true;
 
         // Navigation properties
-        public virtual ICollection<Doctor> Doctors { get; set; } = new List<Doctor>();
+        public virtual ICollection<DoctorHospital> DoctorHospitals { get; set; } = new List<DoctorHospital>();
         public virtual ICollection<Technician> Technicians { get; set; } = new List<Technician>();
         public virtual ICollection<Equipment.Equipment> Equipment { get; set; } = new List<Equipment.Equipment>();
     }

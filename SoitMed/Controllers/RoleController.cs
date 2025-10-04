@@ -131,6 +131,22 @@ namespace SoitMed.Controllers
 				case "superadmin":
 					// These roles only need base fields
 					break;
+
+				case "maintenancemanager":
+					roleSpecificFields.AddRange(new[]
+					{
+						new { name = "maintenanceSpecialty", type = "string", required = false, label = "Maintenance Specialty (Optional)" },
+						new { name = "certification", type = "string", required = false, label = "Certification (Optional)" }
+					});
+					break;
+
+				case "maintenancesupport":
+					roleSpecificFields.AddRange(new[]
+					{
+						new { name = "jobTitle", type = "string", required = false, label = "Job Title (Optional)" },
+						new { name = "technicalSkills", type = "string", required = false, label = "Technical Skills (Optional)" }
+					});
+					break;
 			}
 
 			return Ok(new

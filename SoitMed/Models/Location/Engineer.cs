@@ -13,12 +13,15 @@ namespace SoitMed.Models.Location
         [MaxLength(200)]
         public string Name { get; set; } = string.Empty;
 
-        [Required]
-        [MaxLength(100)]
-        public string Specialty { get; set; } = string.Empty;
+		[Required]
+		[MaxLength(100)]
+		public string Specialty { get; set; } = string.Empty;
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public bool IsActive { get; set; } = true;
+		[MaxLength(200)]
+		public string? PersonalMail { get; set; }
+
+		public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+		public bool IsActive { get; set; } = true;
 
         // Optional: Link to ApplicationUser if engineers are also system users
         public string? UserId { get; set; }

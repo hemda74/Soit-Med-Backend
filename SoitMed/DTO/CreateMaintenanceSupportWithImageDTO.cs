@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SoitMed.DTO
 {
-    public class CreateFinanceEmployeeWithImageDTO
+    public class CreateMaintenanceSupportWithImageDTO
     {
         [Required(ErrorMessage = "Email is required")]
         [EmailAddress(ErrorMessage = "Please provide a valid email address")]
@@ -31,22 +31,28 @@ namespace SoitMed.DTO
         [Range(1, int.MaxValue, ErrorMessage = "Department ID must be a positive number")]
         public int? DepartmentId { get; set; }
 
+        [MaxLength(100, ErrorMessage = "Job title cannot exceed 100 characters")]
+        public string? JobTitle { get; set; } // Optional: Maintenance Technician, Support Specialist, etc.
+        
+        [MaxLength(100, ErrorMessage = "Technical skills cannot exceed 100 characters")]
+        public string? TechnicalSkills { get; set; } // Optional: Specific technical skills
+
         [MaxLength(500, ErrorMessage = "Alt text cannot exceed 500 characters")]
         public string? AltText { get; set; }
     }
 
-    public class CreatedFinanceEmployeeWithImageResponseDTO
+    public class CreatedMaintenanceSupportWithImageResponseDTO
     {
         public string UserId { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public string? DepartmentName { get; set; }
         public DateTime CreatedAt { get; set; }
-        public FinanceEmployeeImageInfo? ProfileImage { get; set; }
+        public MaintenanceSupportImageInfo? ProfileImage { get; set; }
         public string Message { get; set; } = string.Empty;
     }
 
-    public class FinanceEmployeeImageInfo
+    public class MaintenanceSupportImageInfo
     {
         public int Id { get; set; }
         public string FileName { get; set; } = string.Empty;

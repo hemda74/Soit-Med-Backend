@@ -17,13 +17,6 @@ namespace SoitMed.Models.Hospital
         [MaxLength(100)]
         public string Specialty { get; set; } = string.Empty;
 
-        // Foreign Key to Hospital
-        [Required]
-        public string HospitalId { get; set; } = string.Empty;
-
-        [ForeignKey("HospitalId")]
-        public virtual Hospital Hospital { get; set; } = null!;
-
         // Additional properties
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public bool IsActive { get; set; } = true;
@@ -33,6 +26,9 @@ namespace SoitMed.Models.Hospital
         
         [ForeignKey("UserId")]
         public virtual ApplicationUser? User { get; set; }
+
+        // Navigation property for many-to-many relationship with Hospitals
+        public virtual ICollection<DoctorHospital> DoctorHospitals { get; set; } = new List<DoctorHospital>();
 
         // Navigation property for repair requests
         public virtual ICollection<Equipment.RepairRequest> RepairRequests { get; set; } = new List<Equipment.RepairRequest>();
