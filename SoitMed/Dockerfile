@@ -30,3 +30,4 @@ ENV ASPNETCORE_ENVIRONMENT=Development
 ENTRYPOINT ["dotnet", "SoitMed.dll"]
 
 
+

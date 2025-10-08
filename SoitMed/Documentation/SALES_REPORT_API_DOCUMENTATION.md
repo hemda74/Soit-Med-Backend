@@ -407,21 +407,21 @@ GET /api/SalesReport?type=daily&startDate=2024-01-01&endDate=2024-01-31&page=1&p
 
 ### Salesman (Sales Employee)
 
-- ✅ Create reports
-- ✅ Read own reports
-- ✅ Update own reports
-- ✅ Delete own reports
-- ❌ Rate reports
-- ❌ View other employees' reports
+- Create reports
+- Read own reports
+- Update own reports
+- Delete own reports
+- Rate reports
+- View other employees' reports
 
 ### SalesManager
 
-- ❌ Create reports
-- ✅ Read all reports
-- ❌ Update reports
-- ❌ Delete reports
-- ✅ Rate reports
-- ✅ View all employees' reports
+- Create reports
+- Read all reports
+- Update reports
+- Delete reports
+- Rate reports
+- View all employees' reports
 
 ---
 
