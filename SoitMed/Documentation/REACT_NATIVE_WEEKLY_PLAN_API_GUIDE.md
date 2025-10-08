@@ -1,18 +1,18 @@
 # Weekly Plan API Guide for React Native Team
 
-## 🎯 Overview
+## Overview
 
 This guide provides everything the React Native team needs to implement the **Weekly Plan** system for salesmen. This replaces the old Sales Report system with a more structured approach.
 
-## 📱 What Salesmen Can Do
+## What Salesmen Can Do
 
-- ✅ **Create weekly plans** with multiple tasks
-- ✅ **Add daily progress** updates throughout the week
-- ✅ **Manage tasks** (add, edit, delete, mark complete)
-- ✅ **View their plans** and progress
-- ❌ **Cannot see other salesmen's plans** (only managers can)
+- **Create weekly plans** with multiple tasks
+- **Add daily progress** updates throughout the week
+- **Manage tasks** (add, edit, delete, mark complete)
+- **View their plans** and progress
+- **Cannot see other salesmen's plans** (only managers can)
 
-## 🔗 Base URL
+## Base URL
 
 ```
 http://YOUR_COMPUTER_IP:5117/api/WeeklyPlan
@@ -22,7 +22,7 @@ http://YOUR_COMPUTER_IP:5117/api/WeeklyPlan
 
 ---
 
-## 🔐 Authentication
+## Authentication
 
 All requests require a JWT token in the header:
 
@@ -35,7 +35,7 @@ headers: {
 
 ---
 
-## 📋 API Endpoints
+## API Endpoints
 
 ### 1. Create Weekly Plan
 
@@ -246,7 +246,7 @@ const deleteWeeklyPlan = async (planId) => {
 
 ---
 
-## 📝 Task Management
+## Task Management
 
 ### 6. Add Task to Plan
 
@@ -330,7 +330,7 @@ const deleteTask = async (planId, taskId) => {
 
 ---
 
-## 📊 Daily Progress Management
+## Daily Progress Management
 
 ### 9. Add Daily Progress
 
@@ -414,7 +414,7 @@ const deleteDailyProgress = async (planId, progressId) => {
 
 ---
 
-## 🎨 React Native Implementation Examples
+## React Native Implementation Examples
 
 ### API Service Class
 
@@ -766,7 +766,7 @@ export default WeeklyPlanScreen;
 
 ---
 
-## ⚠️ Important Notes
+## Important Notes
 
 ### 1. **Date Format**
 
@@ -801,7 +801,7 @@ export default WeeklyPlanScreen;
 
 ---
 
-## 🚀 Quick Start Checklist
+## Quick Start Checklist
 
 - [ ] Replace `YOUR_IP` with actual computer IP address
 - [ ] Implement authentication with JWT token
@@ -813,7 +813,7 @@ export default WeeklyPlanScreen;
 
 ---
 
-## 📞 Support
+## Support
 
 If you encounter any issues:
 

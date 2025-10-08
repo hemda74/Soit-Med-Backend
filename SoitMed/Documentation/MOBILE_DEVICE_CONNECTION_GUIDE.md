@@ -30,7 +30,7 @@ When testing your mobile app (React Native/Expo) on a physical device, you can't
 
 **Example:** Let's assume your IP is `192.168.1.10`
 
-## Step 2: API Configuration (Already Done ✅)
+## Step 2: API Configuration (Already Done )
 
 The backend API has been configured to accept connections from external devices:
 
@@ -70,7 +70,7 @@ const response = await fetch('http://192.168.1.10:5117/api/Account/Login', {
 const users = await fetch('http://192.168.1.10:5117/api/User');
 ```
 
-## Troubleshooting 🔧
+## Troubleshooting 
 
 ### 1. Still Getting Network Error?
 
@@ -97,7 +97,7 @@ netsh advfirewall set allprofiles state off
 netsh advfirewall set allprofiles state on
 ```
 
-### 2. Android Cleartext Traffic Error 🔴
+### 2. Android Cleartext Traffic Error 
 
 Android 9+ blocks non-HTTPS traffic by default. For development, you need to explicitly allow it.
 
@@ -145,9 +145,9 @@ Some Wi-Fi networks (public, corporate, university) use "Client Isolation" which
 
 Before testing, make sure:
 
-- ✅ The .NET API is running (you should see Swagger at `http://localhost:5117/swagger`)
-- ✅ No error messages in the terminal/console
-- ✅ The port number matches (5117)
+-  The .NET API is running (you should see Swagger at `http://localhost:5117/swagger`)
+-  No error messages in the terminal/console
+-  The port number matches (5117)
 
 ### 5. Test Connection from Computer First
 
@@ -171,15 +171,15 @@ If this doesn't work, the issue is with your network/firewall setup, not your mo
 | **Example IP**       | 192.168.1.10                                 |
 | **Full Example URL** | `http://192.168.1.10:5117/api/Account/Login` |
 
-## Production Considerations ⚠️
+## Production Considerations 
 
 **Important:** These settings are for **DEVELOPMENT ONLY**. In production:
 
-- ✅ Use HTTPS with proper SSL certificates
-- ✅ Remove `usesCleartextTraffic` from Android config
-- ✅ Use a proper domain name instead of IP addresses
-- ✅ Configure proper firewall rules
-- ✅ Use environment variables for API URLs
+-  Use HTTPS with proper SSL certificates
+-  Remove `usesCleartextTraffic` from Android config
+-  Use a proper domain name instead of IP addresses
+-  Configure proper firewall rules
+-  Use environment variables for API URLs
 
 ## Environment-Based Configuration (Recommended)
 
