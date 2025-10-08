@@ -33,6 +33,11 @@ namespace SoitMed.Repositories
         // Sales report repository
         private ISalesReportRepository? _salesReports;
 
+        // Weekly plan repositories
+        private IWeeklyPlanRepository? _weeklyPlans;
+        private IWeeklyPlanTaskRepository? _weeklyPlanTasks;
+        private IDailyProgressRepository? _dailyProgresses;
+
         public UnitOfWork(Context context)
         {
             _context = context;
@@ -82,6 +87,16 @@ namespace SoitMed.Repositories
         // Sales report repository
         public ISalesReportRepository SalesReports => 
             _salesReports ??= new SalesReportRepository(_context);
+
+        // Weekly plan repositories
+        public IWeeklyPlanRepository WeeklyPlans => 
+            _weeklyPlans ??= new WeeklyPlanRepository(_context);
+
+        public IWeeklyPlanTaskRepository WeeklyPlanTasks =>
+            _weeklyPlanTasks ??= new WeeklyPlanTaskRepository(_context);
+
+        public IDailyProgressRepository DailyProgresses => 
+            _dailyProgresses ??= new DailyProgressRepository(_context);
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

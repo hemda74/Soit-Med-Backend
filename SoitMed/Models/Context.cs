@@ -32,8 +32,13 @@ namespace SoitMed.Models
         // User image entities
         public DbSet<UserImage> UserImages { get; set; }
 
-        // Sales report entities
+        // Sales report entities (Legacy - kept for backward compatibility)
         public DbSet<SalesReport> SalesReports { get; set; }
+
+        // Weekly plan entities (New system)
+        public DbSet<WeeklyPlan> WeeklyPlans { get; set; }
+        public DbSet<WeeklyPlanTask> WeeklyPlanTasks { get; set; }
+        public DbSet<DailyProgress> DailyProgresses { get; set; }
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -188,6 +193,37 @@ namespace SoitMed.Models
             modelBuilder.Entity<UserImage>()
                 .HasIndex(ui => new { ui.UserId, ui.IsProfileImage })
                 .HasFilter("[IsProfileImage] = 1")
+                .IsUnique();
+
+            // Configure WeeklyPlan relationships
+            modelBuilder.Entity<WeeklyPlan>()
+                .HasOne(wp => wp.Employee)
+                .WithMany()
+                .HasForeignKey(wp => wp.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Ensure unique week per employee (one plan per week per employee)
+            modelBuilder.Entity<WeeklyPlan>()
+                .HasIndex(wp => new { wp.EmployeeId, wp.WeekStartDate })
+                .IsUnique();
+
+            // Configure WeeklyPlanTask relationships
+            modelBuilder.Entity<WeeklyPlanTask>()
+                .HasOne(wpt => wpt.WeeklyPlan)
+                .WithMany(wp => wp.Tasks)
+                .HasForeignKey(wpt => wpt.WeeklyPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure DailyProgress relationships
+            modelBuilder.Entity<DailyProgress>()
+                .HasOne(dp => dp.WeeklyPlan)
+                .WithMany(wp => wp.DailyProgresses)
+                .HasForeignKey(dp => dp.WeeklyPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Ensure one daily progress per day per weekly plan
+            modelBuilder.Entity<DailyProgress>()
+                .HasIndex(dp => new { dp.WeeklyPlanId, dp.ProgressDate })
                 .IsUnique();
         }
     }
