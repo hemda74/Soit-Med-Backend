@@ -83,9 +83,15 @@ namespace SoitMed
             // Register Unit of Work
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
             
-            // Register Sales Report Services
+            // Register Sales Report Services (Legacy)
             builder.Services.AddScoped<ISalesReportRepository, SalesReportRepository>();
             builder.Services.AddScoped<ISalesReportService, SalesReportService>();
+            
+            // Register Weekly Plan Services (New System)
+            builder.Services.AddScoped<IWeeklyPlanRepository, WeeklyPlanRepository>();
+            builder.Services.AddScoped<IWeeklyPlanTaskRepository, WeeklyPlanTaskRepository>();
+            builder.Services.AddScoped<IDailyProgressRepository, DailyProgressRepository>();
+            builder.Services.AddScoped<IWeeklyPlanService, WeeklyPlanService>();
             
             // Register Image Upload Services
             builder.Services.AddScoped<IImageUploadService, ImageUploadService>();
@@ -98,6 +104,7 @@ namespace SoitMed
             // Register FluentValidation
             builder.Services.AddFluentValidationAutoValidation();
             builder.Services.AddValidatorsFromAssemblyContaining<CreateSalesReportDtoValidator>();
+            builder.Services.AddValidatorsFromAssemblyContaining<CreateWeeklyPlanDtoValidator>();
             
             // Add Health Checks
             builder.Services.AddHealthChecks()

@@ -26,8 +26,13 @@ namespace SoitMed.Repositories
         IApplicationUserRepository Users { get; }
         IUserImageRepository UserImages { get; }
 
-        // Sales report repository (already exists)
+        // Sales report repository (Legacy)
         ISalesReportRepository SalesReports { get; }
+
+        // Weekly plan repositories (New system)
+        IWeeklyPlanRepository WeeklyPlans { get; }
+        IWeeklyPlanTaskRepository WeeklyPlanTasks { get; }
+        IDailyProgressRepository DailyProgresses { get; }
 
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
