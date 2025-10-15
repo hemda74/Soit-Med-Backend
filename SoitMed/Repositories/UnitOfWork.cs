@@ -33,6 +33,16 @@ namespace SoitMed.Repositories
         // Sales report repository
         private ISalesReportRepository? _salesReports;
 
+        // Weekly plan repositories
+        private IWeeklyPlanRepository? _weeklyPlans;
+        private IWeeklyPlanTaskRepository? _weeklyPlanTasks;
+        private IDailyProgressRepository? _dailyProgresses;
+
+        // Sales funnel repositories
+        private IActivityLogRepository? _activityLogs;
+        private IDealRepository? _deals;
+        private IOfferRepository? _offers;
+
         public UnitOfWork(Context context)
         {
             _context = context;
@@ -83,6 +93,26 @@ namespace SoitMed.Repositories
         public ISalesReportRepository SalesReports => 
             _salesReports ??= new SalesReportRepository(_context);
 
+        // Weekly plan repositories
+        public IWeeklyPlanRepository WeeklyPlans => 
+            _weeklyPlans ??= new WeeklyPlanRepository(_context);
+
+        public IWeeklyPlanTaskRepository WeeklyPlanTasks =>
+            _weeklyPlanTasks ??= new WeeklyPlanTaskRepository(_context);
+
+        public IDailyProgressRepository DailyProgresses => 
+            _dailyProgresses ??= new DailyProgressRepository(_context);
+
+        // Sales funnel repositories
+        public IActivityLogRepository ActivityLogs => 
+            _activityLogs ??= new ActivityLogRepository(_context);
+
+        public IDealRepository Deals => 
+            _deals ??= new DealRepository(_context);
+
+        public IOfferRepository Offers => 
+            _offers ??= new OfferRepository(_context);
+
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             return await _context.SaveChangesAsync(cancellationToken);
@@ -111,6 +141,11 @@ namespace SoitMed.Repositories
                 await _transaction.DisposeAsync();
                 _transaction = null;
             }
+        }
+
+        public Context GetContext()
+        {
+            return _context;
         }
 
         public void Dispose()

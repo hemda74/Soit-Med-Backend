@@ -32,8 +32,18 @@ namespace SoitMed.Models
         // User image entities
         public DbSet<UserImage> UserImages { get; set; }
 
-        // Sales report entities
+        // Sales report entities (Legacy - kept for backward compatibility)
         public DbSet<SalesReport> SalesReports { get; set; }
+
+        // Weekly plan entities (New system)
+        public DbSet<WeeklyPlan> WeeklyPlans { get; set; }
+        public DbSet<WeeklyPlanTask> WeeklyPlanTasks { get; set; }
+        public DbSet<DailyProgress> DailyProgresses { get; set; }
+
+        // Sales funnel entities
+        public DbSet<ActivityLog> ActivityLogs { get; set; }
+        public DbSet<Deal> Deals { get; set; }
+        public DbSet<Offer> Offers { get; set; }
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -189,6 +199,142 @@ namespace SoitMed.Models
                 .HasIndex(ui => new { ui.UserId, ui.IsProfileImage })
                 .HasFilter("[IsProfileImage] = 1")
                 .IsUnique();
+
+            // Configure WeeklyPlan relationships
+            modelBuilder.Entity<WeeklyPlan>()
+                .HasOne(wp => wp.Employee)
+                .WithMany()
+                .HasForeignKey(wp => wp.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Ensure unique week per employee (one plan per week per employee)
+            modelBuilder.Entity<WeeklyPlan>()
+                .HasIndex(wp => new { wp.EmployeeId, wp.WeekStartDate })
+                .IsUnique();
+
+            // Configure WeeklyPlanTask relationships
+            modelBuilder.Entity<WeeklyPlanTask>()
+                .HasOne(wpt => wpt.WeeklyPlan)
+                .WithMany(wp => wp.Tasks)
+                .HasForeignKey(wpt => wpt.WeeklyPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure DailyProgress relationships
+            modelBuilder.Entity<DailyProgress>()
+                .HasOne(dp => dp.WeeklyPlan)
+                .WithMany(wp => wp.DailyProgresses)
+                .HasForeignKey(dp => dp.WeeklyPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Ensure one daily progress per day per weekly plan
+            modelBuilder.Entity<DailyProgress>()
+                .HasIndex(dp => new { dp.WeeklyPlanId, dp.ProgressDate })
+                .IsUnique();
+
+            // Configure Sales Funnel entities
+            ConfigureSalesFunnelEntities(modelBuilder);
+        }
+
+        private void ConfigureSalesFunnelEntities(ModelBuilder modelBuilder)
+        {
+            // Configure ActivityLog entity
+            modelBuilder.Entity<ActivityLog>()
+                .HasOne(al => al.PlanTask)
+                .WithMany()
+                .HasForeignKey(al => al.PlanTaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ActivityLog>()
+                .HasOne(al => al.User)
+                .WithMany()
+                .HasForeignKey(al => al.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure indexes for performance
+            modelBuilder.Entity<ActivityLog>()
+                .HasIndex(al => al.PlanTaskId);
+
+            modelBuilder.Entity<ActivityLog>()
+                .HasIndex(al => al.UserId);
+
+            modelBuilder.Entity<ActivityLog>()
+                .HasIndex(al => al.CreatedAt);
+
+            // Configure Deal entity
+            modelBuilder.Entity<Deal>()
+                .HasOne(d => d.ActivityLog)
+                .WithOne(al => al.Deal)
+                .HasForeignKey<Deal>(d => d.ActivityLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Deal>()
+                .HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure decimal precision for DealValue
+            modelBuilder.Entity<Deal>()
+                .Property(d => d.DealValue)
+                .HasPrecision(18, 2);
+
+            // Configure indexes for performance
+            modelBuilder.Entity<Deal>()
+                .HasIndex(d => d.UserId);
+
+            modelBuilder.Entity<Deal>()
+                .HasIndex(d => d.Status);
+
+            modelBuilder.Entity<Deal>()
+                .HasIndex(d => d.CreatedAt);
+
+            // Configure Offer entity
+            modelBuilder.Entity<Offer>()
+                .HasOne(o => o.ActivityLog)
+                .WithOne(al => al.Offer)
+                .HasForeignKey<Offer>(o => o.ActivityLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Offer>()
+                .HasOne(o => o.User)
+                .WithMany()
+                .HasForeignKey(o => o.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure indexes for performance
+            modelBuilder.Entity<Offer>()
+                .HasIndex(o => o.UserId);
+
+            modelBuilder.Entity<Offer>()
+                .HasIndex(o => o.Status);
+
+            modelBuilder.Entity<Offer>()
+                .HasIndex(o => o.CreatedAt);
+
+            // Configure enum conversions
+            modelBuilder.Entity<ActivityLog>()
+                .Property(al => al.InteractionType)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<ActivityLog>()
+                .Property(al => al.ClientType)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<ActivityLog>()
+                .Property(al => al.Result)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<ActivityLog>()
+                .Property(al => al.Reason)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<Deal>()
+                .Property(d => d.Status)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<Offer>()
+                .Property(o => o.Status)
+                .HasConversion<int>();
         }
     }
 }
