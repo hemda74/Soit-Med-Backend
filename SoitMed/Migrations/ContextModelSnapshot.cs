@@ -155,6 +155,53 @@ namespace SoitMed.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("SoitMed.Models.ActivityLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ClientType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("InteractionType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PlanTaskId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Reason")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Result")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("PlanTaskId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ActivityLogs");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Core.Department", b =>
                 {
                     b.Property<int>("Id")
@@ -212,6 +259,91 @@ namespace SoitMed.Migrations
                         .IsUnique();
 
                     b.ToTable("BusinessRoles");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.DailyProgress", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateOnly>("ProgressDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("TasksWorkedOn")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("WeeklyPlanId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WeeklyPlanId", "ProgressDate")
+                        .IsUnique();
+
+                    b.ToTable("DailyProgresses");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Deal", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ActivityLogId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("DealValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ExpectedCloseDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityLogId")
+                        .IsUnique();
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Deals");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Equipment.Equipment", b =>
@@ -753,6 +885,51 @@ namespace SoitMed.Migrations
                     b.ToTable("Governorates");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Offer", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ActivityLogId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DocumentUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OfferDetails")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityLogId")
+                        .IsUnique();
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Offers");
+                });
+
             modelBuilder.Entity("SoitMed.Models.SalesReport", b =>
                 {
                     b.Property<int>("Id")
@@ -807,6 +984,103 @@ namespace SoitMed.Migrations
                     b.ToTable("SalesReports");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.WeeklyPlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("EmployeeId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ManagerComment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("ManagerReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly>("WeekEndDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("WeekStartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId", "WeekStartDate")
+                        .IsUnique();
+
+                    b.ToTable("WeeklyPlans");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.WeeklyPlanTask", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("WeeklyPlanId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WeeklyPlanId");
+
+                    b.ToTable("WeeklyPlanTasks");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -856,6 +1130,55 @@ namespace SoitMed.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("SoitMed.Models.ActivityLog", b =>
+                {
+                    b.HasOne("SoitMed.Models.WeeklyPlanTask", "PlanTask")
+                        .WithMany()
+                        .HasForeignKey("PlanTaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PlanTask");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.DailyProgress", b =>
+                {
+                    b.HasOne("SoitMed.Models.WeeklyPlan", "WeeklyPlan")
+                        .WithMany("DailyProgresses")
+                        .HasForeignKey("WeeklyPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WeeklyPlan");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Deal", b =>
+                {
+                    b.HasOne("SoitMed.Models.ActivityLog", "ActivityLog")
+                        .WithOne("Deal")
+                        .HasForeignKey("SoitMed.Models.Deal", "ActivityLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivityLog");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Equipment.Equipment", b =>
@@ -998,6 +1321,25 @@ namespace SoitMed.Migrations
                     b.Navigation("Governorate");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Offer", b =>
+                {
+                    b.HasOne("SoitMed.Models.ActivityLog", "ActivityLog")
+                        .WithOne("Offer")
+                        .HasForeignKey("SoitMed.Models.Offer", "ActivityLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivityLog");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("SoitMed.Models.SalesReport", b =>
                 {
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Employee")
@@ -1007,6 +1349,35 @@ namespace SoitMed.Migrations
                         .IsRequired();
 
                     b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.WeeklyPlan", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.WeeklyPlanTask", b =>
+                {
+                    b.HasOne("SoitMed.Models.WeeklyPlan", "WeeklyPlan")
+                        .WithMany("Tasks")
+                        .HasForeignKey("WeeklyPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WeeklyPlan");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.ActivityLog", b =>
+                {
+                    b.Navigation("Deal");
+
+                    b.Navigation("Offer");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Core.Department", b =>
@@ -1055,6 +1426,13 @@ namespace SoitMed.Migrations
             modelBuilder.Entity("SoitMed.Models.Location.Governorate", b =>
                 {
                     b.Navigation("EngineerGovernorates");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.WeeklyPlan", b =>
+                {
+                    b.Navigation("DailyProgresses");
+
+                    b.Navigation("Tasks");
                 });
 #pragma warning restore 612, 618
         }
