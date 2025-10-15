@@ -1,3 +1,4 @@
+using SoitMed.Models;
 using SoitMed.Models.Identity;
 
 namespace SoitMed.Repositories
@@ -34,10 +35,18 @@ namespace SoitMed.Repositories
         IWeeklyPlanTaskRepository WeeklyPlanTasks { get; }
         IDailyProgressRepository DailyProgresses { get; }
 
+        // Sales funnel repositories
+        IActivityLogRepository ActivityLogs { get; }
+        IDealRepository Deals { get; }
+        IOfferRepository Offers { get; }
+
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
         Task BeginTransactionAsync(CancellationToken cancellationToken = default);
         Task CommitTransactionAsync(CancellationToken cancellationToken = default);
         Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
+        
+        // Context access for execution strategy
+        Context GetContext();
     }
 }
