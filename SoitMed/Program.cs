@@ -39,7 +39,11 @@ namespace SoitMed
 
             // Add services to the container.
 
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+                });
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
@@ -93,6 +97,14 @@ namespace SoitMed
             builder.Services.AddScoped<IDailyProgressRepository, DailyProgressRepository>();
             builder.Services.AddScoped<IWeeklyPlanService, WeeklyPlanService>();
             
+            // Register Sales Funnel Services
+            builder.Services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
+            builder.Services.AddScoped<IDealRepository, DealRepository>();
+            builder.Services.AddScoped<IOfferRepository, OfferRepository>();
+            builder.Services.AddScoped<IActivityService, ActivityService>();
+            builder.Services.AddScoped<IManagerDashboardService, ManagerDashboardService>();
+            builder.Services.AddScoped<ISalesmanStatsService, SalesmanStatsService>();
+            
             // Register Image Upload Services
             builder.Services.AddScoped<IImageUploadService, ImageUploadService>();
             builder.Services.AddScoped<IRoleBasedImageUploadService, RoleBasedImageUploadService>();
@@ -105,6 +117,7 @@ namespace SoitMed
             builder.Services.AddFluentValidationAutoValidation();
             builder.Services.AddValidatorsFromAssemblyContaining<CreateSalesReportDtoValidator>();
             builder.Services.AddValidatorsFromAssemblyContaining<CreateWeeklyPlanDtoValidator>();
+            builder.Services.AddValidatorsFromAssemblyContaining<CreateActivityRequestValidator>();
             
             // Add Health Checks
             builder.Services.AddHealthChecks()
@@ -208,29 +221,8 @@ namespace SoitMed
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
-            // Add exception handling middleware
-            app.UseExceptionHandler(errorApp =>
-            {
-                errorApp.Run(async context =>
-                {
-                    context.Response.StatusCode = 500;
-                    context.Response.ContentType = "application/json";
-                    
-                    var error = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
-                    if (error != null)
-                    {
-                        var ex = error.Error;
-                        Console.WriteLine($"Unhandled exception: {ex.Message}");
-                        Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                        
-                        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
-                        {
-                            error = "An internal server error occurred",
-                            message = "Please try again later"
-                        }));
-                    }
-                });
-            });
+            // Add global exception handling middleware
+            app.UseMiddleware<SoitMed.Middleware.GlobalExceptionMiddleware>();
             app.UseStatusCodePages();
             
             app.UseStaticFiles();

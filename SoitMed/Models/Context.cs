@@ -39,6 +39,11 @@ namespace SoitMed.Models
         public DbSet<WeeklyPlan> WeeklyPlans { get; set; }
         public DbSet<WeeklyPlanTask> WeeklyPlanTasks { get; set; }
         public DbSet<DailyProgress> DailyProgresses { get; set; }
+
+        // Sales funnel entities
+        public DbSet<ActivityLog> ActivityLogs { get; set; }
+        public DbSet<Deal> Deals { get; set; }
+        public DbSet<Offer> Offers { get; set; }
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -225,6 +230,111 @@ namespace SoitMed.Models
             modelBuilder.Entity<DailyProgress>()
                 .HasIndex(dp => new { dp.WeeklyPlanId, dp.ProgressDate })
                 .IsUnique();
+
+            // Configure Sales Funnel entities
+            ConfigureSalesFunnelEntities(modelBuilder);
+        }
+
+        private void ConfigureSalesFunnelEntities(ModelBuilder modelBuilder)
+        {
+            // Configure ActivityLog entity
+            modelBuilder.Entity<ActivityLog>()
+                .HasOne(al => al.PlanTask)
+                .WithMany()
+                .HasForeignKey(al => al.PlanTaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ActivityLog>()
+                .HasOne(al => al.User)
+                .WithMany()
+                .HasForeignKey(al => al.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure indexes for performance
+            modelBuilder.Entity<ActivityLog>()
+                .HasIndex(al => al.PlanTaskId);
+
+            modelBuilder.Entity<ActivityLog>()
+                .HasIndex(al => al.UserId);
+
+            modelBuilder.Entity<ActivityLog>()
+                .HasIndex(al => al.CreatedAt);
+
+            // Configure Deal entity
+            modelBuilder.Entity<Deal>()
+                .HasOne(d => d.ActivityLog)
+                .WithOne(al => al.Deal)
+                .HasForeignKey<Deal>(d => d.ActivityLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Deal>()
+                .HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure decimal precision for DealValue
+            modelBuilder.Entity<Deal>()
+                .Property(d => d.DealValue)
+                .HasPrecision(18, 2);
+
+            // Configure indexes for performance
+            modelBuilder.Entity<Deal>()
+                .HasIndex(d => d.UserId);
+
+            modelBuilder.Entity<Deal>()
+                .HasIndex(d => d.Status);
+
+            modelBuilder.Entity<Deal>()
+                .HasIndex(d => d.CreatedAt);
+
+            // Configure Offer entity
+            modelBuilder.Entity<Offer>()
+                .HasOne(o => o.ActivityLog)
+                .WithOne(al => al.Offer)
+                .HasForeignKey<Offer>(o => o.ActivityLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Offer>()
+                .HasOne(o => o.User)
+                .WithMany()
+                .HasForeignKey(o => o.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure indexes for performance
+            modelBuilder.Entity<Offer>()
+                .HasIndex(o => o.UserId);
+
+            modelBuilder.Entity<Offer>()
+                .HasIndex(o => o.Status);
+
+            modelBuilder.Entity<Offer>()
+                .HasIndex(o => o.CreatedAt);
+
+            // Configure enum conversions
+            modelBuilder.Entity<ActivityLog>()
+                .Property(al => al.InteractionType)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<ActivityLog>()
+                .Property(al => al.ClientType)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<ActivityLog>()
+                .Property(al => al.Result)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<ActivityLog>()
+                .Property(al => al.Reason)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<Deal>()
+                .Property(d => d.Status)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<Offer>()
+                .Property(o => o.Status)
+                .HasConversion<int>();
         }
     }
 }
