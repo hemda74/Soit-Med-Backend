@@ -17,6 +17,9 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Data.Common;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Http;
 
 namespace SoitMed
 {
@@ -26,11 +29,37 @@ namespace SoitMed
         {
             // Configure logging
             var logger = LoggerFactory.Create(builder => builder.AddConsole().AddDebug()).CreateLogger("SoitMed");
+
+            // Global exception handlers to avoid process termination
+            AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
+            {
+                try
+                {
+                    var ex = eventArgs.ExceptionObject as Exception;
+                    logger.LogError(ex, "UnhandledException: {Message}", ex?.Message);
+                    Console.WriteLine($"[UnhandledException] {ex?.Message}\n{ex?.StackTrace}");
+                }
+                catch { /* swallow logging errors */ }
+            };
+            TaskScheduler.UnobservedTaskException += (sender, eventArgs) =>
+            {
+                try
+                {
+                    logger.LogError(eventArgs.Exception, "UnobservedTaskException: {Message}", eventArgs.Exception.Message);
+                    Console.WriteLine($"[UnobservedTaskException] {eventArgs.Exception.Message}\n{eventArgs.Exception.StackTrace}");
+                    eventArgs.SetObserved();
+                }
+                catch { /* swallow logging errors */ }
+            };
             
             try
             {
                 logger.LogInformation("Starting SoitMed Backend Application...");
                 var builder = WebApplication.CreateBuilder(args);
+                // Ensure web root exists and is set (needed for file uploads)
+                var ensuredWebRoot = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+                Directory.CreateDirectory(ensuredWebRoot);
+                builder.WebHost.UseWebRoot(ensuredWebRoot);
                 
                 // Configure logging
                 builder.Logging.ClearProviders();
@@ -57,6 +86,16 @@ namespace SoitMed
                 .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
                 .EnableServiceProviderCaching()
                 .EnableDetailedErrors(builder.Environment.IsDevelopment());
+            });
+            
+            // Allow reasonably sized image uploads (up to 20MB)
+            builder.Services.Configure<FormOptions>(options =>
+            {
+                options.MultipartBodyLengthLimit = 20 * 1024 * 1024; // 20MB
+            });
+            builder.WebHost.ConfigureKestrel(options =>
+            {
+                options.Limits.MaxRequestBodySize = 20L * 1024 * 1024; // 20MB
             });
            
             builder.Services.AddCors(options => {
@@ -201,11 +240,62 @@ namespace SoitMed
 					new string[] {}
 					}
 					});
+
+                // Render IFormFile as file input in Swagger UI
+                swagger.MapType<IFormFile>(() => new OpenApiSchema
+                {
+                    Type = "string",
+                    Format = "binary"
+                });
+                swagger.MapType<IEnumerable<IFormFile>>(() => new OpenApiSchema
+                {
+                    Type = "array",
+                    Items = new OpenApiSchema { Type = "string", Format = "binary" }
+                });
 			});
 			#endregion
 			//--------------------------------
 
 			var app = builder.Build();
+
+            // Ensure critical tables exist (guard against drift in dev/test)
+            using (var scope = app.Services.CreateScope())
+            {
+                try
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<Context>();
+                    var connection = db.Database.GetDbConnection();
+                    await connection.OpenAsync();
+                    using var command = connection.CreateCommand();
+                    command.CommandText = @"IF OBJECT_ID(N'[dbo].[DoctorHospitals]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[DoctorHospitals] (
+        [Id] INT IDENTITY(1,1) NOT NULL,
+        [DoctorId] INT NOT NULL,
+        [HospitalId] NVARCHAR(450) NOT NULL,
+        [AssignedAt] DATETIME2 NOT NULL,
+        [IsActive] BIT NOT NULL,
+        CONSTRAINT [PK_DoctorHospitals] PRIMARY KEY ([Id]),
+        CONSTRAINT [FK_DoctorHospitals_Doctors_DoctorId] FOREIGN KEY ([DoctorId]) REFERENCES [dbo].[Doctors] ([DoctorId]) ON DELETE CASCADE,
+        CONSTRAINT [FK_DoctorHospitals_Hospitals_HospitalId] FOREIGN KEY ([HospitalId]) REFERENCES [dbo].[Hospitals] ([HospitalId]) ON DELETE NO ACTION
+    );
+
+    CREATE UNIQUE INDEX [IX_DoctorHospitals_DoctorId_HospitalId]
+        ON [dbo].[DoctorHospitals] ([DoctorId], [HospitalId]);
+
+    CREATE INDEX [IX_DoctorHospitals_HospitalId]
+        ON [dbo].[DoctorHospitals] ([HospitalId]);
+END";
+                    await command.ExecuteNonQueryAsync();
+                }
+                catch (Exception guardEx)
+                {
+                    // Log and continue startup; controller action will still surface DB errors if any
+                    var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+                    var startupLogger = loggerFactory.CreateLogger("StartupDbGuard");
+                    startupLogger.LogError(guardEx, "Failed to ensure DoctorHospitals table exists");
+                }
+            }
 
             // Seed roles
             using (var scope = app.Services.CreateScope())
@@ -241,8 +331,7 @@ namespace SoitMed
                     if (error != null)
                     {
                         var ex = error.Error;
-                        Console.WriteLine($"Unhandled exception: {ex.Message}");
-                        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                        // Logging handled by configured providers
                         
                         await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
                         {
@@ -256,11 +345,12 @@ namespace SoitMed
             
             app.UseStaticFiles();
             
-            // Configure static files for uploads
+            // Configure static files for uploads served from outside the project
+            var externalUploadsRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SoitMed", "uploads");
+            Directory.CreateDirectory(externalUploadsRoot);
             app.UseStaticFiles(new StaticFileOptions
             {
-                FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
-                    Path.Combine(builder.Environment.WebRootPath, "uploads")),
+                FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(externalUploadsRoot),
                 RequestPath = "/uploads"
             });
             
@@ -292,10 +382,8 @@ namespace SoitMed
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Application startup failed: {Message}", ex.Message);
-                Console.WriteLine($"Application startup failed: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                throw;
+                // Log and exit gracefully
+                logger.LogError(ex, "Application error: {Message}", ex.Message);
             }
         }
     }

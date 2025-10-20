@@ -21,12 +21,22 @@ namespace SoitMed.Services
     public class RoleBasedImageUploadService : IRoleBasedImageUploadService
     {
         private readonly IWebHostEnvironment _environment;
+        private readonly string _uploadsRootPhysicalPath; // physical folder outside project to avoid hot-reload restarts
+        private readonly ILogger<RoleBasedImageUploadService> _logger;
         private readonly string[] _allowedExtensions = { ".jpg", ".jpeg", ".png", ".gif" };
         private readonly long _maxFileSize = 5 * 1024 * 1024; // 5MB
 
-        public RoleBasedImageUploadService(IWebHostEnvironment environment)
+        public RoleBasedImageUploadService(IWebHostEnvironment environment, ILogger<RoleBasedImageUploadService> logger)
         {
             _environment = environment;
+            _logger = logger;
+            // Default to %LOCALAPPDATA%/SoitMed/uploads if available; fallback to web root
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var defaultUploadsRoot = !string.IsNullOrWhiteSpace(localAppData)
+                ? Path.Combine(localAppData, "SoitMed", "uploads")
+                : Path.Combine(_environment.WebRootPath, "uploads");
+            Directory.CreateDirectory(defaultUploadsRoot);
+            _uploadsRootPhysicalPath = defaultUploadsRoot;
         }
 
         public async Task<ImageUploadResult> UploadUserImageAsync(
@@ -36,11 +46,13 @@ namespace SoitMed.Services
             string? departmentName = null, 
             string? altText = null)
         {
+            _logger.LogInformation("UploadUserImageAsync called for user {UserId}", user.Id);
             try
             {
                 // Validate file
                 if (!IsValidImageFile(imageFile))
                 {
+                    _logger.LogWarning("Invalid image file for user {UserId}", user.Id);
                     return new ImageUploadResult
                     {
                         Success = false,
@@ -51,25 +63,30 @@ namespace SoitMed.Services
                 // Generate folder structure: role/firstname_lastname_departmentname_userid
                 var userFolderName = GenerateUserFolderName(user, departmentName);
                 var roleFolder = role.ToLowerInvariant();
-                var folderPath = Path.Combine("uploads", roleFolder, userFolderName);
+                var relativeFolderPath = Path.Combine("uploads", roleFolder, userFolderName);
+                _logger.LogInformation("FolderPath: {FolderPath}", relativeFolderPath);
 
-                // Create directory if it doesn't exist
-                var uploadPath = Path.Combine(_environment.WebRootPath, folderPath);
+                // Create physical directory outside the project to avoid hot reload restarts
+                var uploadPath = Path.Combine(_uploadsRootPhysicalPath, roleFolder, userFolderName);
+                _logger.LogInformation("UploadPath: {UploadPath}", uploadPath);
                 Directory.CreateDirectory(uploadPath);
+                _logger.LogInformation("Directory created successfully");
 
                 // Generate unique filename
                 var fileExtension = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
                 var fileName = $"{Guid.NewGuid()}{fileExtension}";
                 var filePath = Path.Combine(uploadPath, fileName);
+                _logger.LogInformation("FilePath: {FilePath}", filePath);
 
                 // Save file
                 using (var stream = new FileStream(filePath, FileMode.Create))
                 {
                     await imageFile.CopyToAsync(stream);
                 }
+                _logger.LogInformation("File saved successfully");
 
                 // Return relative path for database storage
-                var relativePath = Path.Combine(folderPath, fileName).Replace("\\", "/");
+                var relativePath = Path.Combine(relativeFolderPath, fileName).Replace("\\", "/");
 
                 return new ImageUploadResult
                 {
@@ -83,6 +100,7 @@ namespace SoitMed.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error uploading image for user {UserId}", user.Id);
                 return new ImageUploadResult
                 {
                     Success = false,
