@@ -1,3 +1,4 @@
+using SoitMed.Models;
 using SoitMed.Models.Identity;
 
 namespace SoitMed.Repositories
@@ -29,10 +30,32 @@ namespace SoitMed.Repositories
         // Sales report repository (already exists)
         ISalesReportRepository SalesReports { get; }
 
+        // Sales funnel repositories
+        IActivityLogRepository ActivityLogs { get; }
+        IDealRepository Deals { get; }
+        IOfferRepository Offers { get; }
+
+        // Workflow and notification repositories
+        IRequestWorkflowRepository RequestWorkflows { get; }
+        INotificationRepository Notifications { get; }
+
+        // Client tracking repositories
+        IClientRepository Clients { get; }
+        IClientVisitRepository ClientVisits { get; }
+        IClientInteractionRepository ClientInteractions { get; }
+        IClientAnalyticsRepository ClientAnalytics { get; }
+
+        // Weekly planning repositories
+        IWeeklyPlanRepository WeeklyPlans { get; }
+        IWeeklyPlanItemRepository WeeklyPlanItems { get; }
+
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
         Task BeginTransactionAsync(CancellationToken cancellationToken = default);
         Task CommitTransactionAsync(CancellationToken cancellationToken = default);
         Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
+        
+        // Context access
+        Context GetContext();
     }
 }

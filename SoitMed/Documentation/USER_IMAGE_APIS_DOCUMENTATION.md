@@ -19,7 +19,9 @@ Content-Type: multipart/form-data
 #### **Request Body (Form Data):**
 
 - `profileImage` (IFormFile, required) - The new profile image file
-- `AltText` (string, optional) - Alternative text for the image
+- `altText` (string, optional) - Alternative text for the image
+
+**Note:** This endpoint also supports `POST /api/User/image` with the same parameters for uploading a new profile image.
 
 #### **Response:**
 
@@ -42,6 +44,72 @@ Content-Type: multipart/form-data
 }
 ```
 
+### **1.1. Upload User Profile Image (Alternative)**
+
+```http
+POST /api/User/image
+Authorization: Bearer {token}
+Content-Type: multipart/form-data
+```
+
+**Note:** This endpoint has the same functionality as the PUT endpoint above. Both can be used to upload or update a profile image.
+
+#### **Error Responses:**
+
+**400 Bad Request - Missing Image:**
+
+```json
+{
+	"error": "Profile image is required",
+	"code": "IMAGE_REQUIRED"
+}
+```
+
+**400 Bad Request - File Too Large:**
+
+```json
+{
+	"error": "Image file size cannot exceed 5MB",
+	"code": "IMAGE_TOO_LARGE"
+}
+```
+
+**400 Bad Request - Invalid File Type:**
+
+```json
+{
+	"error": "Only JPEG, PNG, and GIF images are allowed",
+	"code": "INVALID_IMAGE_TYPE"
+}
+```
+
+**400 Bad Request - Upload Failed:**
+
+```json
+{
+	"error": "Failed to upload image: [error details]",
+	"code": "UPLOAD_FAILED"
+}
+```
+
+**404 Not Found - User Not Found:**
+
+```json
+{
+	"error": "User not found",
+	"code": "USER_NOT_FOUND"
+}
+```
+
+**500 Internal Server Error:**
+
+```json
+{
+	"error": "An unexpected error occurred while uploading the image. Please try again.",
+	"code": "UPLOAD_ERROR"
+}
+```
+
 ### **2. Get User Profile Image**
 
 ```http
@@ -49,7 +117,7 @@ GET /api/User/image
 Authorization: Bearer {token}
 ```
 
-#### **Response:**
+#### **Response (Success):**
 
 ```json
 {
@@ -65,6 +133,15 @@ Authorization: Bearer {token}
 }
 ```
 
+#### **Response (No Image Found):**
+
+```json
+{
+	"error": "No profile image found",
+	"code": "NO_IMAGE_FOUND"
+}
+```
+
 ### **3. Delete User Profile Image**
 
 ```http
@@ -72,13 +149,22 @@ DELETE /api/User/image
 Authorization: Bearer {token}
 ```
 
-#### **Response:**
+#### **Response (Success):**
 
 ```json
 {
 	"userId": "USER-ID-123",
 	"message": "Profile image deleted successfully",
 	"deletedAt": "2025-01-21T10:30:00Z"
+}
+```
+
+#### **Response (No Image Found):**
+
+```json
+{
+	"error": "No profile image found to delete",
+	"code": "NO_IMAGE_FOUND"
 }
 ```
 
@@ -183,11 +269,17 @@ Authorization: Bearer {token}
 3. **Test with Postman/curl:**
 
       ```bash
-      # Update image
+      # Upload/Update image (POST)
+      curl -X POST "http://localhost:5117/api/User/image" \
+           -H "Authorization: Bearer YOUR_TOKEN" \
+           -F "profileImage=@profile.jpg" \
+           -F "altText=My new profile picture"
+
+      # Update image (PUT)
       curl -X PUT "http://localhost:5117/api/User/image" \
            -H "Authorization: Bearer YOUR_TOKEN" \
            -F "profileImage=@profile.jpg" \
-           -F "AltText=My new profile picture"
+           -F "altText=My updated profile picture"
 
       # Get image
       curl -X GET "http://localhost:5117/api/User/image" \
@@ -205,7 +297,7 @@ Authorization: Bearer {token}
 ### **File Structure:**
 
 - **DTO**: `UpdateUserImageDTO.cs` - Request/response models
-- **Controller**: `UserController.cs` - API endpoints
+- **Controller**: `UserImageController.cs` - API endpoints
 - **Service**: `IRoleBasedImageUploadService` - Image upload logic
 - **Model**: `UserImage` - Database entity
 
@@ -213,10 +305,12 @@ Authorization: Bearer {token}
 
 - ✅ **Role-based folder structure** - Images stored in role-specific folders
 - ✅ **Automatic deactivation** - Old images are deactivated when new ones are uploaded
-- ✅ **File validation** - Size and type validation
-- ✅ **Error handling** - Comprehensive error responses
+- ✅ **File validation** - Size and type validation (5MB max, JPEG/PNG/GIF only)
+- ✅ **Error handling** - Comprehensive error responses with error codes
 - ✅ **Swagger documentation** - Full API documentation
 - ✅ **Authentication** - Secure token-based access
+- ✅ **Dual endpoints** - Both POST and PUT support for upload/update
+- ✅ **Soft deletion** - Images are marked as inactive rather than physically deleted
 
 ### **Database Changes:**
 
@@ -250,9 +344,10 @@ using (var client = new HttpClient())
     var fileContent = new ByteArrayContent(File.ReadAllBytes("profile.jpg"));
     fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("image/jpeg");
     form.Add(fileContent, "profileImage", "profile.jpg");
-    form.Add(new StringContent("My profile picture"), "AltText");
+    form.Add(new StringContent("My profile picture"), "altText");
 
-    var response = await client.PutAsync("http://localhost:5117/api/User/image", form);
+    // Use POST for upload or PUT for update
+    var response = await client.PostAsync("http://localhost:5117/api/User/image", form);
     var result = await response.Content.ReadAsStringAsync();
 }
 ```

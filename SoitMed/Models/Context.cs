@@ -34,6 +34,27 @@ namespace SoitMed.Models
 
         // Sales report entities
         public DbSet<SalesReport> SalesReports { get; set; }
+
+        // Sales funnel entities
+        public DbSet<ActivityLog> ActivityLogs { get; set; }
+        public DbSet<Deal> Deals { get; set; }
+        public DbSet<Offer> Offers { get; set; }
+
+        // Workflow and notification entities
+        public DbSet<RequestWorkflow> RequestWorkflows { get; set; }
+        public DbSet<DeliveryTerms> DeliveryTerms { get; set; }
+        public DbSet<PaymentTerms> PaymentTerms { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+
+        // Client tracking entities
+        public DbSet<Client> Clients { get; set; }
+        public DbSet<ClientVisit> ClientVisits { get; set; }
+        public DbSet<ClientInteraction> ClientInteractions { get; set; }
+        public DbSet<ClientAnalytics> ClientAnalytics { get; set; }
+
+        // Weekly planning entities
+        public DbSet<WeeklyPlan> WeeklyPlans { get; set; }
+        public DbSet<WeeklyPlanItem> WeeklyPlanItems { get; set; }
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -189,6 +210,76 @@ namespace SoitMed.Models
                 .HasIndex(ui => new { ui.UserId, ui.IsProfileImage })
                 .HasFilter("[IsProfileImage] = 1")
                 .IsUnique();
+
+            // Configure Sales Funnel entities
+            modelBuilder.Entity<ActivityLog>()
+                .HasOne(al => al.Deal)
+                .WithOne(d => d.ActivityLog)
+                .HasForeignKey<Deal>(d => d.ActivityLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ActivityLog>()
+                .HasOne(al => al.Offer)
+                .WithOne(o => o.ActivityLog)
+                .HasForeignKey<Offer>(o => o.ActivityLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure RequestWorkflow relationships
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasOne(rw => rw.ActivityLog)
+                .WithMany()
+                .HasForeignKey(rw => rw.ActivityLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasOne(rw => rw.Offer)
+                .WithMany()
+                .HasForeignKey(rw => rw.OfferId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasOne(rw => rw.Deal)
+                .WithMany()
+                .HasForeignKey(rw => rw.DealId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasOne(rw => rw.DeliveryTerms)
+                .WithMany()
+                .HasForeignKey(rw => rw.DeliveryTermsId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasOne(rw => rw.PaymentTerms)
+                .WithMany()
+                .HasForeignKey(rw => rw.PaymentTermsId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Configure Notification relationships
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.RequestWorkflow)
+                .WithMany()
+                .HasForeignKey(n => n.RequestWorkflowId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.ActivityLog)
+                .WithMany()
+                .HasForeignKey(n => n.ActivityLogId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Configure indexes for better performance
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasIndex(rw => new { rw.FromUserId, rw.Status });
+
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasIndex(rw => new { rw.ToUserId, rw.Status });
+
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => new { n.UserId, n.IsRead });
+
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => n.CreatedAt);
         }
     }
 }

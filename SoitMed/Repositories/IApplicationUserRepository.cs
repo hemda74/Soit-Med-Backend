@@ -13,6 +13,7 @@ namespace SoitMed.Repositories
         Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default);
         Task<bool> ExistsByUserNameAsync(string userName, CancellationToken cancellationToken = default);
         Task<IEnumerable<ApplicationUser>> GetUsersByRoleAsync(string role, CancellationToken cancellationToken = default);
+        Task<IEnumerable<ApplicationUser>> GetUsersInRoleAsync(string role, CancellationToken cancellationToken = default);
         Task<IEnumerable<ApplicationUser>> GetUsersByLastLoginDateAsync(DateTime date, CancellationToken cancellationToken = default);
     }
 }

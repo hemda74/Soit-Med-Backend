@@ -5,6 +5,7 @@ using SoitMed.Models.Location;
 using SoitMed.Models.Hospital;
 using SoitMed.Services;
 using SoitMed.Repositories;
+using SoitMed.Extensions;
 using SoitMed.Validators;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -95,6 +96,16 @@ namespace SoitMed
             builder.Services.AddScoped<IEmailService, EmailService>();
             builder.Services.AddScoped<IVerificationCodeService, VerificationCodeService>();
             
+            // Register Workflow and Notification Services
+            builder.Services.AddScoped<INotificationService, NotificationService>();
+            builder.Services.AddScoped<IRequestWorkflowService, RequestWorkflowService>();
+            
+            // Register new refactored services
+            builder.Services.AddApplicationServices();
+            
+            // Register SignalR
+            builder.Services.AddSignalR();
+            
             // Register FluentValidation
             builder.Services.AddFluentValidationAutoValidation();
             builder.Services.AddValidatorsFromAssemblyContaining<CreateSalesReportDtoValidator>();
@@ -130,6 +141,23 @@ namespace SoitMed
 					IssuerSigningKey =
 					new SymmetricSecurityKey(
 						Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecritKey"] ?? ""))
+				};
+				
+				// Configure JWT for SignalR
+				options.Events = new JwtBearerEvents
+				{
+					OnMessageReceived = context =>
+					{
+						var accessToken = context.Request.Query["access_token"];
+						var path = context.HttpContext.Request.Path;
+						
+						if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notificationHub"))
+						{
+							context.Token = accessToken;
+						}
+						
+						return Task.CompletedTask;
+					}
 				};
 			});
 
@@ -253,6 +281,11 @@ namespace SoitMed
             });
 
             app.MapControllers();
+            
+            // Map SignalR hubs
+            app.MapHub<SoitMed.Hubs.NotificationHub>("/notificationHub");
+
+            
 
             logger.LogInformation("Application configured successfully. Starting server...");
             await app.RunAsync();

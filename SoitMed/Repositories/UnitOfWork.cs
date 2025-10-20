@@ -33,6 +33,25 @@ namespace SoitMed.Repositories
         // Sales report repository
         private ISalesReportRepository? _salesReports;
 
+        // Sales funnel repositories
+        private IActivityLogRepository? _activityLogs;
+        private IDealRepository? _deals;
+        private IOfferRepository? _offers;
+
+        // Workflow and notification repositories
+        private IRequestWorkflowRepository? _requestWorkflows;
+        private INotificationRepository? _notifications;
+
+        // Client tracking repositories
+        private IClientRepository? _clients;
+        private IClientVisitRepository? _clientVisits;
+        private IClientInteractionRepository? _clientInteractions;
+        private IClientAnalyticsRepository? _clientAnalytics;
+
+        // Weekly planning repositories
+        private IWeeklyPlanRepository? _weeklyPlans;
+        private IWeeklyPlanItemRepository? _weeklyPlanItems;
+
         public UnitOfWork(Context context)
         {
             _context = context;
@@ -83,6 +102,43 @@ namespace SoitMed.Repositories
         public ISalesReportRepository SalesReports => 
             _salesReports ??= new SalesReportRepository(_context);
 
+        // Sales funnel repositories
+        public IActivityLogRepository ActivityLogs => 
+            _activityLogs ??= new ActivityLogRepository(_context);
+
+        public IDealRepository Deals => 
+            _deals ??= new DealRepository(_context);
+
+        public IOfferRepository Offers => 
+            _offers ??= new OfferRepository(_context);
+
+        // Workflow and notification repositories
+        public IRequestWorkflowRepository RequestWorkflows => 
+            _requestWorkflows ??= new RequestWorkflowRepository(_context);
+
+        public INotificationRepository Notifications => 
+            _notifications ??= new NotificationRepository(_context);
+
+        // Client tracking repositories
+        public IClientRepository Clients => 
+            _clients ??= new ClientRepository(_context);
+
+        public IClientVisitRepository ClientVisits => 
+            _clientVisits ??= new ClientVisitRepository(_context);
+
+        public IClientInteractionRepository ClientInteractions => 
+            _clientInteractions ??= new ClientInteractionRepository(_context);
+
+        public IClientAnalyticsRepository ClientAnalytics => 
+            _clientAnalytics ??= new ClientAnalyticsRepository(_context);
+
+        // Weekly planning repositories
+        public IWeeklyPlanRepository WeeklyPlans => 
+            _weeklyPlans ??= new WeeklyPlanRepository(_context);
+
+        public IWeeklyPlanItemRepository WeeklyPlanItems => 
+            _weeklyPlanItems ??= new WeeklyPlanItemRepository(_context);
+
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             return await _context.SaveChangesAsync(cancellationToken);
@@ -111,6 +167,11 @@ namespace SoitMed.Repositories
                 await _transaction.DisposeAsync();
                 _transaction = null;
             }
+        }
+
+        public Context GetContext()
+        {
+            return _context;
         }
 
         public void Dispose()
