@@ -27,6 +27,13 @@ namespace SoitMed.Models.Hospital
         [ForeignKey("UserId")]
         public virtual ApplicationUser? User { get; set; }
 
+        // Required: Link to Hospital
+        [Required]
+        public string HospitalId { get; set; } = string.Empty;
+        
+        [ForeignKey("HospitalId")]
+        public virtual Hospital Hospital { get; set; } = null!;
+
         // Navigation property for many-to-many relationship with Hospitals
         public virtual ICollection<DoctorHospital> DoctorHospitals { get; set; } = new List<DoctorHospital>();
 

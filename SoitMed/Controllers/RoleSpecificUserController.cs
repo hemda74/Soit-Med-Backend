@@ -146,6 +146,7 @@ namespace SoitMed.Controllers
                 Name = $"{doctorDTO.FirstName} {doctorDTO.LastName}".Trim(),
                 Specialty = doctorDTO.Specialty,
                 UserId = user.Id,
+                HospitalId = doctorDTO.HospitalId,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
@@ -1233,6 +1234,99 @@ namespace SoitMed.Controllers
                 CreatedAt = user.CreatedAt,
                 ProfileImage = profileImageInfo,
                 Message = $"Maintenance Support '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
+            });
+        }
+
+        // Create Sales Support with User Account
+        [HttpPost("sales-support")]
+        [Authorize(Roles = "SuperAdmin,Admin,SalesManager")]
+        [ProducesResponseType(typeof(CreatedSalesSupportWithImageResponseDTO), 200)]
+        [ProducesResponseType(400)]
+        public async Task<IActionResult> CreateSalesSupport([FromForm] CreateSalesSupportWithImageDTO salesSupportDTO, [FromForm] IFormFile? profileImage = null)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+            }
+
+            // Get Sales department
+            var salesDepartment = await _unitOfWork.Departments.GetByNameAsync("Sales");
+            if (salesDepartment == null)
+            {
+                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                    "Sales department not found. Please ensure departments are seeded in the system.",
+                    "DepartmentId",
+                    "DEPARTMENT_NOT_FOUND"
+                ));
+            }
+
+            // Generate custom user ID
+            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                salesSupportDTO.FirstName ?? "Unknown",
+                salesSupportDTO.LastName ?? "User",
+                UserRoles.SalesSupport,
+                salesSupportDTO.DepartmentId ?? salesDepartment.Id,
+                null // Sales Support don't use hospital ID
+            );
+
+            // Create user account
+            var user = new ApplicationUser
+            {
+                Id = customUserId, // Use custom generated ID
+                UserName = salesSupportDTO.Email, // Use email as username
+                Email = salesSupportDTO.Email,
+                FirstName = salesSupportDTO.FirstName,
+                LastName = salesSupportDTO.LastName,
+                PhoneNumber = salesSupportDTO.PhoneNumber,
+                DepartmentId = salesSupportDTO.DepartmentId ?? salesDepartment.Id,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            var result = await userManager.CreateAsync(user, salesSupportDTO.Password);
+            if (!result.Succeeded)
+            {
+                var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                    "User creation failed. Please check the following issues:"
+                ));
+            }
+
+            // Assign SalesSupport role
+            await userManager.AddToRoleAsync(user, UserRoles.SalesSupport);
+
+            // Handle image upload if provided
+            var profileImageInfo = await HandleImageUploadAsync(
+                profileImage, 
+                user, 
+                "sales-support", 
+                salesDepartment.Name, 
+                salesSupportDTO.AltText,
+                userImage => new SalesSupportImageInfo
+                {
+                    Id = userImage.Id,
+                    FileName = userImage.FileName,
+                    FilePath = userImage.FilePath,
+                    ContentType = userImage.ContentType,
+                    FileSize = userImage.FileSize,
+                    AltText = userImage.AltText,
+                    IsProfileImage = userImage.IsProfileImage,
+                    UploadedAt = userImage.UploadedAt
+                }) as SalesSupportImageInfo;
+
+            return Ok(new CreatedSalesSupportWithImageResponseDTO
+            {
+                UserId = user.Id,
+                Email = user.Email, // Email is now the username
+                Role = UserRoles.SalesSupport,
+                DepartmentName = salesDepartment.Name,
+                CreatedAt = user.CreatedAt,
+                ProfileImage = profileImageInfo,
+                Message = $"Sales Support '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : ""),
+                SupportSpecialization = salesSupportDTO.SupportSpecialization,
+                SupportLevel = salesSupportDTO.SupportLevel,
+                Notes = salesSupportDTO.Notes
             });
         }
     }

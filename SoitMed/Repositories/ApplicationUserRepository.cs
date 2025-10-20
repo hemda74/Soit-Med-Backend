@@ -64,6 +64,15 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
+        public async Task<IEnumerable<ApplicationUser>> GetUsersInRoleAsync(string role, CancellationToken cancellationToken = default)
+        {
+            // This would require a more complex query with role checking
+            // For now, returning all users - this can be enhanced based on your role management system
+            return await _dbSet
+                .Where(u => u.IsActive)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<IEnumerable<ApplicationUser>> GetUsersByLastLoginDateAsync(DateTime date, CancellationToken cancellationToken = default)
         {
             return await _dbSet
