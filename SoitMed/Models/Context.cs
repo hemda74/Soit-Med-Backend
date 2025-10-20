@@ -87,7 +87,7 @@ namespace SoitMed.Models
                 .HasOne(dh => dh.Hospital)
                 .WithMany(h => h.DoctorHospitals)
                 .HasForeignKey(dh => dh.HospitalId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.NoAction);
 
             // Ensure unique combination of Doctor-Hospital
             modelBuilder.Entity<DoctorHospital>()

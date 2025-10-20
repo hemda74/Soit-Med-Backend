@@ -29,7 +29,7 @@ namespace SoitMed.Controllers
         /// <summary>
         /// Generalized method to handle image upload for any role
         /// </summary>
-        private async Task<object?> HandleImageUploadAsync(
+        private async Task<object> HandleImageUploadAsync(
             IFormFile? profileImage, 
             ApplicationUser user, 
             string role, 
@@ -38,11 +38,16 @@ namespace SoitMed.Controllers
             CreateImageInfoDelegate createImageInfoDelegate)
         {
             if (profileImage == null || profileImage.Length == 0)
-                return null;
+            {
+                return null; // No image provided, return null
+            }
 
             var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, role, departmentName, altText);
             if (!imageResult.Success)
-                return null;
+            {
+                // If upload fails, return a validation problem
+                return new BadRequestObjectResult(new { message = imageResult.ErrorMessage });
+            }
 
             var userImage = new UserImage
             {
@@ -74,6 +79,7 @@ namespace SoitMed.Controllers
 
         // Create Doctor with User Account and Optional Image
         [HttpPost("doctor")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateDoctor([FromForm] CreateDoctorWithImageDTO doctorDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -165,8 +171,7 @@ namespace SoitMed.Controllers
             await _unitOfWork.DoctorHospitals.CreateAsync(doctorHospital);
             await _unitOfWork.SaveChangesAsync();
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "doctor", 
@@ -182,7 +187,16 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as DoctorImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as DoctorImageInfo;
+
+
 
             return Ok(new CreatedDoctorWithImageResponseDTO
             {
@@ -203,6 +217,7 @@ namespace SoitMed.Controllers
 
         // Create Engineer with User Account
         [HttpPost("engineer")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateEngineer([FromForm] CreateEngineerWithImageDTO engineerDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -290,8 +305,7 @@ namespace SoitMed.Controllers
             // This would need a proper repository if we want to follow the pattern completely
             // For now, we'll use the context directly for junction tables
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "engineer", 
@@ -307,7 +321,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as EngineerImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as EngineerImageInfo;
 
             return Ok(new CreatedEngineerWithImageResponseDTO
             {
@@ -326,6 +347,7 @@ namespace SoitMed.Controllers
 
         // Create Technician with User Account
         [HttpPost("technician")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateTechnician([FromForm] CreateTechnicianWithImageDTO technicianDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -406,8 +428,7 @@ namespace SoitMed.Controllers
             await _unitOfWork.Technicians.CreateAsync(technician);
             await _unitOfWork.SaveChangesAsync();
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "technician", 
@@ -423,7 +444,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as TechnicianImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as TechnicianImageInfo;
 
             return Ok(new CreatedTechnicianWithImageResponseDTO
             {
@@ -442,6 +470,7 @@ namespace SoitMed.Controllers
 
         // Create Admin with User Account
         [HttpPost("admin")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> CreateAdmin([FromForm] CreateAdminWithImageDTO adminDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -497,8 +526,7 @@ namespace SoitMed.Controllers
             // Assign Admin role
             await userManager.AddToRoleAsync(user, UserRoles.Admin);
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "admin", 
@@ -514,7 +542,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as AdminImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as AdminImageInfo;
 
             return Ok(new CreatedAdminWithImageResponseDTO
             {
@@ -530,6 +565,7 @@ namespace SoitMed.Controllers
 
         // Create Finance Manager with User Account
         [HttpPost("finance-manager")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateFinanceManager([FromForm] CreateFinanceManagerWithImageDTO financeDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -585,8 +621,7 @@ namespace SoitMed.Controllers
             // Assign FinanceManager role
             await userManager.AddToRoleAsync(user, UserRoles.FinanceManager);
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "finance-manager", 
@@ -602,7 +637,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as FinanceManagerImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as FinanceManagerImageInfo;
 
             return Ok(new CreatedFinanceManagerWithImageResponseDTO
             {
@@ -618,6 +660,7 @@ namespace SoitMed.Controllers
 
         // Create Legal Manager with User Account
         [HttpPost("legal-manager")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateLegalManager([FromForm] CreateLegalManagerWithImageDTO legalDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -673,8 +716,7 @@ namespace SoitMed.Controllers
             // Assign LegalManager role
             await userManager.AddToRoleAsync(user, UserRoles.LegalManager);
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "legal-manager", 
@@ -690,7 +732,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as LegalManagerImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as LegalManagerImageInfo;
 
             return Ok(new CreatedLegalManagerWithImageResponseDTO
             {
@@ -706,6 +755,7 @@ namespace SoitMed.Controllers
 
         // Create Salesman with User Account
         [HttpPost("salesman")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateSalesman([FromForm] CreateSalesmanWithImageDTO salesDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -761,8 +811,7 @@ namespace SoitMed.Controllers
             // Assign Salesman role
             await userManager.AddToRoleAsync(user, UserRoles.Salesman);
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "salesman", 
@@ -778,7 +827,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as SalesmanImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as SalesmanImageInfo;
 
             return Ok(new CreatedSalesmanWithImageResponseDTO
             {
@@ -794,6 +850,7 @@ namespace SoitMed.Controllers
 
         // Create Sales Manager with User Account
         [HttpPost("sales-manager")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         [ProducesResponseType(typeof(CreatedSalesManagerWithImageResponseDTO), 200)]
         [ProducesResponseType(400)]
@@ -851,8 +908,7 @@ namespace SoitMed.Controllers
             // Assign Sales Manager role
             await userManager.AddToRoleAsync(user, UserRoles.SalesManager);
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "sales-manager", 
@@ -868,7 +924,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as SalesManagerImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as SalesManagerImageInfo;
 
             return Ok(new CreatedSalesManagerWithImageResponseDTO
             {
@@ -887,6 +950,7 @@ namespace SoitMed.Controllers
 
         // Create Finance Employee with User Account
         [HttpPost("finance-employee")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin,FinanceManager")]
         public async Task<IActionResult> CreateFinanceEmployee([FromForm] CreateFinanceEmployeeWithImageDTO financeEmployeeDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -942,8 +1006,7 @@ namespace SoitMed.Controllers
             // Assign FinanceEmployee role
             await userManager.AddToRoleAsync(user, UserRoles.FinanceEmployee);
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "finance-employee", 
@@ -959,7 +1022,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as FinanceEmployeeImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as FinanceEmployeeImageInfo;
 
             return Ok(new CreatedFinanceEmployeeWithImageResponseDTO
             {
@@ -975,6 +1045,7 @@ namespace SoitMed.Controllers
 
         // Create Legal Employee with User Account
         [HttpPost("legal-employee")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin,LegalManager")]
         public async Task<IActionResult> CreateLegalEmployee([FromForm] CreateLegalEmployeeWithImageDTO legalEmployeeDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -1030,8 +1101,7 @@ namespace SoitMed.Controllers
             // Assign LegalEmployee role
             await userManager.AddToRoleAsync(user, UserRoles.LegalEmployee);
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "legal-employee", 
@@ -1047,7 +1117,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as LegalEmployeeImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as LegalEmployeeImageInfo;
 
             return Ok(new CreatedLegalEmployeeWithImageResponseDTO
             {
@@ -1063,6 +1140,7 @@ namespace SoitMed.Controllers
 
         // Create Maintenance Manager with User Account
         [HttpPost("maintenance-manager")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateMaintenanceManager([FromForm] CreateMaintenanceManagerWithImageDTO maintenanceManagerDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -1118,8 +1196,7 @@ namespace SoitMed.Controllers
             // Assign MaintenanceManager role
             await userManager.AddToRoleAsync(user, UserRoles.MaintenanceManager);
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "maintenance-manager", 
@@ -1135,7 +1212,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as MaintenanceManagerImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as MaintenanceManagerImageInfo;
 
             return Ok(new CreatedMaintenanceManagerWithImageResponseDTO
             {
@@ -1151,6 +1235,7 @@ namespace SoitMed.Controllers
 
         // Create Maintenance Support with User Account
         [HttpPost("maintenance-support")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin,MaintenanceManager")]
         public async Task<IActionResult> CreateMaintenanceSupport([FromForm] CreateMaintenanceSupportWithImageDTO maintenanceSupportDTO, [FromForm] IFormFile? profileImage = null)
         {
@@ -1206,8 +1291,7 @@ namespace SoitMed.Controllers
             // Assign MaintenanceSupport role
             await userManager.AddToRoleAsync(user, UserRoles.MaintenanceSupport);
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "maintenance-support", 
@@ -1223,7 +1307,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as MaintenanceSupportImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as MaintenanceSupportImageInfo;
 
             return Ok(new CreatedMaintenanceSupportWithImageResponseDTO
             {
@@ -1239,6 +1330,7 @@ namespace SoitMed.Controllers
 
         // Create Sales Support with User Account
         [HttpPost("sales-support")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin,SalesManager")]
         [ProducesResponseType(typeof(CreatedSalesSupportWithImageResponseDTO), 200)]
         [ProducesResponseType(400)]
@@ -1296,8 +1388,7 @@ namespace SoitMed.Controllers
             // Assign SalesSupport role
             await userManager.AddToRoleAsync(user, UserRoles.SalesSupport);
 
-            // Handle image upload if provided
-            var profileImageInfo = await HandleImageUploadAsync(
+            var profileImageInfoResult = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "sales-support", 
@@ -1313,7 +1404,14 @@ namespace SoitMed.Controllers
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
                     UploadedAt = userImage.UploadedAt
-                }) as SalesSupportImageInfo;
+                });
+
+            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            {
+                return badRequest;
+            }
+
+            var profileImageInfo = profileImageInfoResult as SalesSupportImageInfo;
 
             return Ok(new CreatedSalesSupportWithImageResponseDTO
             {
