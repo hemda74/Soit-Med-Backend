@@ -345,15 +345,6 @@ END";
             
             app.UseStaticFiles();
             
-            // Configure static files for uploads served from outside the project
-            var externalUploadsRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SoitMed", "uploads");
-            Directory.CreateDirectory(externalUploadsRoot);
-            app.UseStaticFiles(new StaticFileOptions
-            {
-                FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(externalUploadsRoot),
-                RequestPath = "/uploads"
-            });
-            
             app.UseCors("MyPolicy");
             app.UseResponseCaching();
             app.UseAuthentication();

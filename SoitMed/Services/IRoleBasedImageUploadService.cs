@@ -21,7 +21,7 @@ namespace SoitMed.Services
     public class RoleBasedImageUploadService : IRoleBasedImageUploadService
     {
         private readonly IWebHostEnvironment _environment;
-        private readonly string _uploadsRootPhysicalPath; // physical folder outside project to avoid hot-reload restarts
+        private readonly string _uploadsRootPhysicalPath; // physical folder in wwwroot for project-based storage
         private readonly ILogger<RoleBasedImageUploadService> _logger;
         private readonly string[] _allowedExtensions = { ".jpg", ".jpeg", ".png", ".gif" };
         private readonly long _maxFileSize = 5 * 1024 * 1024; // 5MB
@@ -30,11 +30,8 @@ namespace SoitMed.Services
         {
             _environment = environment;
             _logger = logger;
-            // Default to %LOCALAPPDATA%/SoitMed/uploads if available; fallback to web root
-            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var defaultUploadsRoot = !string.IsNullOrWhiteSpace(localAppData)
-                ? Path.Combine(localAppData, "SoitMed", "uploads")
-                : Path.Combine(_environment.WebRootPath, "uploads");
+            // Always use wwwroot/uploads for project-based storage
+            var defaultUploadsRoot = Path.Combine(_environment.WebRootPath, "uploads");
             Directory.CreateDirectory(defaultUploadsRoot);
             _uploadsRootPhysicalPath = defaultUploadsRoot;
         }
@@ -78,10 +75,11 @@ namespace SoitMed.Services
                 var filePath = Path.Combine(uploadPath, fileName);
                 _logger.LogInformation("FilePath: {FilePath}", filePath);
 
-                // Save file
+                // Save file (following the pattern from C# Corner reference)
                 using (var stream = new FileStream(filePath, FileMode.Create))
                 {
                     await imageFile.CopyToAsync(stream);
+                    stream.Flush();
                 }
                 _logger.LogInformation("File saved successfully");
 
