@@ -92,10 +92,15 @@ namespace SoitMed
             builder.Services.Configure<FormOptions>(options =>
             {
                 options.MultipartBodyLengthLimit = 20 * 1024 * 1024; // 20MB
+                options.ValueLengthLimit = int.MaxValue;
+                options.ValueCountLimit = int.MaxValue;
+                options.KeyLengthLimit = int.MaxValue;
             });
             builder.WebHost.ConfigureKestrel(options =>
             {
                 options.Limits.MaxRequestBodySize = 20L * 1024 * 1024; // 20MB
+                options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
+                options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(1);
             });
            
             builder.Services.AddCors(options => {

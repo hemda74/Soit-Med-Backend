@@ -29,7 +29,7 @@ namespace SoitMed.Controllers
         /// <summary>
         /// Generalized method to handle image upload for any role
         /// </summary>
-        private async Task<object> HandleImageUploadAsync(
+        private async Task<(object? result, string? errorMessage)> HandleImageUploadAsync(
             IFormFile? profileImage, 
             ApplicationUser user, 
             string role, 
@@ -39,7 +39,7 @@ namespace SoitMed.Controllers
         {
             if (profileImage == null || profileImage.Length == 0)
             {
-                return null; // No image provided, return null
+                return (null, null); // No image provided, return null
             }
 
             try
@@ -47,8 +47,8 @@ namespace SoitMed.Controllers
                 var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, role, departmentName, altText);
                 if (!imageResult.Success)
                 {
-                    // If upload fails, return a validation problem
-                    return new BadRequestObjectResult(new { message = imageResult.ErrorMessage });
+                    // If upload fails, return error message
+                    return (null, imageResult.ErrorMessage);
                 }
 
                 // First, deactivate any existing profile images for this user
@@ -81,12 +81,12 @@ namespace SoitMed.Controllers
                 await _unitOfWork.UserImages.CreateAsync(userImage);
                 await _unitOfWork.SaveChangesAsync();
 
-                return createImageInfoDelegate(userImage);
+                return (createImageInfoDelegate(userImage), null);
             }
             catch (Exception ex)
             {
-                // Log the error and return a proper error response
-                return new BadRequestObjectResult(new { message = $"Error uploading image: {ex.Message}" });
+                // Log the error and return error message
+                return (null, $"Error uploading image: {ex.Message}");
             }
         }
 
@@ -193,7 +193,7 @@ namespace SoitMed.Controllers
             await _unitOfWork.DoctorHospitals.CreateAsync(doctorHospital);
             await _unitOfWork.SaveChangesAsync();
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "doctor", 
@@ -211,12 +211,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as DoctorImageInfo;
 
 
 
@@ -230,7 +228,7 @@ namespace SoitMed.Controllers
                 DoctorId = doctor.DoctorId,
                 Specialty = doctor.Specialty,
                 HospitalName = hospital.Name,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as DoctorImageInfo,
                 Message = $"Doctor '{doctor.Name}' created successfully and assigned to hospital '{hospital.Name}'"
             });
         }
@@ -327,7 +325,7 @@ namespace SoitMed.Controllers
             // This would need a proper repository if we want to follow the pattern completely
             // For now, we'll use the context directly for junction tables
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "engineer", 
@@ -345,12 +343,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as EngineerImageInfo;
 
             return Ok(new CreatedEngineerWithImageResponseDTO
             {
@@ -362,7 +358,7 @@ namespace SoitMed.Controllers
                 EngineerId = engineer.EngineerId.ToString(),
                 Specialty = engineer.Specialty,
                 GovernorateNames = governorates?.Select(g => g.Name).ToList() ?? new List<string>(),
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as EngineerImageInfo,
                 Message = $"Engineer '{engineer.Name}' created successfully and assigned to {governorates.Count()} governorate(s)"
             });
         }
@@ -450,7 +446,7 @@ namespace SoitMed.Controllers
             await _unitOfWork.Technicians.CreateAsync(technician);
             await _unitOfWork.SaveChangesAsync();
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "technician", 
@@ -468,12 +464,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as TechnicianImageInfo;
 
             return Ok(new CreatedTechnicianWithImageResponseDTO
             {
@@ -485,7 +479,7 @@ namespace SoitMed.Controllers
                 TechnicianId = technician.TechnicianId,
                 Department = technician.Department,
                 HospitalName = hospital.Name,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as TechnicianImageInfo,
                 Message = $"Technician '{technician.Name}' created successfully and assigned to hospital '{hospital.Name}'"
             });
         }
@@ -548,7 +542,7 @@ namespace SoitMed.Controllers
             // Assign Admin role
             await userManager.AddToRoleAsync(user, UserRoles.Admin);
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "admin", 
@@ -566,12 +560,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as AdminImageInfo;
 
             return Ok(new CreatedAdminWithImageResponseDTO
             {
@@ -580,7 +572,7 @@ namespace SoitMed.Controllers
                 Role = UserRoles.Admin,
                 DepartmentName = adminDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as AdminImageInfo,
                 Message = $"Admin '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
             });
         }
@@ -643,7 +635,7 @@ namespace SoitMed.Controllers
             // Assign FinanceManager role
             await userManager.AddToRoleAsync(user, UserRoles.FinanceManager);
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "finance-manager", 
@@ -661,12 +653,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as FinanceManagerImageInfo;
 
             return Ok(new CreatedFinanceManagerWithImageResponseDTO
             {
@@ -675,7 +665,7 @@ namespace SoitMed.Controllers
                 Role = UserRoles.FinanceManager,
                 DepartmentName = financeDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as FinanceManagerImageInfo,
                 Message = $"Finance Manager '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
             });
         }
@@ -738,7 +728,7 @@ namespace SoitMed.Controllers
             // Assign LegalManager role
             await userManager.AddToRoleAsync(user, UserRoles.LegalManager);
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "legal-manager", 
@@ -756,12 +746,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as LegalManagerImageInfo;
 
             return Ok(new CreatedLegalManagerWithImageResponseDTO
             {
@@ -770,7 +758,7 @@ namespace SoitMed.Controllers
                 Role = UserRoles.LegalManager,
                 DepartmentName = legalDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as LegalManagerImageInfo,
                 Message = $"Legal Manager '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
             });
         }
@@ -833,7 +821,7 @@ namespace SoitMed.Controllers
             // Assign Salesman role
             await userManager.AddToRoleAsync(user, UserRoles.Salesman);
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "salesman", 
@@ -851,12 +839,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as SalesmanImageInfo;
 
             return Ok(new CreatedSalesmanWithImageResponseDTO
             {
@@ -865,7 +851,7 @@ namespace SoitMed.Controllers
                 Role = UserRoles.Salesman,
                 DepartmentName = salesDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as SalesmanImageInfo,
                 Message = $"Salesman '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
             });
         }
@@ -930,7 +916,7 @@ namespace SoitMed.Controllers
             // Assign Sales Manager role
             await userManager.AddToRoleAsync(user, UserRoles.SalesManager);
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "sales-manager", 
@@ -948,12 +934,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as SalesManagerImageInfo;
 
             return Ok(new CreatedSalesManagerWithImageResponseDTO
             {
@@ -962,7 +946,7 @@ namespace SoitMed.Controllers
                 Role = UserRoles.SalesManager,
                 DepartmentName = salesDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as SalesManagerImageInfo,
                 Message = $"Sales Manager '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : ""),
                 SalesTerritory = salesManagerDTO.SalesTerritory,
                 SalesTeam = salesManagerDTO.SalesTeam,
@@ -1028,7 +1012,7 @@ namespace SoitMed.Controllers
             // Assign FinanceEmployee role
             await userManager.AddToRoleAsync(user, UserRoles.FinanceEmployee);
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "finance-employee", 
@@ -1046,12 +1030,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as FinanceEmployeeImageInfo;
 
             return Ok(new CreatedFinanceEmployeeWithImageResponseDTO
             {
@@ -1060,7 +1042,7 @@ namespace SoitMed.Controllers
                 Role = UserRoles.FinanceEmployee,
                 DepartmentName = financeDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as FinanceEmployeeImageInfo,
                 Message = $"Finance Employee '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
             });
         }
@@ -1123,7 +1105,7 @@ namespace SoitMed.Controllers
             // Assign LegalEmployee role
             await userManager.AddToRoleAsync(user, UserRoles.LegalEmployee);
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "legal-employee", 
@@ -1141,12 +1123,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as LegalEmployeeImageInfo;
 
             return Ok(new CreatedLegalEmployeeWithImageResponseDTO
             {
@@ -1155,7 +1135,7 @@ namespace SoitMed.Controllers
                 Role = UserRoles.LegalEmployee,
                 DepartmentName = legalDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as LegalEmployeeImageInfo,
                 Message = $"Legal Employee '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
             });
         }
@@ -1218,7 +1198,7 @@ namespace SoitMed.Controllers
             // Assign MaintenanceManager role
             await userManager.AddToRoleAsync(user, UserRoles.MaintenanceManager);
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "maintenance-manager", 
@@ -1236,12 +1216,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as MaintenanceManagerImageInfo;
 
             return Ok(new CreatedMaintenanceManagerWithImageResponseDTO
             {
@@ -1250,7 +1228,7 @@ namespace SoitMed.Controllers
                 Role = UserRoles.MaintenanceManager,
                 DepartmentName = engineeringDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as MaintenanceManagerImageInfo,
                 Message = $"Maintenance Manager '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
             });
         }
@@ -1313,7 +1291,7 @@ namespace SoitMed.Controllers
             // Assign MaintenanceSupport role
             await userManager.AddToRoleAsync(user, UserRoles.MaintenanceSupport);
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "maintenance-support", 
@@ -1331,12 +1309,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as MaintenanceSupportImageInfo;
 
             return Ok(new CreatedMaintenanceSupportWithImageResponseDTO
             {
@@ -1345,7 +1321,7 @@ namespace SoitMed.Controllers
                 Role = UserRoles.MaintenanceSupport,
                 DepartmentName = engineeringDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as MaintenanceSupportImageInfo,
                 Message = $"Maintenance Support '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
             });
         }
@@ -1410,7 +1386,7 @@ namespace SoitMed.Controllers
             // Assign SalesSupport role
             await userManager.AddToRoleAsync(user, UserRoles.SalesSupport);
 
-            var profileImageInfoResult = await HandleImageUploadAsync(
+            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
                 "sales-support", 
@@ -1428,12 +1404,10 @@ namespace SoitMed.Controllers
                     UploadedAt = userImage.UploadedAt
                 });
 
-            if (profileImageInfoResult is BadRequestObjectResult badRequest)
+            if (!string.IsNullOrEmpty(imageError))
             {
-                return badRequest;
+                return BadRequest(new { message = imageError });
             }
-
-            var profileImageInfo = profileImageInfoResult as SalesSupportImageInfo;
 
             return Ok(new CreatedSalesSupportWithImageResponseDTO
             {
@@ -1442,7 +1416,7 @@ namespace SoitMed.Controllers
                 Role = UserRoles.SalesSupport,
                 DepartmentName = salesDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo,
+                ProfileImage = profileImageInfo as SalesSupportImageInfo,
                 Message = $"Sales Support '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : ""),
                 SupportSpecialization = salesSupportDTO.SupportSpecialization,
                 SupportLevel = salesSupportDTO.SupportLevel,
