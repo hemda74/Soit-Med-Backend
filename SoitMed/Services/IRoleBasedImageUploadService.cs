@@ -44,6 +44,7 @@ namespace SoitMed.Services
             string? altText = null)
         {
             _logger.LogInformation("UploadUserImageAsync called for user {UserId}", user.Id);
+            string? filePath = null;
             try
             {
                 // Validate file
@@ -72,14 +73,15 @@ namespace SoitMed.Services
                 // Generate unique filename
                 var fileExtension = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
                 var fileName = $"{Guid.NewGuid()}{fileExtension}";
-                var filePath = Path.Combine(uploadPath, fileName);
+                filePath = Path.Combine(uploadPath, fileName);
                 _logger.LogInformation("FilePath: {FilePath}", filePath);
 
-                // Save file (following the pattern from C# Corner reference)
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                // Save file with proper stream handling
+                using (var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true))
                 {
                     await imageFile.CopyToAsync(stream);
-                    stream.Flush();
+                    await stream.FlushAsync();
+                    await stream.FlushAsync(); // Ensure all data is written
                 }
                 _logger.LogInformation("File saved successfully");
 
@@ -99,6 +101,21 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error uploading image for user {UserId}", user.Id);
+                
+                // Clean up partially created file
+                if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+                {
+                    try
+                    {
+                        File.Delete(filePath);
+                        _logger.LogInformation("Cleaned up partially created file: {FilePath}", filePath);
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        _logger.LogWarning(cleanupEx, "Failed to clean up file: {FilePath}", filePath);
+                    }
+                }
+                
                 return new ImageUploadResult
                 {
                     Success = false,
