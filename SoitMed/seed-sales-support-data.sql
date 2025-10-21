@@ -66,8 +66,8 @@ BEGIN
 END
 
 -- 5. Create some sample ActivityLogs for testing
-INSERT INTO ActivityLogs (UserId, InteractionType, ClientType, Result, Reason, Comment, CreatedAt, UpdatedAt)
-SELECT @UserId, 1, 1, 1, 1, 'Initial sales support activity log', GETUTCDATE(), GETUTCDATE()
+INSERT INTO ActivityLogs (PlanTaskId, UserId, InteractionType, ClientType, Result, Reason, Comment, CreatedAt, UpdatedAt)
+SELECT 1, @UserId, 1, 1, 1, 1, 'Initial sales support activity log', GETUTCDATE(), GETUTCDATE()
 WHERE NOT EXISTS (SELECT 1 FROM ActivityLogs WHERE UserId = @UserId)
 
 -- 6. Create sample Offers linked to ActivityLogs
