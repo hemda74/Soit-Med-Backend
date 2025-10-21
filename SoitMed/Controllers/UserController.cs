@@ -54,6 +54,78 @@ namespace SoitMed.Controllers
 			};
 		}
 
+		// OPTIMIZED: Bulk load users data with roles and profile images
+		private async Task<List<UserDataDTO>> GetOptimizedUsersDataAsync(List<ApplicationUser> users)
+		{
+			if (!users.Any())
+				return new List<UserDataDTO>();
+
+			var userIds = users.Select(u => u.Id).ToList();
+
+			// OPTIMIZED: Load all roles for all users in a single query
+			var userRoles = await context.UserRoles
+				.Where(ur => userIds.Contains(ur.UserId))
+				.Join(context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Name })
+				.ToListAsync();
+
+			// OPTIMIZED: Load all profile images for all users in a single query
+			var profileImages = await context.UserImages
+				.Where(ui => userIds.Contains(ui.UserId) && ui.IsActive && ui.IsProfileImage)
+				.GroupBy(ui => ui.UserId)
+				.Select(g => g.OrderByDescending(ui => ui.UploadedAt).First())
+				.ToListAsync();
+
+			// Group roles by user ID for efficient lookup
+			var rolesByUserId = userRoles
+				.GroupBy(ur => ur.UserId)
+				.ToDictionary(g => g.Key, g => g.Select(ur => ur.Name).ToList());
+
+			// Group profile images by user ID for efficient lookup
+			var imagesByUserId = profileImages
+				.ToDictionary(ui => ui.UserId, ui => new UserImageInfoDTO
+				{
+					Id = ui.Id,
+					FileName = ui.FileName,
+					FilePath = ui.FilePath,
+					ContentType = ui.ContentType,
+					FileSize = ui.FileSize,
+					AltText = ui.AltText,
+					IsProfileImage = ui.IsProfileImage,
+					UploadedAt = ui.UploadedAt,
+					IsActive = ui.IsActive
+				});
+
+			// Build the result efficiently
+			var usersData = new List<UserDataDTO>();
+			foreach (var user in users)
+			{
+				var roles = rolesByUserId.GetValueOrDefault(user.Id, new List<string>());
+				var profileImage = imagesByUserId.GetValueOrDefault(user.Id);
+
+				usersData.Add(new UserDataDTO
+				{
+					Id = user.Id,
+					UserName = user.UserName ?? "",
+					Email = user.Email ?? "",
+					FirstName = user.FirstName,
+					LastName = user.LastName,
+					FullName = user.FullName,
+					IsActive = user.IsActive,
+					CreatedAt = user.CreatedAt,
+					LastLoginAt = user.LastLoginAt,
+					Roles = roles,
+					DepartmentId = user.DepartmentId,
+					DepartmentName = user.Department?.Name,
+					DepartmentDescription = user.Department?.Description,
+					ProfileImage = profileImage,
+					PhoneNumber = user.PhoneNumber,
+					PhoneNumberConfirmed = user.PhoneNumberConfirmed
+				});
+			}
+
+			return usersData;
+		}
+
 		// Helper method to safely upsert user profile image
 		private async Task<UserImage> UpsertUserProfileImageAsync(string userId, string fileName, string filePath, string contentType, long fileSize, string? altText)
 		{
@@ -360,7 +432,7 @@ namespace SoitMed.Controllers
 			return Ok(userData);
 		}
 
-		// Get all users with detailed data (improved version with filtering and sorting)
+		// Get all users with detailed data (optimized version with eager loading)
 		[HttpGet("all")]
 		[Authorize(Roles = "SuperAdmin,Admin,Doctor")]
 		public async Task<IActionResult> GetAllUsersData([FromQuery] UserFilterDTO filter)
@@ -374,113 +446,89 @@ namespace SoitMed.Controllers
 					return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}");
 				}
 
-				// Get all users with the specified role
+				// Get all users with the specified role using optimized query
 				var usersInRole = await userManager.GetUsersInRoleAsync(filter.Role);
-				var allUsersData = new List<UserDataDTO>();
+				var userIds = usersInRole.Select(u => u.Id).ToList();
 
-				foreach (var user in usersInRole)
+				// Build optimized query with eager loading
+				var query = context.Users
+					.Include(u => u.Department)
+					.Where(u => userIds.Contains(u.Id))
+					.AsQueryable();
+
+				// Apply other filters
+				if (!string.IsNullOrEmpty(filter.SearchTerm))
 				{
-					var userWithDepartment = await context.Users
-						.Include(u => u.Department)
-						.FirstOrDefaultAsync(u => u.Id == user.Id);
+					var searchTerm = filter.SearchTerm.ToLower();
+					query = query.Where(u => 
+						(u.FirstName != null && u.FirstName.ToLower().Contains(searchTerm)) ||
+						(u.LastName != null && u.LastName.ToLower().Contains(searchTerm)) ||
+						(u.Email != null && u.Email.ToLower().Contains(searchTerm)) ||
+						(u.UserName != null && u.UserName.ToLower().Contains(searchTerm))
+					);
+				}
 
-					if (userWithDepartment != null)
-					{
-						var roles = await userManager.GetRolesAsync(userWithDepartment);
+				if (filter.DepartmentId.HasValue)
+				{
+					query = query.Where(u => u.DepartmentId == filter.DepartmentId.Value);
+				}
 
-						// Apply other filters
-						if (!string.IsNullOrEmpty(filter.SearchTerm))
-						{
-							var searchTerm = filter.SearchTerm.ToLower();
-							if (!((userWithDepartment.FirstName != null && userWithDepartment.FirstName.ToLower().Contains(searchTerm)) ||
-								(userWithDepartment.LastName != null && userWithDepartment.LastName.ToLower().Contains(searchTerm)) ||
-								(userWithDepartment.Email != null && userWithDepartment.Email.ToLower().Contains(searchTerm)) ||
-								(userWithDepartment.UserName != null && userWithDepartment.UserName.ToLower().Contains(searchTerm))))
-							{
-								continue;
-							}
-						}
+				if (filter.IsActive.HasValue)
+				{
+					query = query.Where(u => u.IsActive == filter.IsActive.Value);
+				}
 
-						if (filter.DepartmentId.HasValue && userWithDepartment.DepartmentId != filter.DepartmentId.Value)
-						{
-							continue;
-						}
+				if (filter.CreatedFrom.HasValue)
+				{
+					query = query.Where(u => u.CreatedAt >= filter.CreatedFrom.Value);
+				}
 
-						if (filter.IsActive.HasValue && userWithDepartment.IsActive != filter.IsActive.Value)
-						{
-							continue;
-						}
-
-						if (filter.CreatedFrom.HasValue && userWithDepartment.CreatedAt < filter.CreatedFrom.Value)
-						{
-							continue;
-						}
-
-						if (filter.CreatedTo.HasValue && userWithDepartment.CreatedAt > filter.CreatedTo.Value)
-						{
-							continue;
-						}
-
-						var profileImage = await GetUserProfileImageAsync(userWithDepartment.Id);
-
-						allUsersData.Add(new UserDataDTO
-						{
-							Id = userWithDepartment.Id,
-							UserName = userWithDepartment.UserName ?? "",
-							Email = userWithDepartment.Email ?? "",
-							FirstName = userWithDepartment.FirstName,
-							LastName = userWithDepartment.LastName,
-							FullName = userWithDepartment.FullName,
-							IsActive = userWithDepartment.IsActive,
-							CreatedAt = userWithDepartment.CreatedAt,
-							LastLoginAt = userWithDepartment.LastLoginAt,
-							Roles = roles.ToList(),
-							DepartmentId = userWithDepartment.DepartmentId,
-							DepartmentName = userWithDepartment.Department?.Name,
-							DepartmentDescription = userWithDepartment.Department?.Description,
-							ProfileImage = profileImage,
-							PhoneNumber = userWithDepartment.PhoneNumber,
-							PhoneNumberConfirmed = userWithDepartment.PhoneNumberConfirmed
-						});
-					}
+				if (filter.CreatedTo.HasValue)
+				{
+					query = query.Where(u => u.CreatedAt <= filter.CreatedTo.Value);
 				}
 
 				// Apply sorting
-				allUsersData = filter.SortBy?.ToLower() switch
+				query = filter.SortBy?.ToLower() switch
 				{
-					"firstname" => filter.SortOrder?.ToLower() == "asc" ? allUsersData.OrderBy(u => u.FirstName).ToList() : allUsersData.OrderByDescending(u => u.FirstName).ToList(),
-					"lastname" => filter.SortOrder?.ToLower() == "asc" ? allUsersData.OrderBy(u => u.LastName).ToList() : allUsersData.OrderByDescending(u => u.LastName).ToList(),
-					"email" => filter.SortOrder?.ToLower() == "asc" ? allUsersData.OrderBy(u => u.Email).ToList() : allUsersData.OrderByDescending(u => u.Email).ToList(),
-					"isactive" => filter.SortOrder?.ToLower() == "asc" ? allUsersData.OrderBy(u => u.IsActive).ToList() : allUsersData.OrderByDescending(u => u.IsActive).ToList(),
-					"createdat" or _ => filter.SortOrder?.ToLower() == "asc" ? allUsersData.OrderBy(u => u.CreatedAt).ToList() : allUsersData.OrderByDescending(u => u.CreatedAt).ToList()
+					"firstname" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.FirstName) : query.OrderByDescending(u => u.FirstName),
+					"lastname" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.LastName) : query.OrderByDescending(u => u.LastName),
+					"email" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.Email) : query.OrderByDescending(u => u.Email),
+					"isactive" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.IsActive) : query.OrderByDescending(u => u.IsActive),
+					"createdat" or _ => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.CreatedAt) : query.OrderByDescending(u => u.CreatedAt)
 				};
 
+				// Get total count before pagination
+				var totalCount = await query.CountAsync();
+
 				// Apply pagination
-				var roleFilteredTotalCount = allUsersData.Count;
-				var roleFilteredUsersData = allUsersData
+				var users = await query
 					.Skip((filter.PageNumber - 1) * filter.PageSize)
 					.Take(filter.PageSize)
-					.ToList();
+					.ToListAsync();
 
-				var roleFilteredTotalPages = (int)Math.Ceiling((double)roleFilteredTotalCount / filter.PageSize);
+				// OPTIMIZED: Load all roles and profile images in bulk
+				var allUsersData = await GetOptimizedUsersDataAsync(users);
 
-				var roleFilteredResponse = new PaginatedUserResponseDTO
+				var totalPages = (int)Math.Ceiling((double)totalCount / filter.PageSize);
+
+				var response = new PaginatedUserResponseDTO
 				{
-					Users = roleFilteredUsersData,
-					TotalCount = roleFilteredTotalCount,
+					Users = allUsersData,
+					TotalCount = totalCount,
 					PageNumber = filter.PageNumber,
 					PageSize = filter.PageSize,
-					TotalPages = roleFilteredTotalPages,
+					TotalPages = totalPages,
 					HasPreviousPage = filter.PageNumber > 1,
-					HasNextPage = filter.PageNumber < roleFilteredTotalPages,
+					HasNextPage = filter.PageNumber < totalPages,
 					AppliedFilters = filter
 				};
 
-				return Ok(roleFilteredResponse);
+				return Ok(response);
 			}
 
-			// Original logic for when no role filter is specified
-			var query = context.Users
+			// Original logic for when no role filter is specified - OPTIMIZED
+			var baseQuery = context.Users
 				.Include(u => u.Department)
 				.AsQueryable();
 
@@ -488,7 +536,7 @@ namespace SoitMed.Controllers
 			if (!string.IsNullOrEmpty(filter.SearchTerm))
 			{
 				var searchTerm = filter.SearchTerm.ToLower();
-				query = query.Where(u => 
+				baseQuery = baseQuery.Where(u => 
 					(u.FirstName != null && u.FirstName.ToLower().Contains(searchTerm)) ||
 					(u.LastName != null && u.LastName.ToLower().Contains(searchTerm)) ||
 					(u.Email != null && u.Email.ToLower().Contains(searchTerm)) ||
@@ -498,89 +546,64 @@ namespace SoitMed.Controllers
 
 			if (filter.DepartmentId.HasValue)
 			{
-				query = query.Where(u => u.DepartmentId == filter.DepartmentId.Value);
+				baseQuery = baseQuery.Where(u => u.DepartmentId == filter.DepartmentId.Value);
 			}
 
 			if (filter.IsActive.HasValue)
 			{
-				query = query.Where(u => u.IsActive == filter.IsActive.Value);
+				baseQuery = baseQuery.Where(u => u.IsActive == filter.IsActive.Value);
 			}
 
 			if (filter.CreatedFrom.HasValue)
 			{
-				query = query.Where(u => u.CreatedAt >= filter.CreatedFrom.Value);
+				baseQuery = baseQuery.Where(u => u.CreatedAt >= filter.CreatedFrom.Value);
 			}
 
 			if (filter.CreatedTo.HasValue)
 			{
-				query = query.Where(u => u.CreatedAt <= filter.CreatedTo.Value);
+				baseQuery = baseQuery.Where(u => u.CreatedAt <= filter.CreatedTo.Value);
 			}
 
 			// Apply sorting
-			query = filter.SortBy?.ToLower() switch
+			baseQuery = filter.SortBy?.ToLower() switch
 			{
-				"firstname" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.FirstName) : query.OrderByDescending(u => u.FirstName),
-				"lastname" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.LastName) : query.OrderByDescending(u => u.LastName),
-				"email" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.Email) : query.OrderByDescending(u => u.Email),
-				"isactive" => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.IsActive) : query.OrderByDescending(u => u.IsActive),
-				"createdat" or _ => filter.SortOrder?.ToLower() == "asc" ? query.OrderBy(u => u.CreatedAt) : query.OrderByDescending(u => u.CreatedAt)
+				"firstname" => filter.SortOrder?.ToLower() == "asc" ? baseQuery.OrderBy(u => u.FirstName) : baseQuery.OrderByDescending(u => u.FirstName),
+				"lastname" => filter.SortOrder?.ToLower() == "asc" ? baseQuery.OrderBy(u => u.LastName) : baseQuery.OrderByDescending(u => u.LastName),
+				"email" => filter.SortOrder?.ToLower() == "asc" ? baseQuery.OrderBy(u => u.Email) : baseQuery.OrderByDescending(u => u.Email),
+				"isactive" => filter.SortOrder?.ToLower() == "asc" ? baseQuery.OrderBy(u => u.IsActive) : baseQuery.OrderByDescending(u => u.IsActive),
+				"createdat" or _ => filter.SortOrder?.ToLower() == "asc" ? baseQuery.OrderBy(u => u.CreatedAt) : baseQuery.OrderByDescending(u => u.CreatedAt)
 			};
 
 			// Get total count before pagination
-			var totalCount = await query.CountAsync();
+			var baseTotalCount = await baseQuery.CountAsync();
 
 			// Apply pagination
-			var users = await query
+			var baseUsers = await baseQuery
 				.Skip((filter.PageNumber - 1) * filter.PageSize)
 				.Take(filter.PageSize)
 				.ToListAsync();
 
-			var usersData = new List<UserDataDTO>();
+			// OPTIMIZED: Load all roles and profile images in bulk
+			var baseUsersData = await GetOptimizedUsersDataAsync(baseUsers);
 
-			foreach (var user in users)
+			var baseTotalPages = (int)Math.Ceiling((double)baseTotalCount / filter.PageSize);
+
+			var baseResponse = new PaginatedUserResponseDTO
 			{
-				var roles = await userManager.GetRolesAsync(user);
-				var profileImage = await GetUserProfileImageAsync(user.Id);
-
-				usersData.Add(new UserDataDTO
-				{
-					Id = user.Id,
-					UserName = user.UserName ?? "",
-					Email = user.Email ?? "",
-					FirstName = user.FirstName,
-					LastName = user.LastName,
-					FullName = user.FullName,
-					IsActive = user.IsActive,
-					CreatedAt = user.CreatedAt,
-					LastLoginAt = user.LastLoginAt,
-					Roles = roles.ToList(),
-					DepartmentId = user.DepartmentId,
-					DepartmentName = user.Department?.Name,
-					DepartmentDescription = user.Department?.Description,
-					ProfileImage = profileImage,
-					PhoneNumber = user.PhoneNumber,
-					PhoneNumberConfirmed = user.PhoneNumberConfirmed
-				});
-			}
-
-			var totalPages = (int)Math.Ceiling((double)totalCount / filter.PageSize);
-
-			var response = new PaginatedUserResponseDTO
-			{
-				Users = usersData,
-				TotalCount = totalCount,
+				Users = baseUsersData,
+				TotalCount = baseTotalCount,
 				PageNumber = filter.PageNumber,
 				PageSize = filter.PageSize,
-				TotalPages = totalPages,
+				TotalPages = baseTotalPages,
 				HasPreviousPage = filter.PageNumber > 1,
-				HasNextPage = filter.PageNumber < totalPages,
+				HasNextPage = filter.PageNumber < baseTotalPages,
 				AppliedFilters = filter
 			};
 
-			return Ok(response);
+			return Ok(baseResponse);
 		}
 
-		// Get users by role
+		// Get users by role (OPTIMIZED)
 		[HttpGet("role/{role}")]
 		[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
 		public async Task<IActionResult> GetUsersByRole(string role)
@@ -592,45 +615,21 @@ namespace SoitMed.Controllers
 			}
 
 			var usersInRole = await userManager.GetUsersInRoleAsync(role);
-			var usersData = new List<UserDataDTO>();
+			var userIds = usersInRole.Select(u => u.Id).ToList();
 
-			foreach (var user in usersInRole)
-			{
-				var userWithDepartment = await context.Users
-					.Include(u => u.Department)
-					.FirstOrDefaultAsync(u => u.Id == user.Id);
+			// OPTIMIZED: Load all users with departments in a single query
+			var users = await context.Users
+				.Include(u => u.Department)
+				.Where(u => userIds.Contains(u.Id))
+				.ToListAsync();
 
-				if (userWithDepartment != null)
-				{
-					var roles = await userManager.GetRolesAsync(userWithDepartment);
-					var profileImage = await GetUserProfileImageAsync(userWithDepartment.Id);
-
-				usersData.Add(new UserDataDTO
-				{
-					Id = userWithDepartment.Id,
-					UserName = userWithDepartment.UserName ?? "",
-					Email = userWithDepartment.Email ?? "",
-					FirstName = userWithDepartment.FirstName,
-					LastName = userWithDepartment.LastName,
-					FullName = userWithDepartment.FullName,
-					IsActive = userWithDepartment.IsActive,
-					CreatedAt = userWithDepartment.CreatedAt,
-					LastLoginAt = userWithDepartment.LastLoginAt,
-					Roles = roles.ToList(),
-					DepartmentId = userWithDepartment.DepartmentId,
-					DepartmentName = userWithDepartment.Department?.Name,
-					DepartmentDescription = userWithDepartment.Department?.Description,
-					ProfileImage = profileImage,
-					PhoneNumber = userWithDepartment.PhoneNumber,
-					PhoneNumberConfirmed = userWithDepartment.PhoneNumberConfirmed
-				});
-				}
-			}
+			// OPTIMIZED: Load all roles and profile images in bulk
+			var usersData = await GetOptimizedUsersDataAsync(users);
 
 			return Ok(new { Role = role, UserCount = usersData.Count, Users = usersData });
 		}
 
-		// Get users by department
+		// Get users by department (OPTIMIZED)
 		[HttpGet("department/{departmentId}")]
 		[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
 		public async Task<IActionResult> GetUsersByDepartment(int departmentId)
@@ -646,33 +645,8 @@ namespace SoitMed.Controllers
 				.Where(u => u.DepartmentId == departmentId)
 				.ToListAsync();
 
-			var usersData = new List<UserDataDTO>();
-
-			foreach (var user in users)
-			{
-				var roles = await userManager.GetRolesAsync(user);
-				var profileImage = await GetUserProfileImageAsync(user.Id);
-
-				usersData.Add(new UserDataDTO
-				{
-					Id = user.Id,
-					UserName = user.UserName ?? "",
-					Email = user.Email ?? "",
-					FirstName = user.FirstName,
-					LastName = user.LastName,
-					FullName = user.FullName,
-					IsActive = user.IsActive,
-					CreatedAt = user.CreatedAt,
-					LastLoginAt = user.LastLoginAt,
-					Roles = roles.ToList(),
-					DepartmentId = user.DepartmentId,
-					DepartmentName = user.Department?.Name,
-					DepartmentDescription = user.Department?.Description,
-					ProfileImage = profileImage,
-					PhoneNumber = user.PhoneNumber,
-					PhoneNumberConfirmed = user.PhoneNumberConfirmed
-				});
-			}
+			// OPTIMIZED: Load all roles and profile images in bulk
+			var usersData = await GetOptimizedUsersDataAsync(users);
 
 			return Ok(new
 			{

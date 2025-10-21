@@ -61,11 +61,6 @@ namespace SoitMed.Repositories
             }
 
             return await query
-                .Include(rw => rw.ActivityLog)
-                .Include(rw => rw.Offer)
-                .Include(rw => rw.Deal)
-                .Include(rw => rw.DeliveryTerms)
-                .Include(rw => rw.PaymentTerms)
                 .OrderByDescending(rw => rw.CreatedAt)
                 .ToListAsync(cancellationToken);
         }

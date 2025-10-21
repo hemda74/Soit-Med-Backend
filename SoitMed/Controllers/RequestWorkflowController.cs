@@ -105,7 +105,7 @@ namespace SoitMed.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving assigned requests for user {UserId}", GetCurrentUserId());
-                return ErrorResponse("An error occurred while retrieving assigned requests", 500);
+                return ErrorResponse($"An error occurred while retrieving assigned requests: {ex.Message}", 500);
             }
         }
 

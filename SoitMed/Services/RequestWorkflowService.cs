@@ -131,24 +131,32 @@ namespace SoitMed.Services
 
         public async Task<IEnumerable<RequestWorkflowResponseDto>> GetAssignedRequestsAsync(string userId, RequestStatus? status = null, CancellationToken cancellationToken = default)
         {
-            var requests = await _unitOfWork.RequestWorkflows.GetAssignedRequestsAsync(userId, status, cancellationToken);
-            
-            return requests.Select(r => new RequestWorkflowResponseDto
+            try
             {
-                Id = r.Id,
-                ActivityLogId = r.ActivityLogId,
-                OfferId = r.OfferId,
-                DealId = r.DealId,
-                FromUserId = r.FromUserId,
-                FromUserName = r.FromUser?.UserName ?? "Unknown",
-                ToUserId = r.ToUserId,
-                ToUserName = r.ToUser?.UserName ?? "Unknown",
-                Status = r.Status,
-                StatusName = r.Status.ToString(),
-                Comment = r.Comment,
-                CreatedAt = r.CreatedAt,
-                UpdatedAt = r.UpdatedAt
-            });
+                var requests = await _unitOfWork.RequestWorkflows.GetAssignedRequestsAsync(userId, status, cancellationToken);
+                
+                return requests.Select(r => new RequestWorkflowResponseDto
+                {
+                    Id = r.Id,
+                    ActivityLogId = r.ActivityLogId,
+                    OfferId = r.OfferId,
+                    DealId = r.DealId,
+                    FromUserId = r.FromUserId,
+                    FromUserName = r.FromUser?.UserName ?? "Unknown",
+                    ToUserId = r.ToUserId,
+                    ToUserName = r.ToUser?.UserName ?? "Unknown",
+                    Status = r.Status,
+                    StatusName = r.Status.ToString(),
+                    Comment = r.Comment,
+                    CreatedAt = r.CreatedAt,
+                    UpdatedAt = r.UpdatedAt
+                });
+            }
+            catch (Exception ex)
+            {
+                // Log the actual exception for debugging
+                throw new Exception($"Error in GetAssignedRequestsAsync: {ex.Message}", ex);
+            }
         }
 
         public async Task<RequestWorkflowResponseDto?> UpdateWorkflowStatusAsync(long workflowId, string userId, UpdateWorkflowRequestStatusDto updateDto, CancellationToken cancellationToken = default)

@@ -42,30 +42,52 @@ namespace SoitMed.Controllers
                 return null; // No image provided, return null
             }
 
-            var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, role, departmentName, altText);
-            if (!imageResult.Success)
+            try
             {
-                // If upload fails, return a validation problem
-                return new BadRequestObjectResult(new { message = imageResult.ErrorMessage });
+                var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, role, departmentName, altText);
+                if (!imageResult.Success)
+                {
+                    // If upload fails, return a validation problem
+                    return new BadRequestObjectResult(new { message = imageResult.ErrorMessage });
+                }
+
+                // First, deactivate any existing profile images for this user
+                var existingProfileImages = await _unitOfWork.UserImages.GetAllAsync();
+                var userProfileImages = existingProfileImages
+                    .Where(ui => ui.UserId == user.Id && ui.IsProfileImage && ui.IsActive)
+                    .ToList();
+
+                foreach (var existingImage in userProfileImages)
+                {
+                    existingImage.IsActive = false;
+                    await _unitOfWork.UserImages.UpdateAsync(existingImage);
+                }
+
+                // Create new profile image
+                var userImage = new UserImage
+                {
+                    UserId = user.Id,
+                    FileName = imageResult.FileName ?? "profile.jpg",
+                    FilePath = imageResult.FilePath ?? "",
+                    ContentType = imageResult.ContentType ?? "image/jpeg",
+                    FileSize = imageResult.FileSize,
+                    AltText = imageResult.AltText,
+                    ImageType = "Profile",
+                    IsProfileImage = true,
+                    IsActive = true,
+                    UploadedAt = DateTime.UtcNow
+                };
+
+                await _unitOfWork.UserImages.CreateAsync(userImage);
+                await _unitOfWork.SaveChangesAsync();
+
+                return createImageInfoDelegate(userImage);
             }
-
-            var userImage = new UserImage
+            catch (Exception ex)
             {
-                UserId = user.Id,
-                FileName = imageResult.FileName ?? "profile.jpg",
-                FilePath = imageResult.FilePath ?? "",
-                ContentType = imageResult.ContentType ?? "image/jpeg",
-                FileSize = imageResult.FileSize,
-                AltText = imageResult.AltText,
-                ImageType = "Profile",
-                IsProfileImage = true,
-                UploadedAt = DateTime.UtcNow
-            };
-
-            await _unitOfWork.UserImages.CreateAsync(userImage);
-            await _unitOfWork.SaveChangesAsync();
-
-            return createImageInfoDelegate(userImage);
+                // Log the error and return a proper error response
+                return new BadRequestObjectResult(new { message = $"Error uploading image: {ex.Message}" });
+            }
         }
 
         public RoleSpecificUserController(UserManager<ApplicationUser> _userManager, IUnitOfWork unitOfWork, UserIdGenerationService _userIdGenerationService, IRoleBasedImageUploadService imageUploadService, IWebHostEnvironment environment)
