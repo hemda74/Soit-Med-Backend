@@ -71,11 +71,13 @@ Fixed property name from `RelativePath` to `FilePath` to match the actual `Image
 ### Sample Data
 
 **Plan #41** (Active):
+
 - Task #94: "Finalize MRI Deal with Cairo Hospital" - Planned, High
 - Task #95: "Follow Up on Equipment Delivery" - Planned, Medium
 - Task #96: "Prepare Q4 Sales Presentation" - Planned, High
 
 **Plan #34** (Reviewed, Rating: 4):
+
 - Task #80: "Visit Cairo Hospital" - Completed, High
 - Task #81: "Follow Up Alexandria Clinic" - Pending, Medium
 
@@ -89,31 +91,31 @@ Now all endpoints return tasks in the response:
 
 ```json
 {
-  "success": true,
-  "data": {
-    "plans": [
-      {
-        "id": 41,
-        "title": "Week 45 Sales Plan",
-        "tasks": [
-          {
-            "id": 94,
-            "taskType": "Visit",
-            "title": "Finalize MRI Deal with Cairo Hospital",
-            "status": "Planned",
-            "priority": "High"
-          },
-          {
-            "id": 95,
-            "taskType": "FollowUp",
-            "title": "Follow Up on Equipment Delivery",
-            "status": "Planned",
-            "priority": "Medium"
-          }
-        ]
-      }
-    ]
-  }
+	"success": true,
+	"data": {
+		"plans": [
+			{
+				"id": 41,
+				"title": "Week 45 Sales Plan",
+				"tasks": [
+					{
+						"id": 94,
+						"taskType": "Visit",
+						"title": "Finalize MRI Deal with Cairo Hospital",
+						"status": "Planned",
+						"priority": "High"
+					},
+					{
+						"id": 95,
+						"taskType": "FollowUp",
+						"title": "Follow Up on Equipment Delivery",
+						"status": "Planned",
+						"priority": "Medium"
+					}
+				]
+			}
+		]
+	}
 }
 ```
 
@@ -121,27 +123,27 @@ Now all endpoints return tasks in the response:
 
 ```json
 {
-  "success": true,
-  "data": {
-    "id": 34,
-    "title": "Week 1 Sales Plan",
-    "tasks": [
-      {
-        "id": 80,
-        "taskType": "Visit",
-        "title": "Visit Cairo Hospital",
-        "status": "Completed",
-        "priority": "High"
-      },
-      {
-        "id": 81,
-        "taskType": "FollowUp",
-        "title": "Follow Up Alexandria Clinic",
-        "status": "Pending",
-        "priority": "Medium"
-      }
-    ]
-  }
+	"success": true,
+	"data": {
+		"id": 34,
+		"title": "Week 1 Sales Plan",
+		"tasks": [
+			{
+				"id": 80,
+				"taskType": "Visit",
+				"title": "Visit Cairo Hospital",
+				"status": "Completed",
+				"priority": "High"
+			},
+			{
+				"id": 81,
+				"taskType": "FollowUp",
+				"title": "Follow Up Alexandria Clinic",
+				"status": "Pending",
+				"priority": "Medium"
+			}
+		]
+	}
 }
 ```
 
@@ -163,13 +165,15 @@ Now all endpoints return tasks in the response:
 ## Files Changed
 
 1. **SoitMed/Repositories/WeeklyPlanRepository.cs**
-   - Added override for `GetByIdAsync` with `.Include(p => p.Tasks)`
+
+      - Added override for `GetByIdAsync` with `.Include(p => p.Tasks)`
 
 2. **SoitMed/Services/PdfExportService.cs**
-   - Added `using SoitMed.Models.Identity;`
+
+      - Added `using SoitMed.Models.Identity;`
 
 3. **SoitMed/Services/OfferEquipmentImageService.cs**
-   - Changed `RelativePath` to `FilePath` property
+      - Changed `RelativePath` to `FilePath` property
 
 ---
 
@@ -227,6 +231,7 @@ Expected: Current plan with tasks
 **Before**: Tasks array was always empty or null
 
 **After**: Tasks array is properly populated with:
+
 - Task ID
 - Task Type (Visit, FollowUp, Call, Email, Meeting)
 - Task Title
@@ -246,4 +251,3 @@ Expected: Current plan with tasks
 ---
 
 **Status**: ✅ RESOLVED - Tasks now visible in all weekly plan API responses
-

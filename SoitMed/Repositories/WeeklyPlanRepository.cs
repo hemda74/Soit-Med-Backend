@@ -16,11 +16,28 @@ namespace SoitMed.Repositories
                 .FirstOrDefaultAsync(p => p.Id == (long)id, cancellationToken);
         }
 
+        public async Task<IEnumerable<WeeklyPlan>> GetAllPlansAsync(int page = 1, int pageSize = 20)
+        {
+            return await _context.WeeklyPlans
+                .Include(p => p.Tasks)
+                    .ThenInclude(t => t.Progresses)
+                .Include(p => p.Tasks)
+                    .ThenInclude(t => t.Client)
+                .Include(p => p.Employee)  // Include Employee user data
+                .OrderByDescending(p => p.WeekStartDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+        }
+
         public async Task<IEnumerable<WeeklyPlan>> GetEmployeePlansAsync(string employeeId, int page = 1, int pageSize = 20)
         {
             return await _context.WeeklyPlans
                 .Where(p => p.EmployeeId == employeeId)
                 .Include(p => p.Tasks)
+                    .ThenInclude(t => t.Progresses)
+                .Include(p => p.Tasks)
+                    .ThenInclude(t => t.Client)
                 .OrderByDescending(p => p.WeekStartDate)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -61,6 +78,16 @@ namespace SoitMed.Repositories
         {
             return await _context.WeeklyPlans
                 .AnyAsync(p => p.EmployeeId == employeeId && p.WeekStartDate == weekStart);
+        }
+
+        public async Task<WeeklyPlan?> GetPlanWithFullDetailsAsync(long id)
+        {
+            return await _context.WeeklyPlans
+                .Include(p => p.Tasks)
+                    .ThenInclude(t => t.Progresses)
+                .Include(p => p.Tasks)
+                    .ThenInclude(t => t.Client)
+                .FirstOrDefaultAsync(p => p.Id == id);
         }
     }
 }
