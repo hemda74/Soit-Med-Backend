@@ -14,6 +14,54 @@ namespace SoitMed.Common
         public static readonly string[] ManagerRoles = { "SalesManager", "SuperAdmin", "MaintenanceManager" };
 
         /// <summary>
+        /// Sales-specific roles
+        /// </summary>
+        public static class SalesRoles
+        {
+            public const string Salesman = "Salesman";
+            public const string SalesManager = "SalesManager";
+            public const string SalesSupport = "SalesSupport";
+            public const string SuperAdmin = "SuperAdmin";
+        }
+
+        /// <summary>
+        /// Sales-specific permissions
+        /// </summary>
+        public static class SalesPermissions
+        {
+            // Client permissions
+            public const string ViewOwnClients = "ViewOwnClients";
+            public const string ViewAllClients = "ViewAllClients";
+            public const string ViewClientHistory = "ViewClientHistory";
+            public const string CreateClient = "CreateClient";
+            public const string EditClient = "EditClient";
+            
+            // Weekly Plan permissions
+            public const string CreateWeeklyPlan = "CreateWeeklyPlan";
+            public const string ViewOwnWeeklyPlans = "ViewOwnWeeklyPlans";
+            public const string ViewAllWeeklyPlans = "ViewAllWeeklyPlans";
+            public const string ReviewWeeklyPlan = "ReviewWeeklyPlan";
+            
+            // Task Progress permissions
+            public const string CreateTaskProgress = "CreateTaskProgress";
+            public const string ViewOwnProgress = "ViewOwnProgress";
+            public const string ViewAllProgress = "ViewAllProgress";
+            
+            // Offer permissions
+            public const string RequestOffer = "RequestOffer";
+            public const string CreateOffer = "CreateOffer";
+            public const string ViewOwnOffers = "ViewOwnOffers";
+            public const string ViewAllOffers = "ViewAllOffers";
+            
+            // Deal permissions
+            public const string CreateDeal = "CreateDeal";
+            public const string ViewOwnDeals = "ViewOwnDeals";
+            public const string ViewAllDeals = "ViewAllDeals";
+            public const string ApproveManagerDeal = "ApproveManagerDeal";
+            public const string ApproveSuperAdminDeal = "ApproveSuperAdminDeal";
+        }
+
+        /// <summary>
         /// Checks if a user has manager-level access
         /// </summary>
         public static bool IsManager(IList<string> userRoles)

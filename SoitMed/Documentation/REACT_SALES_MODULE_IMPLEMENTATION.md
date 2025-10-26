@@ -74,6 +74,20 @@ src/
 
 ## API Service Layer Integration
 
+### ⚠️ IMPORTANT: Recent Production Updates
+
+The backend now includes these production enhancements:
+
+- **Pagination**: All list endpoints return paged results
+- **Rate Limiting**: Global 100 req/min, API 200 req/min, Auth 10 req/min
+- **Production Logging**: Reduced verbosity, only warnings/errors
+
+**Key Changes:**
+
+- List endpoints now return `PagedResult<T>` objects
+- Handle 429 (Too Many Requests) errors for rate limiting
+- Client search already supports pagination with `page` and `pageSize` parameters
+
 ### 1. Base API Service
 
 Create `src/services/salesApiService.js` (or integrate with your existing API service):
@@ -111,6 +125,22 @@ class ApiService {
 				if (error.response?.status === 401) {
 					localStorage.removeItem('authToken');
 					window.location.href = '/login';
+				}
+				// Handle rate limiting (429 errors)
+				if (error.response?.status === 429) {
+					const retryAfter =
+						error.response.headers[
+							'retry-after'
+						] || 60;
+					console.warn(
+						`Rate limit exceeded. Retry after ${retryAfter} seconds`
+					);
+					// Show user-friendly message
+					if (window.toast) {
+						window.toast.error(
+							'Too many requests. Please wait a moment and try again.'
+						);
+					}
 				}
 				return Promise.reject(error);
 			}
@@ -151,9 +181,8 @@ import apiService from './apiService';
 class SalesApiService {
 	// ==================== CLIENT MANAGEMENT ====================
 
-	async searchClients(query, filters = {}) {
-		const params = { query, ...filters };
-		return await apiService.get('/Client/search', params);
+	async searchClients(searchDto) {
+		return await apiService.get('/Client/search', searchDto);
 	}
 
 	async createClient(clientData) {
@@ -187,14 +216,25 @@ class SalesApiService {
 		return await apiService.get('/Client/statistics');
 	}
 
+	async getClientProfile(clientId) {
+		return await apiService.get(`/Client/${clientId}/profile`);
+	}
+
+	async getClientHistory(clientId, filters = {}) {
+		return await apiService.get(
+			`/Client/${clientId}/history`,
+			filters
+		);
+	}
+
 	// ==================== WEEKLY PLANNING ====================
 
 	async createWeeklyPlan(planData) {
 		return await apiService.post('/WeeklyPlan', planData);
 	}
 
-	async getWeeklyPlans(filters = {}) {
-		return await apiService.get('/WeeklyPlan', filters);
+	async getWeeklyPlans(page = 1, pageSize = 20) {
+		return await apiService.get('/WeeklyPlan', { page, pageSize });
 	}
 
 	async getWeeklyPlan(planId) {
@@ -209,16 +249,11 @@ class SalesApiService {
 		return await apiService.post(`/WeeklyPlan/${planId}/submit`);
 	}
 
-	async approveWeeklyPlan(planId, notes = '') {
-		return await apiService.post(`/WeeklyPlan/${planId}/approve`, {
-			notes,
-		});
-	}
-
-	async rejectWeeklyPlan(planId, reason = '') {
-		return await apiService.post(`/WeeklyPlan/${planId}/reject`, {
-			reason,
-		});
+	async reviewWeeklyPlan(planId, reviewData) {
+		return await apiService.post(
+			`/WeeklyPlan/${planId}/review`,
+			reviewData
+		);
 	}
 
 	async getCurrentWeeklyPlan() {
@@ -425,6 +460,117 @@ class SalesApiService {
 }
 
 export default new SalesApiService();
+```
+
+### 3. Pagination Helper
+
+Add this helper to handle paginated API responses in `src/utils/pagination.js`:
+
+```javascript
+/**
+ * PagedResult structure from backend
+ * {
+ *   items: [...],
+ *   totalCount: 150,
+ *   page: 1,
+ *   pageSize: 20,
+ *   totalPages: 8,
+ *   hasPrevious: false,
+ *   hasNext: true
+ * }
+ */
+
+export const extractPaginatedData = (response) => {
+	if (response.data && response.data.items) {
+		// PagedResult format
+		return {
+			items:
+				response.data.items ||
+				response.data.data?.items ||
+				[],
+			pagination: {
+				page:
+					response.data.page ||
+					response.data.data?.page ||
+					1,
+				pageSize:
+					response.data.pageSize ||
+					response.data.data?.pageSize ||
+					20,
+				totalCount:
+					response.data.totalCount ||
+					response.data.data?.totalCount ||
+					0,
+				totalPages:
+					response.data.totalPages ||
+					response.data.data?.totalPages ||
+					0,
+				hasPrevious:
+					response.data.hasPrevious ||
+					response.data.data?.hasPrevious ||
+					false,
+				hasNext:
+					response.data.hasNext ||
+					response.data.data?.hasNext ||
+					false,
+			},
+		};
+	}
+	// Non-paginated format
+	return {
+		items: Array.isArray(response.data)
+			? response.data
+			: [response.data],
+		pagination: null,
+	};
+};
+
+export const createPaginationParams = (
+	page = 1,
+	pageSize = 20,
+	filters = {}
+) => {
+	return {
+		page,
+		pageSize,
+		...filters,
+	};
+};
+```
+
+### 4. Rate Limiting Handler
+
+Add this component to handle rate limiting gracefully in `src/components/RateLimitHandler.jsx`:
+
+```jsx
+import { useEffect } from 'react';
+import { showError } from './Toast';
+
+export const useRateLimitHandler = () => {
+	useEffect(() => {
+		const originalFetch = window.fetch;
+		window.fetch = async (...args) => {
+			try {
+				const response = await originalFetch(...args);
+				if (response.status === 429) {
+					const retryAfter =
+						response.headers.get(
+							'retry-after'
+						) || '60';
+					showError(
+						`Too many requests. Please wait ${retryAfter} seconds before trying again.`
+					);
+				}
+				return response;
+			} catch (error) {
+				throw error;
+			}
+		};
+		return () => {
+			window.fetch = originalFetch;
+		};
+	}, []);
+};
 ```
 
 ## State Management Integration
@@ -1012,6 +1158,151 @@ const ClientSearch = ({
 };
 
 export default ClientSearch;
+```
+
+### 5. Pagination Component
+
+Add this component to handle pagination in list views in `src/components/common/Pagination.jsx`:
+
+```jsx
+import React from 'react';
+
+const Pagination = ({ pagination, onPageChange }) => {
+	if (!pagination || pagination.totalPages <= 1) return null;
+
+	return (
+		<div className="flex items-center justify-between bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+			<div className="flex flex-1 justify-between sm:hidden">
+				<button
+					onClick={() =>
+						onPageChange(
+							pagination.page - 1
+						)
+					}
+					disabled={!pagination.hasPrevious}
+					className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					Previous
+				</button>
+				<button
+					onClick={() =>
+						onPageChange(
+							pagination.page + 1
+						)
+					}
+					disabled={!pagination.hasNext}
+					className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					Next
+				</button>
+			</div>
+			<div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+				<div>
+					<p className="text-sm text-gray-700">
+						Showing{' '}
+						<span className="font-medium">
+							{(pagination.page - 1) *
+								pagination.pageSize +
+								1}
+						</span>{' '}
+						to{' '}
+						<span className="font-medium">
+							{Math.min(
+								pagination.page *
+									pagination.pageSize,
+								pagination.totalCount
+							)}
+						</span>{' '}
+						of{' '}
+						<span className="font-medium">
+							{pagination.totalCount}
+						</span>{' '}
+						results
+					</p>
+				</div>
+				<div>
+					<nav
+						className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+						aria-label="Pagination"
+					>
+						<button
+							onClick={() =>
+								onPageChange(
+									pagination.page -
+										1
+								)
+							}
+							disabled={
+								!pagination.hasPrevious
+							}
+							className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+						>
+							Previous
+						</button>
+						{/* Page numbers */}
+						{[
+							...Array(
+								pagination.totalPages
+							),
+						]
+							.slice(0, 5)
+							.map((_, i) => {
+								const pageNum =
+									pagination.page -
+									2 +
+									i;
+								if (
+									pageNum <
+										1 ||
+									pageNum >
+										pagination.totalPages
+								)
+									return null;
+								return (
+									<button
+										key={
+											i
+										}
+										onClick={() =>
+											onPageChange(
+												pageNum
+											)
+										}
+										className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+											pageNum ===
+											pagination.page
+												? 'z-10 bg-blue-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2'
+												: 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
+										}`}
+									>
+										{
+											pageNum
+										}
+									</button>
+								);
+							})}
+						<button
+							onClick={() =>
+								onPageChange(
+									pagination.page +
+										1
+								)
+							}
+							disabled={
+								!pagination.hasNext
+							}
+							className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+						>
+							Next
+						</button>
+					</nav>
+				</div>
+			</div>
+		</div>
+	);
+};
+
+export default Pagination;
 ```
 
 ### 3. Client Details Component
@@ -2072,6 +2363,84 @@ describe('ClientSearch', () => {
 		});
 	});
 });
+```
+
+## Using Pagination and Handling Rate Limits
+
+### Example: Client Search with Pagination
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { searchClients } from '../store/slices/clientSlice';
+import { extractPaginatedData } from '../utils/pagination';
+import Pagination from '../components/common/Pagination';
+import { showError } from '../components/Toast';
+
+const ClientList = () => {
+	const dispatch = useDispatch();
+	const [page, setPage] = useState(1);
+	const [searchTerm, setSearchTerm] = useState('');
+	const { clients, pagination, loading, error } = useSelector(
+		(state) => state.clients
+	);
+
+	useEffect(() => {
+		// Fetch with pagination
+		dispatch(
+			searchClients({ query: searchTerm, page, pageSize: 20 })
+		);
+	}, [dispatch, searchTerm, page]);
+
+	// Handle rate limiting
+	useEffect(() => {
+		if (error?.response?.status === 429) {
+			showError('Too many requests. Please wait a moment.');
+		}
+	}, [error]);
+
+	const handlePageChange = (newPage) => {
+		setPage(newPage);
+		// Scroll to top if needed
+		window.scrollTo({ top: 0, behavior: 'smooth' });
+	};
+
+	return (
+		<div>
+			{/* Search input */}
+			<input
+				type="text"
+				value={searchTerm}
+				onChange={(e) => {
+					setSearchTerm(e.target.value);
+					setPage(1); // Reset to first page on new search
+				}}
+				placeholder="Search clients..."
+			/>
+
+			{/* Client list */}
+			{loading ? (
+				<div>Loading...</div>
+			) : (
+				<ul>
+					{clients.map((client) => (
+						<li key={client.id}>
+							{client.name}
+						</li>
+					))}
+				</ul>
+			)}
+
+			{/* Pagination component */}
+			<Pagination
+				pagination={pagination}
+				onPageChange={handlePageChange}
+			/>
+		</div>
+	);
+};
+
+export default ClientList;
 ```
 
 ## Integration Steps Summary

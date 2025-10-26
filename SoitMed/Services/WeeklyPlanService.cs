@@ -28,9 +28,9 @@ namespace SoitMed.Services
                 EmployeeId = userId,
                 WeekStartDate = createDto.WeekStartDate,
                 WeekEndDate = createDto.WeekEndDate,
-                PlanTitle = createDto.PlanTitle,
-                PlanDescription = createDto.PlanDescription,
-                Status = "Draft"
+                Title = createDto.Title,
+                Description = createDto.Description,
+                IsActive = true
             };
 
             await UnitOfWork.WeeklyPlans.CreateAsync(plan);
@@ -42,9 +42,9 @@ namespace SoitMed.Services
                 EmployeeId = plan.EmployeeId,
                 WeekStartDate = plan.WeekStartDate,
                 WeekEndDate = plan.WeekEndDate,
-                PlanTitle = plan.PlanTitle,
-                PlanDescription = plan.PlanDescription,
-                Status = plan.Status,
+                Title = plan.Title,
+                Description = plan.Description,
+                IsActive = plan.IsActive,
                 CreatedAt = plan.CreatedAt,
                 UpdatedAt = plan.UpdatedAt
             };
@@ -61,23 +61,28 @@ namespace SoitMed.Services
                 EmployeeId = p.EmployeeId,
                 WeekStartDate = p.WeekStartDate,
                 WeekEndDate = p.WeekEndDate,
-                PlanTitle = p.PlanTitle,
-                PlanDescription = p.PlanDescription,
-                Status = p.Status,
-                SubmittedAt = p.SubmittedAt,
-                ApprovedAt = p.ApprovedAt,
-                RejectedAt = p.RejectedAt,
+                Title = p.Title,
+                Description = p.Description,
+                IsActive = p.IsActive,
+                Rating = p.Rating,
+                ManagerComment = p.ManagerComment,
+                ManagerReviewedAt = p.ManagerReviewedAt,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
-                PlanItems = p.PlanItems.Select(pi => new WeeklyPlanItemResponseDTO
+                Tasks = p.Tasks.Select(t => new WeeklyPlanTaskResponseDTO
                 {
-                    Id = pi.Id,
-                    ClientName = pi.ClientName,
-                    ClientType = pi.ClientType,
-                    PlannedVisitDate = pi.PlannedVisitDate,
-                    VisitPurpose = pi.VisitPurpose,
-                    Priority = pi.Priority,
-                    Status = pi.Status
+                    Id = t.Id,
+                    TaskType = t.TaskType,
+                    ClientId = t.ClientId,
+                    ClientName = t.ClientName,
+                    ClientStatus = t.ClientStatus,
+                    ClientClassification = t.ClientClassification,
+                    PlannedDate = t.PlannedDate,
+                    PlannedTime = t.PlannedTime,
+                    Purpose = t.Purpose,
+                    Priority = t.Priority,
+                    Status = t.Status,
+                    ProgressCount = t.Progresses.Count
                 }).ToList()
             });
 
@@ -98,31 +103,28 @@ namespace SoitMed.Services
                 EmployeeId = plan.EmployeeId,
                 WeekStartDate = plan.WeekStartDate,
                 WeekEndDate = plan.WeekEndDate,
-                PlanTitle = plan.PlanTitle,
-                PlanDescription = plan.PlanDescription,
-                Status = plan.Status,
-                ApprovalNotes = plan.ApprovalNotes,
-                RejectionReason = plan.RejectionReason,
-                SubmittedAt = plan.SubmittedAt,
-                ApprovedAt = plan.ApprovedAt,
-                RejectedAt = plan.RejectedAt,
-                ApprovedBy = plan.ApprovedBy,
-                RejectedBy = plan.RejectedBy,
+                Title = plan.Title,
+                Description = plan.Description,
+                IsActive = plan.IsActive,
+                Rating = plan.Rating,
+                ManagerComment = plan.ManagerComment,
+                ManagerReviewedAt = plan.ManagerReviewedAt,
                 CreatedAt = plan.CreatedAt,
                 UpdatedAt = plan.UpdatedAt,
-                PlanItems = plan.PlanItems.Select(pi => new WeeklyPlanItemResponseDTO
+                Tasks = plan.Tasks.Select(t => new WeeklyPlanTaskResponseDTO
                 {
-                    Id = pi.Id,
-                    WeeklyPlanId = pi.WeeklyPlanId,
-                    ClientId = pi.ClientId,
-                    ClientName = pi.ClientName,
-                    ClientType = pi.ClientType,
-                    ClientSpecialization = pi.ClientSpecialization,
-                    PlannedVisitDate = pi.PlannedVisitDate,
-                    VisitPurpose = pi.VisitPurpose,
-                    Priority = pi.Priority,
-                    Status = pi.Status,
-                    IsNewClient = pi.IsNewClient
+                    Id = t.Id,
+                    TaskType = t.TaskType,
+                    ClientId = t.ClientId,
+                    ClientName = t.ClientName,
+                    ClientStatus = t.ClientStatus,
+                    ClientClassification = t.ClientClassification,
+                    PlannedDate = t.PlannedDate,
+                    PlannedTime = t.PlannedTime,
+                    Purpose = t.Purpose,
+                    Priority = t.Priority,
+                    Status = t.Status,
+                    ProgressCount = t.Progresses.Count
                 }).ToList()
             };
         }
@@ -135,16 +137,16 @@ namespace SoitMed.Services
                 return null;
             }
 
-            // Only allow updates if status is Draft
-            if (plan.Status != "Draft")
+            // Only allow updates if plan is active
+            if (!plan.IsActive)
             {
-                throw new InvalidOperationException("لا يمكن تعديل الخطة بعد إرسالها");
+                throw new InvalidOperationException("لا يمكن تعديل الخطة غير النشطة");
             }
 
-            if (!string.IsNullOrEmpty(updateDto.PlanTitle))
-                plan.PlanTitle = updateDto.PlanTitle;
-            if (updateDto.PlanDescription != null)
-                plan.PlanDescription = updateDto.PlanDescription;
+            if (!string.IsNullOrEmpty(updateDto.Title))
+                plan.Title = updateDto.Title;
+            if (updateDto.Description != null)
+                plan.Description = updateDto.Description;
 
             await UnitOfWork.SaveChangesAsync();
 
@@ -154,9 +156,9 @@ namespace SoitMed.Services
                 EmployeeId = plan.EmployeeId,
                 WeekStartDate = plan.WeekStartDate,
                 WeekEndDate = plan.WeekEndDate,
-                PlanTitle = plan.PlanTitle,
-                PlanDescription = plan.PlanDescription,
-                Status = plan.Status,
+                Title = plan.Title,
+                Description = plan.Description,
+                IsActive = plan.IsActive,
                 UpdatedAt = plan.UpdatedAt
             };
         }
@@ -169,19 +171,17 @@ namespace SoitMed.Services
                 return false;
             }
 
-            if (plan.Status != "Draft")
+            if (!plan.IsActive)
             {
-                throw new InvalidOperationException("تم إرسال هذه الخطة بالفعل");
+                throw new InvalidOperationException("لا يمكن إرسال خطة غير نشطة");
             }
 
-            plan.Status = "Submitted";
-            plan.SubmittedAt = DateTime.UtcNow;
-
+            // Plan is already active, no need to change status
             await UnitOfWork.SaveChangesAsync();
             return true;
         }
 
-        public async Task<bool> ApproveWeeklyPlanAsync(long id, ApprovePlanDTO approveDto, string userId)
+        public async Task<bool> ReviewWeeklyPlanAsync(long id, ReviewWeeklyPlanDTO reviewDto, string userId)
         {
             var plan = await UnitOfWork.WeeklyPlans.GetByIdAsync(id);
             if (plan == null)
@@ -189,37 +189,15 @@ namespace SoitMed.Services
                 return false;
             }
 
-            if (plan.Status != "Submitted")
+            if (!plan.IsActive)
             {
-                throw new InvalidOperationException("لا يمكن الموافقة على هذه الخطة");
+                throw new InvalidOperationException("لا يمكن مراجعة خطة غير نشطة");
             }
 
-            plan.Status = "Approved";
-            plan.ApprovedAt = DateTime.UtcNow;
-            plan.ApprovedBy = userId;
-            plan.ApprovalNotes = approveDto.Notes;
-
-            await UnitOfWork.SaveChangesAsync();
-            return true;
-        }
-
-        public async Task<bool> RejectWeeklyPlanAsync(long id, RejectPlanDTO rejectDto, string userId)
-        {
-            var plan = await UnitOfWork.WeeklyPlans.GetByIdAsync(id);
-            if (plan == null)
-            {
-                return false;
-            }
-
-            if (plan.Status != "Submitted")
-            {
-                throw new InvalidOperationException("لا يمكن رفض هذه الخطة");
-            }
-
-            plan.Status = "Rejected";
-            plan.RejectedAt = DateTime.UtcNow;
-            plan.RejectedBy = userId;
-            plan.RejectionReason = rejectDto.Reason;
+            plan.Rating = reviewDto.Rating;
+            plan.ManagerComment = reviewDto.Comment;
+            plan.ManagerReviewedAt = DateTime.UtcNow;
+            plan.ReviewedBy = userId;
 
             await UnitOfWork.SaveChangesAsync();
             return true;
@@ -239,16 +217,26 @@ namespace SoitMed.Services
                 EmployeeId = plan.EmployeeId,
                 WeekStartDate = plan.WeekStartDate,
                 WeekEndDate = plan.WeekEndDate,
-                PlanTitle = plan.PlanTitle,
-                Status = plan.Status,
-                PlanItems = plan.PlanItems.Select(pi => new WeeklyPlanItemResponseDTO
+                Title = plan.Title,
+                Description = plan.Description,
+                IsActive = plan.IsActive,
+                Rating = plan.Rating,
+                ManagerComment = plan.ManagerComment,
+                ManagerReviewedAt = plan.ManagerReviewedAt,
+                Tasks = plan.Tasks.Select(t => new WeeklyPlanTaskResponseDTO
                 {
-                    Id = pi.Id,
-                    ClientName = pi.ClientName,
-                    PlannedVisitDate = pi.PlannedVisitDate,
-                    VisitPurpose = pi.VisitPurpose,
-                    Priority = pi.Priority,
-                    Status = pi.Status
+                    Id = t.Id,
+                    TaskType = t.TaskType,
+                    ClientId = t.ClientId,
+                    ClientName = t.ClientName,
+                    ClientStatus = t.ClientStatus,
+                    ClientClassification = t.ClientClassification,
+                    PlannedDate = t.PlannedDate,
+                    PlannedTime = t.PlannedTime,
+                    Purpose = t.Purpose,
+                    Priority = t.Priority,
+                    Status = t.Status,
+                    ProgressCount = t.Progresses.Count
                 }).ToList()
             };
         }

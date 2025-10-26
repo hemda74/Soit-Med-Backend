@@ -34,14 +34,9 @@ namespace SoitMed.Services
         Task<bool> SubmitWeeklyPlanAsync(long id, string userId);
 
         /// <summary>
-        /// Approves a weekly plan
+        /// Reviews a weekly plan (manager rating and comment)
         /// </summary>
-        Task<bool> ApproveWeeklyPlanAsync(long id, ApprovePlanDTO approveDto, string userId);
-
-        /// <summary>
-        /// Rejects a weekly plan
-        /// </summary>
-        Task<bool> RejectWeeklyPlanAsync(long id, RejectPlanDTO rejectDto, string userId);
+        Task<bool> ReviewWeeklyPlanAsync(long id, ReviewWeeklyPlanDTO reviewDto, string userId);
 
         /// <summary>
         /// Gets the current week's plan for a user

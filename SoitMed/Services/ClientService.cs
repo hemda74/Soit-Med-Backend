@@ -6,299 +6,319 @@ using SoitMed.Repositories;
 namespace SoitMed.Services
 {
     /// <summary>
-    /// Service implementation for client business logic operations
+    /// Service for managing clients with complete history tracking
     /// </summary>
-    public class ClientService : BaseService, IClientService
+    public class ClientService : IClientService
     {
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly ILogger<ClientService> _logger;
+
         public ClientService(IUnitOfWork unitOfWork, ILogger<ClientService> logger) 
-            : base(unitOfWork, logger)
         {
+            _unitOfWork = unitOfWork;
+            _logger = logger;
         }
 
-        public async Task<ServiceResult<ClientSearchResult>> SearchClientsAsync(SearchClientDTO searchDto, string userId)
+        #region Client Management
+
+        public async Task<ClientResponseDTO> CreateClientAsync(CreateClientDTO createClientDto, string userId)
         {
             try
             {
-                var clients = await UnitOfWork.Clients.SearchClientsAsync(searchDto.Query, searchDto.Page, searchDto.PageSize);
-                var totalCount = await UnitOfWork.Clients.CountAsync();
-
-                var clientDtos = clients.Select(MapToResponseDTO);
-                var pagination = new PaginationInfo
-                {
-                    Page = searchDto.Page,
-                    PageSize = searchDto.PageSize,
-                    TotalCount = totalCount,
-                    TotalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize)
-                };
-
-                var result = new ClientSearchResult
-                {
-                    Clients = clientDtos,
-                    Pagination = pagination
-                };
-
-                return ServiceResult<ClientSearchResult>.Success(result);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error searching clients for user {UserId}", userId);
-                return ServiceResult<ClientSearchResult>.Failure("حدث خطأ في البحث عن العملاء", "SEARCH_ERROR");
-            }
-        }
-
-        public async Task<ServiceResult<ClientResponseDTO>> CreateClientAsync(CreateClientDTO createDto, string userId)
-        {
-            try
-            {
-                // Check if client already exists
-                var existingClient = await UnitOfWork.Clients.FindByNameAndTypeAsync(createDto.Name, createDto.Type);
-                if (existingClient != null)
-                {
-                    return ServiceResult<ClientResponseDTO>.Failure("العميل موجود بالفعل", "CLIENT_EXISTS");
-                }
-
                 var client = new Client
                 {
-                    Name = createDto.Name,
-                    Type = createDto.Type,
-                    Specialization = createDto.Specialization,
-                    Location = createDto.Location,
-                    Phone = createDto.Phone,
-                    Email = createDto.Email,
-                    Website = createDto.Website,
-                    Address = createDto.Address,
-                    City = createDto.City,
-                    Governorate = createDto.Governorate,
-                    PostalCode = createDto.PostalCode,
-                    Notes = createDto.Notes,
-                    Status = createDto.Status,
-                    Priority = createDto.Priority,
-                    PotentialValue = createDto.PotentialValue,
-                    ContactPerson = createDto.ContactPerson,
-                    ContactPersonPhone = createDto.ContactPersonPhone,
-                    ContactPersonEmail = createDto.ContactPersonEmail,
-                    ContactPersonPosition = createDto.ContactPersonPosition,
+                    Name = createClientDto.Name,
+                    Type = createClientDto.Type,
+                    Specialization = createClientDto.Specialization,
+                    Location = createClientDto.Location,
+                    Phone = createClientDto.Phone,
+                    Email = createClientDto.Email,
+                    Address = createClientDto.Address,
+                    City = createClientDto.City,
+                    Governorate = createClientDto.Governorate,
+                    ContactPerson = createClientDto.ContactPerson,
+                    ContactPersonPhone = createClientDto.ContactPersonPhone,
+                    ContactPersonEmail = createClientDto.ContactPersonEmail,
+                    ContactPersonPosition = createClientDto.ContactPersonPosition,
+                    Notes = createClientDto.Notes,
+                    Priority = createClientDto.Priority,
+                    Classification = createClientDto.Classification,
+                    Status = "Active",
                     CreatedBy = userId,
-                    AssignedTo = createDto.AssignedTo
+                    AssignedTo = userId
                 };
 
-                await UnitOfWork.Clients.CreateAsync(client);
-                await UnitOfWork.SaveChangesAsync();
+                await _unitOfWork.Clients.CreateAsync(client);
+                await _unitOfWork.SaveChangesAsync();
 
-                var responseDto = MapToResponseDTO(client);
-                return ServiceResult<ClientResponseDTO>.Success(responseDto);
+                _logger.LogInformation("Client created successfully. ClientId: {ClientId}, Name: {Name}", client.Id, client.Name);
+
+                return MapToClientResponseDTO(client);
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error creating client for user {UserId}", userId);
-                return ServiceResult<ClientResponseDTO>.Failure("حدث خطأ في إنشاء العميل", "CREATE_ERROR");
+                _logger.LogError(ex, "Error creating client. Name: {Name}", createClientDto.Name);
+                throw;
             }
         }
 
-        public async Task<ServiceResult<ClientResponseDTO>> GetClientAsync(long id, string userId)
+        public async Task<ClientResponseDTO?> GetClientAsync(long clientId)
         {
             try
             {
-                var client = await UnitOfWork.Clients.GetByIdAsync(id);
+                var client = await _unitOfWork.Clients.GetByIdAsync(clientId);
                 if (client == null)
-                {
-                    return ServiceResult<ClientResponseDTO>.Failure("العميل غير موجود", "CLIENT_NOT_FOUND");
-                }
+                    return null;
 
-                // Check if user can access this client
-                if (!await CanAccessClientAsync(id, userId))
-                {
-                    return ServiceResult<ClientResponseDTO>.Failure("ليس لديك صلاحية للوصول إلى هذا العميل", "ACCESS_DENIED");
-                }
-
-                var responseDto = MapToResponseDTO(client);
-                return ServiceResult<ClientResponseDTO>.Success(responseDto);
+                return MapToClientResponseDTO(client);
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error getting client {ClientId} for user {UserId}", id, userId);
-                return ServiceResult<ClientResponseDTO>.Failure("حدث خطأ في جلب بيانات العميل", "GET_ERROR");
+                _logger.LogError(ex, "Error getting client. ClientId: {ClientId}", clientId);
+                throw;
             }
         }
 
-        public async Task<ServiceResult<ClientResponseDTO>> UpdateClientAsync(long id, UpdateClientDTO updateDto, string userId)
+        public async Task<ClientProfileDTO?> GetClientProfileAsync(long clientId, string userId)
         {
             try
             {
-                var client = await UnitOfWork.Clients.GetByIdAsync(id);
+                var client = await _unitOfWork.Clients.GetByIdAsync(clientId);
                 if (client == null)
+                    return null;
+
+                // Authorization is already checked at controller level
+                // Here we just ensure the client exists and return the profile
+                // The controller's [Authorize(Roles="Salesman,SalesManager,SuperAdmin")] handles role check
+                // For data filtering, check if client is assigned to user when needed
+
+                // Get all task progresses (visits/interactions)
+                var taskProgresses = await _unitOfWork.TaskProgresses
+                    .GetProgressesByClientIdAsync(clientId);
+
+                // Get all offers
+                var offers = await _unitOfWork.SalesOffers
+                    .GetOffersByClientIdAsync(clientId);
+
+                // Get all deals
+                var deals = await _unitOfWork.SalesDeals
+                    .GetDealsByClientIdAsync(clientId);
+
+                // Calculate statistics
+                var statistics = new ClientStatisticsDTO
                 {
-                    return ServiceResult<ClientResponseDTO>.Failure("العميل غير موجود", "CLIENT_NOT_FOUND");
-                }
-
-                // Check if user can access this client
-                if (!await CanAccessClientAsync(id, userId))
-                {
-                    return ServiceResult<ClientResponseDTO>.Failure("ليس لديك صلاحية لتعديل هذا العميل", "ACCESS_DENIED");
-                }
-
-                // Update client properties using business logic methods
-                if (!string.IsNullOrEmpty(updateDto.Name))
-                    client.Name = updateDto.Name;
-                if (!string.IsNullOrEmpty(updateDto.Type))
-                    client.Type = updateDto.Type;
-                if (updateDto.Specialization != null)
-                    client.Specialization = updateDto.Specialization;
-                if (updateDto.Location != null)
-                    client.Location = updateDto.Location;
-
-                // Use business logic methods for related updates
-                client.UpdateContactInfo(updateDto.Phone, updateDto.Email, updateDto.Website);
-                client.UpdateAddress(updateDto.Address, updateDto.City, updateDto.Governorate, updateDto.PostalCode);
-                client.UpdateContactPerson(updateDto.ContactPerson, updateDto.ContactPersonPhone, 
-                    updateDto.ContactPersonEmail, updateDto.ContactPersonPosition);
-
-                if (!string.IsNullOrEmpty(updateDto.Status) || !string.IsNullOrEmpty(updateDto.Priority))
-                {
-                    client.UpdateStatus(updateDto.Status ?? client.Status, 
-                        updateDto.Priority ?? client.Priority, 
-                        updateDto.PotentialValue);
-                }
-
-                if (updateDto.AssignedTo != null)
-                    client.AssignedTo = updateDto.AssignedTo;
-
-                if (updateDto.Notes != null)
-                    client.Notes = updateDto.Notes;
-
-                await UnitOfWork.SaveChangesAsync();
-
-                var responseDto = MapToResponseDTO(client);
-                return ServiceResult<ClientResponseDTO>.Success(responseDto);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error updating client {ClientId} for user {UserId}", id, userId);
-                return ServiceResult<ClientResponseDTO>.Failure("حدث خطأ في تحديث العميل", "UPDATE_ERROR");
-            }
-        }
-
-        public async Task<ServiceResult<ClientResponseDTO>> FindOrCreateClientAsync(FindOrCreateClientDTO findDto, string userId)
-        {
-            try
-            {
-                var client = await UnitOfWork.Clients.FindOrCreateClientAsync(
-                    findDto.Name, 
-                    findDto.Type, 
-                    findDto.Specialization, 
-                    userId);
-
-                var responseDto = MapToResponseDTO(client);
-                return ServiceResult<ClientResponseDTO>.Success(responseDto);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error finding or creating client for user {UserId}", userId);
-                return ServiceResult<ClientResponseDTO>.Failure("حدث خطأ في البحث عن العميل أو إنشاؤه", "FIND_CREATE_ERROR");
-            }
-        }
-
-        public async Task<ServiceResult<ClientSearchResult>> GetMyClientsAsync(string userId, int page, int pageSize)
-        {
-            try
-            {
-                var clients = await UnitOfWork.Clients.GetMyClientsAsync(userId, page, pageSize);
-                var totalCount = await UnitOfWork.Clients.CountAsync(c => c.CreatedBy == userId || c.AssignedTo == userId);
-
-                var clientDtos = clients.Select(MapToResponseDTO);
-                var pagination = new PaginationInfo
-                {
-                    Page = page,
-                    PageSize = pageSize,
-                    TotalCount = totalCount,
-                    TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                    TotalVisits = taskProgresses.Count,
+                    TotalOffers = offers.Count,
+                    SuccessfulDeals = deals.Count(d => d.Status == "Success"),
+                    FailedDeals = deals.Count(d => d.Status == "Failed"),
+                    TotalRevenue = deals.Where(d => d.Status == "Success").Sum(d => d.DealValue),
+                    AverageSatisfaction = taskProgresses.Where(tp => tp.SatisfactionRating.HasValue)
+                        .Any() ? taskProgresses.Where(tp => tp.SatisfactionRating.HasValue)
+                        .Average(tp => tp.SatisfactionRating.Value) : null
                 };
 
-                var result = new ClientSearchResult
+                return new ClientProfileDTO
                 {
-                    Clients = clientDtos,
-                    Pagination = pagination
+                    ClientInfo = MapToClientResponseDTO(client),
+                    AllVisits = taskProgresses.Select(MapToTaskProgressSummaryDTO).ToList(),
+                    AllOffers = offers.Select(MapToOfferSummaryDTO).ToList(),
+                    AllDeals = deals.Select(MapToDealSummaryDTO).ToList(),
+                    Statistics = statistics
                 };
-
-                return ServiceResult<ClientSearchResult>.Success(result);
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error getting my clients for user {UserId}", userId);
-                return ServiceResult<ClientSearchResult>.Failure("حدث خطأ في جلب عملائي", "GET_MY_CLIENTS_ERROR");
+                _logger.LogError(ex, "Error getting client profile. ClientId: {ClientId}", clientId);
+                throw;
             }
         }
 
-        public async Task<ServiceResult<IEnumerable<ClientFollowUpDTO>>> GetClientsNeedingFollowUpAsync(string userId)
+        public async Task<List<ClientResponseDTO>> GetMyClientsAsync(string userId)
         {
             try
             {
-                var clients = await UnitOfWork.Clients.GetClientsNeedingFollowUpAsync(userId);
-                var followUpDtos = clients.Select(c => new ClientFollowUpDTO
-                {
-                    Id = c.Id,
-                    Name = c.Name,
-                    Type = c.Type,
-                    NextContactDate = c.NextContactDate,
-                    Priority = c.Priority,
-                    Status = c.Status
-                });
-
-                return ServiceResult<IEnumerable<ClientFollowUpDTO>>.Success(followUpDtos);
+                var clients = await _unitOfWork.Clients.GetMyClientsAsync(userId, 1, 20);
+                return clients.Select(MapToClientResponseDTO).ToList();
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error getting clients needing follow-up for user {UserId}", userId);
-                return ServiceResult<IEnumerable<ClientFollowUpDTO>>.Failure("حدث خطأ في جلب العملاء المحتاجين لمتابعة", "GET_FOLLOW_UP_ERROR");
+                _logger.LogError(ex, "Error getting my clients. UserId: {UserId}", userId);
+                throw;
             }
         }
 
-        public async Task<ServiceResult<ClientStatisticsDTO>> GetClientStatisticsAsync(string userId)
+        public async Task<List<ClientResponseDTO>> GetClientsNeedingFollowUpAsync(string userId)
         {
             try
             {
-                var statistics = await UnitOfWork.Clients.GetClientStatisticsAsync(userId);
-                
-                // Map the anonymous object to our DTO
-                var statisticsDto = new ClientStatisticsDTO
-                {
-                    MyClientsCount = (int)statistics.GetType().GetProperty("MyClientsCount")?.GetValue(statistics)!,
-                    TotalClientsCount = (int)statistics.GetType().GetProperty("TotalClientsCount")?.GetValue(statistics)!,
-                    ClientsByType = ((IEnumerable<dynamic>)statistics.GetType().GetProperty("ClientsByType")?.GetValue(statistics)!).Select(x => new ClientTypeCount { Type = x.Type, Count = x.Count }),
-                    ClientsByStatus = ((IEnumerable<dynamic>)statistics.GetType().GetProperty("ClientsByStatus")?.GetValue(statistics)!).Select(x => new ClientStatusCount { Status = x.Status, Count = x.Count }),
-                    ClientsByPriority = ((IEnumerable<dynamic>)statistics.GetType().GetProperty("ClientsByPriority")?.GetValue(statistics)!).Select(x => new ClientPriorityCount { Priority = x.Priority, Count = x.Count })
-                };
-
-                return ServiceResult<ClientStatisticsDTO>.Success(statisticsDto);
+                var clients = await _unitOfWork.Clients.GetClientsNeedingFollowUpAsync(userId);
+                return clients.Select(MapToClientResponseDTO).ToList();
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error getting client statistics for user {UserId}", userId);
-                return ServiceResult<ClientStatisticsDTO>.Failure("حدث خطأ في جلب إحصائيات العملاء", "GET_STATISTICS_ERROR");
+                _logger.LogError(ex, "Error getting clients needing follow-up. UserId: {UserId}", userId);
+                throw;
             }
         }
 
-        public async Task<bool> CanAccessClientAsync(long clientId, string userId)
+        public async Task<ClientResponseDTO> UpdateClientAsync(long clientId, CreateClientDTO updateClientDto, string userId)
         {
             try
             {
-                var client = await UnitOfWork.Clients.GetByIdAsync(clientId);
+                var client = await _unitOfWork.Clients.GetByIdAsync(clientId);
+                if (client == null)
+                    throw new ArgumentException("Client not found", nameof(clientId));
+
+                // Update client properties
+                client.Name = updateClientDto.Name;
+                client.Type = updateClientDto.Type;
+                client.Specialization = updateClientDto.Specialization;
+                client.Location = updateClientDto.Location;
+                client.Phone = updateClientDto.Phone;
+                client.Email = updateClientDto.Email;
+                client.Address = updateClientDto.Address;
+                client.City = updateClientDto.City;
+                client.Governorate = updateClientDto.Governorate;
+                client.ContactPerson = updateClientDto.ContactPerson;
+                client.ContactPersonPhone = updateClientDto.ContactPersonPhone;
+                client.ContactPersonEmail = updateClientDto.ContactPersonEmail;
+                client.ContactPersonPosition = updateClientDto.ContactPersonPosition;
+                client.Notes = updateClientDto.Notes;
+                client.Priority = updateClientDto.Priority;
+                client.Classification = updateClientDto.Classification;
+                client.UpdatedAt = DateTime.UtcNow;
+
+                await _unitOfWork.Clients.UpdateAsync(client);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Client updated successfully. ClientId: {ClientId}", clientId);
+
+                return MapToClientResponseDTO(client);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating client. ClientId: {ClientId}", clientId);
+                throw;
+            }
+        }
+
+        public async Task<bool> DeleteClientAsync(long clientId, string userId)
+        {
+            try
+            {
+                var client = await _unitOfWork.Clients.GetByIdAsync(clientId);
                 if (client == null)
                     return false;
 
-                return client.CreatedBy == userId || client.AssignedTo == userId;
+                await _unitOfWork.Clients.DeleteAsync(client);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Client deleted successfully. ClientId: {ClientId}", clientId);
+
+                return true;
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error checking client access for user {UserId} and client {ClientId}", userId, clientId);
-                return false;
+                _logger.LogError(ex, "Error deleting client. ClientId: {ClientId}", clientId);
+                throw;
             }
         }
 
-        /// <summary>
-        /// Maps a Client entity to ClientResponseDTO
-        /// </summary>
-        private static ClientResponseDTO MapToResponseDTO(Client client)
+        #endregion
+
+        #region Search and Filter
+
+        public async Task<List<ClientResponseDTO>> SearchClientsAsync(SearchClientDTO searchDto, string userId)
+        {
+            try
+            {
+                var clients = await _unitOfWork.Clients.SearchClientsAsync(searchDto.Query);
+                return clients.Select(MapToClientResponseDTO).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error searching clients. Query: {Query}, UserId: {UserId}", searchDto.Query, userId);
+                throw;
+            }
+        }
+
+        public async Task<List<ClientResponseDTO>> GetClientsByClassificationAsync(string classification, string userId)
+        {
+            try
+            {
+                // Get all clients and filter by classification
+                var allClients = await _unitOfWork.Clients.GetMyClientsAsync(userId, 1, 20);
+                var clients = allClients.Where(c => c.Classification == classification);
+                return clients.Select(MapToClientResponseDTO).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting clients by classification. Classification: {Classification}, UserId: {UserId}", classification, userId);
+                throw;
+            }
+        }
+
+        public async Task<ClientResponseDTO> FindOrCreateClientAsync(FindOrCreateClientDTO findDto, string userId)
+        {
+            try
+            {
+                // Try to find existing client
+                var existingClient = await _unitOfWork.Clients.FindByNameAndTypeAsync(findDto.Name, findDto.Type);
+                if (existingClient != null)
+                {
+                    return MapToClientResponseDTO(existingClient);
+                }
+
+                // Create new client if not found
+                var createDto = new CreateClientDTO
+                {
+                    Name = findDto.Name,
+                    Type = findDto.Type,
+                    Specialization = findDto.Specialization
+                };
+
+                return await CreateClientAsync(createDto, userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error finding or creating client. Name: {Name}, Type: {Type}, UserId: {UserId}", 
+                    findDto.Name, findDto.Type, userId);
+                throw;
+            }
+        }
+
+        public async Task<ClientStatisticsDTO> GetClientStatisticsAsync(string userId)
+        {
+            try
+            {
+                // Get all clients for the user
+                var clients = await _unitOfWork.Clients.GetMyClientsAsync(userId, 1, 20);
+                
+                // Calculate statistics
+                var statistics = new ClientStatisticsDTO
+                {
+                    TotalVisits = 0, // This would be calculated from task progresses
+                    TotalOffers = 0, // This would be calculated from offers
+                    SuccessfulDeals = 0, // This would be calculated from deals
+                    FailedDeals = 0, // This would be calculated from deals
+                    TotalRevenue = 0, // This would be calculated from successful deals
+                    AverageSatisfaction = null // This would be calculated from task progresses
+                };
+
+                return statistics;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting client statistics. UserId: {UserId}", userId);
+                throw;
+            }
+        }
+
+        #endregion
+
+        #region Mapping Methods
+
+        private static ClientResponseDTO MapToClientResponseDTO(Client client)
         {
             return new ClientResponseDTO
             {
@@ -309,27 +329,52 @@ namespace SoitMed.Services
                 Location = client.Location,
                 Phone = client.Phone,
                 Email = client.Email,
-                Website = client.Website,
-                Address = client.Address,
-                City = client.City,
-                Governorate = client.Governorate,
-                PostalCode = client.PostalCode,
-                Notes = client.Notes,
                 Status = client.Status,
                 Priority = client.Priority,
-                PotentialValue = client.PotentialValue,
-                ContactPerson = client.ContactPerson,
-                ContactPersonPhone = client.ContactPersonPhone,
-                ContactPersonEmail = client.ContactPersonEmail,
-                ContactPersonPosition = client.ContactPersonPosition,
+                Classification = client.Classification,
                 LastContactDate = client.LastContactDate,
                 NextContactDate = client.NextContactDate,
                 SatisfactionRating = client.SatisfactionRating,
-                CreatedBy = client.CreatedBy,
-                AssignedTo = client.AssignedTo,
-                CreatedAt = client.CreatedAt,
-                UpdatedAt = client.UpdatedAt
+                CreatedAt = client.CreatedAt
             };
         }
+
+        private static TaskProgressSummaryDTO MapToTaskProgressSummaryDTO(TaskProgress taskProgress)
+        {
+            return new TaskProgressSummaryDTO
+            {
+                Id = taskProgress.Id,
+                ProgressDate = taskProgress.ProgressDate,
+                ProgressType = taskProgress.ProgressType,
+                VisitResult = taskProgress.VisitResult,
+                NextStep = taskProgress.NextStep,
+                SatisfactionRating = taskProgress.SatisfactionRating
+            };
+        }
+
+        private static OfferSummaryDTO MapToOfferSummaryDTO(SalesOffer offer)
+        {
+            return new OfferSummaryDTO
+            {
+                Id = offer.Id,
+                CreatedAt = offer.CreatedAt,
+                TotalAmount = offer.TotalAmount,
+                Status = offer.Status,
+                ValidUntil = offer.ValidUntil
+            };
+        }
+
+        private static DealSummaryDTO MapToDealSummaryDTO(SalesDeal deal)
+        {
+            return new DealSummaryDTO
+            {
+                Id = deal.Id,
+                ClosedDate = deal.ClosedDate,
+                DealValue = deal.DealValue,
+                Status = deal.Status
+            };
+        }
+
+        #endregion
     }
 }

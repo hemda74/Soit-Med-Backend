@@ -20,6 +20,8 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Data.Common;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Http;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace SoitMed
 {
@@ -95,13 +97,48 @@ namespace SoitMed
                 options.ValueLengthLimit = int.MaxValue;
                 options.ValueCountLimit = int.MaxValue;
                 options.KeyLengthLimit = int.MaxValue;
+                options.MultipartHeadersLengthLimit = int.MaxValue;
+                options.MultipartBoundaryLengthLimit = int.MaxValue;
             });
+            
+            // Configure Kestrel for better file upload handling
             builder.WebHost.ConfigureKestrel(options =>
             {
                 options.Limits.MaxRequestBodySize = 20L * 1024 * 1024; // 20MB
-                options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
-                options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(1);
+                options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(5); // Increased timeout
+                options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(2); // Increased timeout
+                options.Limits.MaxConcurrentConnections = 100;
+                options.Limits.MaxConcurrentUpgradedConnections = 100;
+                options.Limits.MaxRequestBufferSize = 1024 * 1024; // 1MB buffer
+                options.Limits.MaxRequestLineSize = 8192; // 8KB
+                options.Limits.MaxRequestHeaderCount = 100;
+                options.Limits.MaxRequestHeadersTotalSize = 32 * 1024; // 32KB
             });
+            
+            // Configure request size limits
+            builder.Services.Configure<IISServerOptions>(options =>
+            {
+                options.MaxRequestBodySize = 20 * 1024 * 1024; // 20MB
+            });
+            
+            // Configure memory management
+            builder.Services.Configure<Microsoft.Extensions.Caching.Memory.MemoryCacheOptions>(options =>
+            {
+                options.SizeLimit = 100 * 1024 * 1024; // 100MB cache limit
+            });
+            
+            // Add health checks for monitoring
+            builder.Services.AddHealthChecks()
+                .AddDbContextCheck<Context>("database")
+                .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), new[] { "ready" })
+                .AddCheck("memory", () => 
+                {
+                    var memory = GC.GetTotalMemory(false);
+                    var maxMemory = 500 * 1024 * 1024; // 500MB threshold
+                    return memory < maxMemory ? 
+                        HealthCheckResult.Healthy($"Memory usage: {memory / 1024 / 1024}MB") : 
+                        HealthCheckResult.Unhealthy($"High memory usage: {memory / 1024 / 1024}MB");
+                });
            
             builder.Services.AddCors(options => {
                 options.AddPolicy("MyPolicy",
@@ -154,16 +191,54 @@ namespace SoitMed
             builder.Services.AddFluentValidationAutoValidation();
             builder.Services.AddValidatorsFromAssemblyContaining<CreateSalesReportDtoValidator>();
             
-            // Add Health Checks
-            builder.Services.AddHealthChecks()
-                .AddDbContextCheck<Context>("database")
-                .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), new[] { "ready" });
+            // Add Health Checks (consolidated with the one above)
+            // Removed duplicate registration
             
             // Add Memory Cache
             builder.Services.AddMemoryCache();
             
             // Add Response Caching
             builder.Services.AddResponseCaching();
+
+            // Configure Rate Limiting
+            builder.Services.AddRateLimiter(options =>
+            {
+                // Global rate limiter
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.User?.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
+                        factory: partition => new FixedWindowRateLimiterOptions
+                        {
+                            AutoReplenishment = true,
+                            PermitLimit = 100,
+                            QueueLimit = 50,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+
+                // Specific policy for API endpoints
+                options.AddPolicy("API", httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.User?.Identity?.Name ?? httpContext.Connection.Id,
+                        factory: partition => new FixedWindowRateLimiterOptions
+                        {
+                            AutoReplenishment = true,
+                            PermitLimit = 200,
+                            QueueLimit = 100,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+
+                // Stricter policy for authentication endpoints
+                options.AddPolicy("Auth", httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: partition => new FixedWindowRateLimiterOptions
+                        {
+                            AutoReplenishment = true,
+                            PermitLimit = 10,
+                            QueueLimit = 5,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+            });
             
             
 			
@@ -216,7 +291,7 @@ namespace SoitMed
 				swagger.SwaggerDoc("v1", new OpenApiInfo
 				{
 					Version = "v1",
-					Title = "Soit-Med Hospital Management API",
+					Title = "Soit-Med",
 					Description = "Comprehensive hospital management system with equipment tracking and repair request management"
 				});
 				
@@ -336,15 +411,44 @@ END";
                     if (error != null)
                     {
                         var ex = error.Error;
-                        // Logging handled by configured providers
+                        // Log the exception for debugging
+                        var logger = context.RequestServices.GetService<ILogger<Program>>();
+                        logger?.LogError(ex, "Unhandled exception in request pipeline");
                         
                         await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
                         {
                             error = "An internal server error occurred",
-                            message = "Please try again later"
+                            message = "Please try again later",
+                            details = app.Environment.IsDevelopment() ? ex.Message : null
                         }));
                     }
                 });
+            });
+            
+            // Add custom middleware for handling large file uploads
+            app.Use(async (context, next) =>
+            {
+                try
+                {
+                    // Set additional headers for large file handling
+                    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+                    context.Response.Headers.Append("X-Frame-Options", "DENY");
+                    
+                    await next();
+                }
+                catch (Exception ex)
+                {
+                    var logger = context.RequestServices.GetService<ILogger<Program>>();
+                    logger?.LogError(ex, "Error in custom middleware");
+                    
+                    context.Response.StatusCode = 500;
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        error = "Request processing failed",
+                        message = "Please try again with a smaller file or check your connection"
+                    }));
+                }
             });
             app.UseStatusCodePages();
             
@@ -352,6 +456,7 @@ END";
             
             app.UseCors("MyPolicy");
             app.UseResponseCaching();
+            app.UseRateLimiter(); // Add rate limiting middleware
             app.UseAuthentication();
             app.UseAuthorization();
 

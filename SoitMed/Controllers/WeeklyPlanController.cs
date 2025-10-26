@@ -122,8 +122,8 @@ namespace SoitMed.Controllers
                 return Ok(ResponseHelper.CreateSuccessResponse(new
                 {
                     Id = plan.Id,
-                    PlanTitle = plan.PlanTitle,
-                    PlanDescription = plan.PlanDescription,
+                    Title = plan.Title,
+                    Description = plan.Description,
                     UpdatedAt = plan.UpdatedAt
                 }));
             }
@@ -166,9 +166,9 @@ namespace SoitMed.Controllers
             }
         }
 
-        [HttpPost("{id}/approve")]
+        [HttpPost("{id}/review")]
         [Authorize(Roles = "Admin,SalesManager")]
-        public async Task<IActionResult> ApproveWeeklyPlan(long id, [FromBody] ApprovePlanDTO approveDto)
+        public async Task<IActionResult> ReviewWeeklyPlan(long id, [FromBody] ReviewWeeklyPlanDTO reviewDto)
         {
             try
             {
@@ -176,13 +176,13 @@ namespace SoitMed.Controllers
                 if (currentUser == null)
                     return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
 
-                var success = await _weeklyPlanService.ApproveWeeklyPlanAsync(id, approveDto, currentUser.Id);
+                var success = await _weeklyPlanService.ReviewWeeklyPlanAsync(id, reviewDto, currentUser.Id);
                 if (!success)
                 {
                     return NotFound(ResponseHelper.CreateErrorResponse("Weekly plan not found"));
                 }
 
-                return Ok(ResponseHelper.CreateSuccessResponse("Weekly plan approved successfully"));
+                return Ok(ResponseHelper.CreateSuccessResponse("Weekly plan reviewed successfully"));
             }
             catch (InvalidOperationException ex)
             {
@@ -190,37 +190,8 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error approving weekly plan {PlanId}", id);
-                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while approving the weekly plan"));
-            }
-        }
-
-        [HttpPost("{id}/reject")]
-        [Authorize(Roles = "Admin,SalesManager")]
-        public async Task<IActionResult> RejectWeeklyPlan(long id, [FromBody] RejectPlanDTO rejectDto)
-        {
-            try
-            {
-                var currentUser = await GetCurrentUserAsync();
-                if (currentUser == null)
-                    return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
-
-                var success = await _weeklyPlanService.RejectWeeklyPlanAsync(id, rejectDto, currentUser.Id);
-                if (!success)
-                {
-                    return NotFound(ResponseHelper.CreateErrorResponse("Weekly plan not found"));
-                }
-
-                return Ok(ResponseHelper.CreateSuccessResponse("Weekly plan rejected successfully"));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error rejecting weekly plan {PlanId}", id);
-                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while rejecting the weekly plan"));
+                _logger.LogError(ex, "Error reviewing weekly plan {PlanId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while reviewing the weekly plan"));
             }
         }
 

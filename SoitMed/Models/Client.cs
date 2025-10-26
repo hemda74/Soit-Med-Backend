@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using SoitMed.Models.Core;
 
 namespace SoitMed.Models
@@ -71,6 +72,11 @@ namespace SoitMed.Models
         [MaxLength(50)]
         public string Priority { get; set; } = ClientPriority.Medium;
 
+        // Client Classification (A, B, C, D)
+        [MaxLength(1)]
+        public string? Classification { get; set; } // A, B, C, D
+
+        [Column(TypeName = "decimal(18,2)")]
         public decimal? PotentialValue { get; set; }
 
         public DateTime? LastContactDate { get; set; }
@@ -88,10 +94,10 @@ namespace SoitMed.Models
         public string? AssignedTo { get; set; }
         #endregion
 
-        #region Navigation Properties
-        public virtual ICollection<ClientVisit> Visits { get; set; } = new List<ClientVisit>();
-        public virtual ICollection<ClientInteraction> Interactions { get; set; } = new List<ClientInteraction>();
-        public virtual ICollection<WeeklyPlanItem> WeeklyPlanItems { get; set; } = new List<WeeklyPlanItem>();
+        #region Navigation Properties - Complete History
+        public virtual ICollection<TaskProgress> TaskProgresses { get; set; } = new List<TaskProgress>(); // All visits/interactions
+        public virtual ICollection<Offer> Offers { get; set; } = new List<Offer>(); // All offers
+        public virtual ICollection<Deal> Deals { get; set; } = new List<Deal>(); // All deals (success/failed)
         #endregion
 
         #region Business Logic Methods

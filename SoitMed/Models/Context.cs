@@ -54,7 +54,13 @@ namespace SoitMed.Models
 
         // Weekly planning entities
         public DbSet<WeeklyPlan> WeeklyPlans { get; set; }
-        public DbSet<WeeklyPlanItem> WeeklyPlanItems { get; set; }
+        public DbSet<WeeklyPlanTask> WeeklyPlanTasks { get; set; }
+        public DbSet<TaskProgress> TaskProgresses { get; set; }
+
+        // Sales workflow entities
+        public DbSet<OfferRequest> OfferRequests { get; set; }
+        public DbSet<SalesOffer> SalesOffers { get; set; }
+        public DbSet<SalesDeal> SalesDeals { get; set; }
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -212,17 +218,7 @@ namespace SoitMed.Models
                 .IsUnique();
 
             // Configure Sales Funnel entities
-            modelBuilder.Entity<ActivityLog>()
-                .HasOne(al => al.Deal)
-                .WithOne(d => d.ActivityLog)
-                .HasForeignKey<Deal>(d => d.ActivityLogId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<ActivityLog>()
-                .HasOne(al => al.Offer)
-                .WithOne(o => o.ActivityLog)
-                .HasForeignKey<Offer>(o => o.ActivityLogId)
-                .OnDelete(DeleteBehavior.Cascade);
+            // Note: ActivityLog relationships with Deal and Offer are handled in their respective models
 
             // Configure RequestWorkflow relationships
             modelBuilder.Entity<RequestWorkflow>()
@@ -280,6 +276,152 @@ namespace SoitMed.Models
 
             modelBuilder.Entity<Notification>()
                 .HasIndex(n => n.CreatedAt);
+
+            // ========== NEW SALES MODULE RELATIONSHIPS ==========
+            
+            // WeeklyPlanTask relationships
+            modelBuilder.Entity<WeeklyPlanTask>()
+                .HasOne(wpt => wpt.WeeklyPlan)
+                .WithMany(wp => wp.Tasks)
+                .HasForeignKey(wpt => wpt.WeeklyPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<WeeklyPlanTask>()
+                .HasOne(wpt => wpt.Client)
+                .WithMany()
+                .HasForeignKey(wpt => wpt.ClientId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // TaskProgress relationships
+            modelBuilder.Entity<TaskProgress>()
+                .HasOne(tp => tp.Task)
+                .WithMany(wpt => wpt.Progresses)
+                .HasForeignKey(tp => tp.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TaskProgress>()
+                .HasOne(tp => tp.Client)
+                .WithMany(c => c.TaskProgresses)
+                .HasForeignKey(tp => tp.ClientId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TaskProgress>()
+                .HasOne(tp => tp.Employee)
+                .WithMany()
+                .HasForeignKey(tp => tp.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // OfferRequest relationships
+            modelBuilder.Entity<OfferRequest>()
+                .HasOne(or => or.Requester)
+                .WithMany()
+                .HasForeignKey(or => or.RequestedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<OfferRequest>()
+                .HasOne(or => or.Client)
+                .WithMany()
+                .HasForeignKey(or => or.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure OfferRequest -> TaskProgress relationship (one-way: OfferRequest references TaskProgress)
+            modelBuilder.Entity<OfferRequest>()
+                .HasOne(or => or.TaskProgress)
+                .WithMany()
+                .HasForeignKey(or => or.TaskProgressId)
+                .OnDelete(DeleteBehavior.SetNull);
+            
+            // Ignore the TaskProgress.OfferRequest navigation to avoid shadow property
+            modelBuilder.Entity<TaskProgress>()
+                .Ignore(tp => tp.OfferRequest);
+            
+            modelBuilder.Entity<OfferRequest>()
+                .HasOne<ApplicationUser>("AssignedSupportUser")
+                .WithMany()
+                .HasForeignKey("AssignedTo")
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
+            // Indexes for performance
+            modelBuilder.Entity<OfferRequest>()
+                .HasIndex(or => new { or.Status, or.RequestedBy });
+
+            modelBuilder.Entity<TaskProgress>()
+                .HasIndex(tp => new { tp.ClientId, tp.ProgressDate });
+
+            modelBuilder.Entity<WeeklyPlanTask>()
+                .HasIndex(wpt => new { wpt.WeeklyPlanId, wpt.Status });
+
+            // ==================== Sales Module Relationships ====================
+            
+            // SalesOffer relationships
+            modelBuilder.Entity<OfferRequest>()
+                .HasOne(or => or.CreatedOffer)
+                .WithOne(so => so.OfferRequest)
+                .HasForeignKey<OfferRequest>(or => or.CreatedOfferId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<SalesOffer>()
+                .HasOne(so => so.Client)
+                .WithMany()
+                .HasForeignKey(so => so.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesOffer>()
+                .HasOne(so => so.Creator)
+                .WithMany()
+                .HasForeignKey(so => so.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesOffer>()
+                .HasOne(so => so.Salesman)
+                .WithMany()
+                .HasForeignKey(so => so.AssignedTo)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // SalesDeal relationships
+            modelBuilder.Entity<SalesDeal>()
+                .HasOne(sd => sd.Offer)
+                .WithOne(so => so.Deal)
+                .HasForeignKey<SalesDeal>(sd => sd.OfferId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasOne(sd => sd.Client)
+                .WithMany()
+                .HasForeignKey(sd => sd.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasOne(sd => sd.Salesman)
+                .WithMany()
+                .HasForeignKey(sd => sd.SalesmanId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasOne(sd => sd.ManagerApprover)
+                .WithMany()
+                .HasForeignKey(sd => sd.ManagerApprovedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasOne(sd => sd.SuperAdminApprover)
+                .WithMany()
+                .HasForeignKey(sd => sd.SuperAdminApprovedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes for performance
+            modelBuilder.Entity<SalesOffer>()
+                .HasIndex(so => new { so.Status, so.AssignedTo });
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasIndex(sd => new { sd.Status, sd.SalesmanId });
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasIndex(sd => new { sd.Status, sd.ManagerApprovedBy });
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasIndex(sd => new { sd.Status, sd.SuperAdminApprovedBy });
         }
     }
 }

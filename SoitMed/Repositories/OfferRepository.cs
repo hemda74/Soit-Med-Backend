@@ -19,7 +19,7 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<Offer>> GetByStatusAsync(OfferStatus status, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<Offer>> GetByStatusAsync(string status, CancellationToken cancellationToken = default)
         {
             return await _context.Offers
                 .Where(o => o.Status == status)

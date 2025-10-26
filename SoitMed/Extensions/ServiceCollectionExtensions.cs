@@ -12,12 +12,17 @@ namespace SoitMed.Extensions
         /// </summary>
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
-        // Register services
-        services.AddScoped<IClientService, ClientService>();
-        services.AddScoped<IValidationService, ValidationService>();
-        services.AddScoped<IMappingService, MappingService>();
-        services.AddScoped<IWeeklyPlanService, WeeklyPlanService>();
-        services.AddScoped<IWeeklyPlanItemService, WeeklyPlanItemService>();
+            // Core services
+            services.AddScoped<IClientService, ClientService>();
+            services.AddScoped<IValidationService, ValidationService>();
+            services.AddScoped<IMappingService, MappingService>();
+            services.AddScoped<IWeeklyPlanService, WeeklyPlanService>();
+
+            // Sales workflow services
+            services.AddScoped<ITaskProgressService, TaskProgressService>();
+            services.AddScoped<IOfferRequestService, OfferRequestService>();
+            services.AddScoped<IOfferService, OfferService>();
+            services.AddScoped<IDealService, DealService>();
 
             return services;
         }

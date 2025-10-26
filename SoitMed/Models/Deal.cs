@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SoitMed.Models.Core;
 using SoitMed.Models.Enums;
 
 namespace SoitMed.Models
@@ -15,135 +16,100 @@ namespace SoitMed.Models
         public ActivityLog ActivityLog { get; set; } = null!;
 
         [Required]
+        public long ClientId { get; set; }
+        public Client Client { get; set; } = null!;
+
+        [Required]
+        [MaxLength(450)]
+        public string UserId { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(1000)]
+        public string? Description { get; set; }
+
+        [Required]
         [Column(TypeName = "decimal(18,2)")]
-        public decimal DealValue { get; set; }
+        public decimal Value { get; set; }
 
         [Required]
-        public DateTime ExpectedCloseDate { get; set; }
-
-        [Required]
-        public DealStatus Status { get; set; } = DealStatus.Pending;
+        public string Status { get; set; } = "Pending";
 
         [MaxLength(1000)]
         public string? Notes { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? ExpectedCloseDate { get; set; }
+
+        public DateTime? ActualCloseDate { get; set; }
+
+        [MaxLength(200)]
+        public string? ContactPerson { get; set; }
+
+        [MaxLength(50)]
+        public string? ContactPhone { get; set; }
+
+        [MaxLength(100)]
+        public string? ContactEmail { get; set; }
+
+        [MaxLength(1000)]
+        public string? RejectionReason { get; set; }
+
+        [MaxLength(1000)]
+        public string? ApprovalNotes { get; set; }
+
+        public string? ApprovedBy { get; set; }
+
+        public DateTime? ApprovedAt { get; set; }
+
+        public string? RejectedBy { get; set; }
+
+        public DateTime? RejectedAt { get; set; }
         #endregion
 
         #region Business Logic Methods
         /// <summary>
-        /// Determines if this deal is overdue for closing
+        /// Approves the deal
         /// </summary>
-        public bool IsOverdue()
+        public void Approve(string approvedBy, string? notes = null)
         {
-            return Status == DealStatus.Pending && 
-                   ExpectedCloseDate < DateTime.UtcNow;
+            Status = "Approved";
+            ApprovedBy = approvedBy;
+            ApprovedAt = DateTime.UtcNow;
+            if (!string.IsNullOrEmpty(notes))
+                ApprovalNotes = notes;
         }
 
         /// <summary>
-        /// Calculates the days until expected close date
+        /// Rejects the deal
         /// </summary>
-        public int GetDaysUntilClose()
+        public void Reject(string rejectedBy, string reason, string? notes = null)
         {
-            return (ExpectedCloseDate - DateTime.UtcNow).Days;
+            Status = "Rejected";
+            RejectedBy = rejectedBy;
+            RejectedAt = DateTime.UtcNow;
+            RejectionReason = reason;
+            if (!string.IsNullOrEmpty(notes))
+                ApprovalNotes = notes;
         }
 
         /// <summary>
-        /// Calculates the age of this deal in days
+        /// Marks the deal as completed
         /// </summary>
-        public int GetAgeInDays()
+        public void Complete()
         {
-            return (DateTime.UtcNow - CreatedAt).Days;
-        }
-
-        /// <summary>
-        /// Determines if this deal is closing soon (within specified days)
-        /// </summary>
-        public bool IsClosingSoon(int daysThreshold = 7)
-        {
-            return Status == DealStatus.Pending && 
-                   ExpectedCloseDate <= DateTime.UtcNow.AddDays(daysThreshold);
-        }
-
-        /// <summary>
-        /// Updates the deal status
-        /// </summary>
-        public void UpdateStatus(DealStatus newStatus)
-        {
-            Status = newStatus;
-            UpdatedAt = DateTime.UtcNow;
-        }
-
-        /// <summary>
-        /// Updates the deal value
-        /// </summary>
-        public void UpdateValue(decimal newValue)
-        {
-            if (newValue > 0)
-            {
-                DealValue = newValue;
-                UpdatedAt = DateTime.UtcNow;
-            }
-        }
-
-        /// <summary>
-        /// Updates the expected close date
-        /// </summary>
-        public void UpdateExpectedCloseDate(DateTime newDate)
-        {
-            ExpectedCloseDate = newDate;
-            UpdatedAt = DateTime.UtcNow;
-        }
-
-        /// <summary>
-        /// Adds notes to the deal
-        /// </summary>
-        public void AddNotes(string additionalNotes)
-        {
-            if (!string.IsNullOrEmpty(additionalNotes))
-            {
-                Notes = string.IsNullOrEmpty(Notes) 
-                    ? additionalNotes 
-                    : $"{Notes}\n{additionalNotes}";
-                UpdatedAt = DateTime.UtcNow;
-            }
-        }
-
-        /// <summary>
-        /// Determines if this deal was closed successfully
-        /// </summary>
-        public bool WasClosed()
-        {
-            return Status == DealStatus.Closed;
-        }
-
-        /// <summary>
-        /// Determines if this deal was lost
-        /// </summary>
-        public bool WasLost()
-        {
-            return Status == DealStatus.Lost;
-        }
-
-        /// <summary>
-        /// Determines if this deal is still pending
-        /// </summary>
-        public bool IsPending()
-        {
-            return Status == DealStatus.Pending;
+            Status = "Completed";
+            ActualCloseDate = DateTime.UtcNow;
         }
 
         /// <summary>
         /// Marks the deal as closed
         /// </summary>
-        public void Close(string? notes = null)
+        public void Close()
         {
-            Status = DealStatus.Closed;
-            UpdatedAt = DateTime.UtcNow;
-            
-            if (!string.IsNullOrEmpty(notes))
-                AddNotes($"Closed: {notes}");
+            Status = "Closed";
+            ActualCloseDate = DateTime.UtcNow;
         }
 
         /// <summary>
@@ -151,38 +117,83 @@ namespace SoitMed.Models
         /// </summary>
         public void MarkAsLost(string? reason = null)
         {
-            Status = DealStatus.Lost;
-            UpdatedAt = DateTime.UtcNow;
-            
+            Status = "Lost";
             if (!string.IsNullOrEmpty(reason))
-                AddNotes($"Lost: {reason}");
+                RejectionReason = reason;
         }
 
         /// <summary>
-        /// Determines if this deal needs follow-up
+        /// Determines if the deal is pending
         /// </summary>
-        public bool NeedsFollowUp()
+        public bool IsPending()
         {
-            return Status == DealStatus.Pending && 
-                   CreatedAt.AddDays(5) < DateTime.UtcNow;
+            return Status == "Pending";
         }
 
         /// <summary>
-        /// Calculates the probability of closing based on age and value
+        /// Determines if the deal is approved
         /// </summary>
-        public decimal CalculateClosingProbability()
+        public bool IsApproved()
         {
-            if (Status != DealStatus.Pending)
-                return Status == DealStatus.Closed ? 100 : 0;
+            return Status == "Approved";
+        }
 
-            var ageInDays = GetAgeInDays();
-            var daysUntilClose = GetDaysUntilClose();
-            
-            // Simple probability calculation based on deal age and time to close
-            var ageFactor = Math.Max(0, 1 - (ageInDays / 30.0m)); // Decreases over 30 days
-            var timeFactor = Math.Max(0, 1 - (Math.Abs(daysUntilClose) / 14.0m)); // Better if close to expected date
-            
-            return Math.Min(100, (ageFactor + timeFactor) * 50); // Max 100%
+        /// <summary>
+        /// Determines if the deal is rejected
+        /// </summary>
+        public bool IsRejected()
+        {
+            return Status == "Rejected";
+        }
+
+        /// <summary>
+        /// Determines if the deal is completed
+        /// </summary>
+        public bool IsCompleted()
+        {
+            return Status == "Completed";
+        }
+
+        /// <summary>
+        /// Determines if the deal is closed
+        /// </summary>
+        public bool IsClosed()
+        {
+            return Status == "Closed";
+        }
+
+        /// <summary>
+        /// Determines if the deal is lost
+        /// </summary>
+        public bool IsLost()
+        {
+            return Status == "Lost";
+        }
+
+        /// <summary>
+        /// Updates the deal value
+        /// </summary>
+        public void UpdateValue(decimal newValue)
+        {
+            Value = newValue;
+        }
+
+        /// <summary>
+        /// Updates the expected close date
+        /// </summary>
+        public void UpdateExpectedCloseDate(DateTime? expectedDate)
+        {
+            ExpectedCloseDate = expectedDate;
+        }
+
+        /// <summary>
+        /// Updates contact information
+        /// </summary>
+        public void UpdateContactInfo(string? person, string? phone, string? email)
+        {
+            if (!string.IsNullOrEmpty(person)) ContactPerson = person;
+            if (!string.IsNullOrEmpty(phone)) ContactPhone = phone;
+            if (!string.IsNullOrEmpty(email)) ContactEmail = email;
         }
         #endregion
     }

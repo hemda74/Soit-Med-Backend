@@ -105,6 +105,20 @@ src/
 
 ## API Service Layer Integration
 
+### ⚠️ IMPORTANT: Recent Production Updates
+
+The backend now includes these production enhancements:
+
+- **Pagination**: All list endpoints return paged results
+- **Rate Limiting**: Global 100 req/min, API 200 req/min, Auth 10 req/min
+- **Production Logging**: Reduced verbosity, only warnings/errors
+
+**Key Changes:**
+
+- List endpoints now return `PagedResult<T>` objects
+- Handle 429 (Too Many Requests) errors for rate limiting
+- Client search already supports pagination with `page` and `pageSize` parameters
+
 ### 1. Base API Service
 
 Add this service to your existing services in `src/services/salesApiService.js`:
@@ -149,6 +163,22 @@ class SalesApiService {
 					// Navigate to login screen
 					// You can use your existing navigation method here
 				}
+				// Handle rate limiting (429 errors)
+				if (error.response?.status === 429) {
+					const retryAfter =
+						error.response.headers[
+							'retry-after'
+						] || '60';
+					console.warn(
+						`Rate limit exceeded. Retry after ${retryAfter} seconds`
+					);
+					// Import and use Alert from react-native
+					// Alert.alert(
+					// 	'Too Many Requests',
+					// 	`Please wait ${retryAfter} seconds before trying again.`,
+					// 	[{ text: 'OK' }]
+					// );
+				}
 				return Promise.reject(error);
 			}
 		);
@@ -188,9 +218,8 @@ import salesApiService from './salesApiService';
 class SalesApiService {
 	// ==================== CLIENT MANAGEMENT ====================
 
-	async searchClients(query, filters = {}) {
-		const params = { query, ...filters };
-		return await salesApiService.get('/Client/search', params);
+	async searchClients(searchDto) {
+		return await salesApiService.get('/Client/search', searchDto);
 	}
 
 	async createClient(clientData) {
@@ -227,14 +256,28 @@ class SalesApiService {
 		return await salesApiService.get('/Client/statistics');
 	}
 
+	async getClientProfile(clientId) {
+		return await salesApiService.get(`/Client/${clientId}/profile`);
+	}
+
+	async getClientHistory(clientId, filters = {}) {
+		return await salesApiService.get(
+			`/Client/${clientId}/history`,
+			filters
+		);
+	}
+
 	// ==================== WEEKLY PLANNING ====================
 
 	async createWeeklyPlan(planData) {
 		return await salesApiService.post('/WeeklyPlan', planData);
 	}
 
-	async getWeeklyPlans(filters = {}) {
-		return await salesApiService.get('/WeeklyPlan', filters);
+	async getWeeklyPlans(page = 1, pageSize = 20) {
+		return await salesApiService.get('/WeeklyPlan', {
+			page,
+			pageSize,
+		});
 	}
 
 	async getWeeklyPlan(planId) {
@@ -254,17 +297,10 @@ class SalesApiService {
 		);
 	}
 
-	async approveWeeklyPlan(planId, notes = '') {
+	async reviewWeeklyPlan(planId, reviewData) {
 		return await salesApiService.post(
-			`/WeeklyPlan/${planId}/approve`,
-			{ notes }
-		);
-	}
-
-	async rejectWeeklyPlan(planId, reason = '') {
-		return await salesApiService.post(
-			`/WeeklyPlan/${planId}/reject`,
-			{ reason }
+			`/WeeklyPlan/${planId}/review`,
+			reviewData
 		);
 	}
 
@@ -454,6 +490,240 @@ class SalesApiService {
 }
 
 export default new SalesApiService();
+```
+
+### 3. Pagination Helper
+
+Add this helper to handle paginated API responses in `src/utils/pagination.js`:
+
+```javascript
+/**
+ * PagedResult structure from backend
+ * {
+ *   items: [...],
+ *   totalCount: 150,
+ *   page: 1,
+ *   pageSize: 20,
+ *   totalPages: 8,
+ *   hasPrevious: false,
+ *   hasNext: true
+ * }
+ */
+
+export const extractPaginatedData = (response) => {
+	if (response.data && response.data.items) {
+		// PagedResult format
+		return {
+			items:
+				response.data.items ||
+				response.data.data?.items ||
+				[],
+			pagination: {
+				page:
+					response.data.page ||
+					response.data.data?.page ||
+					1,
+				pageSize:
+					response.data.pageSize ||
+					response.data.data?.pageSize ||
+					20,
+				totalCount:
+					response.data.totalCount ||
+					response.data.data?.totalCount ||
+					0,
+				totalPages:
+					response.data.totalPages ||
+					response.data.data?.totalPages ||
+					0,
+				hasPrevious:
+					response.data.hasPrevious ||
+					response.data.data?.hasPrevious ||
+					false,
+				hasNext:
+					response.data.hasNext ||
+					response.data.data?.hasNext ||
+					false,
+			},
+		};
+	}
+	// Non-paginated format
+	return {
+		items: Array.isArray(response.data)
+			? response.data
+			: [response.data],
+		pagination: null,
+	};
+};
+
+export const createPaginationParams = (
+	page = 1,
+	pageSize = 20,
+	filters = {}
+) => {
+	return {
+		page,
+		pageSize,
+		...filters,
+	};
+};
+```
+
+### 4. Pagination Component
+
+Add this component to handle pagination in React Native in `src/components/common/Pagination.jsx`:
+
+```jsx
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+
+const Pagination = ({ pagination, onPageChange }) => {
+	if (!pagination || pagination.totalPages <= 1) return null;
+
+	return (
+		<View style={styles.container}>
+			<View style={styles.infoContainer}>
+				<Text style={styles.infoText}>
+					Showing{' '}
+					{(pagination.page - 1) *
+						pagination.pageSize +
+						1}{' '}
+					to{' '}
+					{Math.min(
+						pagination.page *
+							pagination.pageSize,
+						pagination.totalCount
+					)}{' '}
+					of {pagination.totalCount} results
+				</Text>
+			</View>
+
+			<View style={styles.buttonsContainer}>
+				<TouchableOpacity
+					onPress={() =>
+						onPageChange(
+							pagination.page - 1
+						)
+					}
+					disabled={!pagination.hasPrevious}
+					style={[
+						styles.button,
+						!pagination.hasPrevious &&
+							styles.buttonDisabled,
+					]}
+				>
+					<Icon
+						name="chevron-left"
+						size={20}
+						color={
+							pagination.hasPrevious
+								? '#2196F3'
+								: '#ccc'
+						}
+					/>
+					<Text
+						style={[
+							styles.buttonText,
+							!pagination.hasPrevious &&
+								styles.buttonTextDisabled,
+						]}
+					>
+						Previous
+					</Text>
+				</TouchableOpacity>
+
+				<TouchableOpacity
+					onPress={() =>
+						onPageChange(
+							pagination.page + 1
+						)
+					}
+					disabled={!pagination.hasNext}
+					style={[
+						styles.button,
+						!pagination.hasNext &&
+							styles.buttonDisabled,
+					]}
+				>
+					<Text
+						style={[
+							styles.buttonText,
+							!pagination.hasNext &&
+								styles.buttonTextDisabled,
+						]}
+					>
+						Next
+					</Text>
+					<Icon
+						name="chevron-right"
+						size={20}
+						color={
+							pagination.hasNext
+								? '#2196F3'
+								: '#ccc'
+						}
+					/>
+				</TouchableOpacity>
+			</View>
+
+			<Text style={styles.pageInfo}>
+				Page {pagination.page} of{' '}
+				{pagination.totalPages}
+			</Text>
+		</View>
+	);
+};
+
+const styles = StyleSheet.create({
+	container: {
+		padding: 16,
+		borderTopWidth: 1,
+		borderTopColor: '#e0e0e0',
+	},
+	infoContainer: {
+		marginBottom: 12,
+		alignItems: 'center',
+	},
+	infoText: {
+		fontSize: 14,
+		color: '#666',
+	},
+	buttonsContainer: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		marginBottom: 8,
+	},
+	button: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 8,
+		paddingHorizontal: 16,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#2196F3',
+	},
+	buttonDisabled: {
+		borderColor: '#ccc',
+	},
+	buttonText: {
+		marginLeft: 4,
+		marginRight: 4,
+		fontSize: 16,
+		color: '#2196F3',
+		fontWeight: '600',
+	},
+	buttonTextDisabled: {
+		color: '#ccc',
+	},
+	pageInfo: {
+		textAlign: 'center',
+		fontSize: 14,
+		color: '#666',
+		fontWeight: '600',
+	},
+});
+
+export default Pagination;
 ```
 
 ## State Management Integration
@@ -1664,6 +1934,126 @@ const styles = StyleSheet.create({
 export default ClientDetails;
 ```
 
+## Using Pagination and Handling Rate Limits
+
+### Example: Client List with Pagination
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+	View,
+	Text,
+	FlatList,
+	ActivityIndicator,
+	TextInput,
+} from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { searchClients } from '../store/slices/clientSlice';
+import Pagination from '../components/common/Pagination';
+import { Alert } from 'react-native';
+
+const ClientList = () => {
+	const dispatch = useDispatch();
+	const [page, setPage] = useState(1);
+	const [searchTerm, setSearchTerm] = useState('');
+	const { clients, pagination, loading, error } = useSelector(
+		(state) => state.clients
+	);
+
+	useEffect(() => {
+		// Fetch with pagination
+		dispatch(
+			searchClients({ query: searchTerm, page, pageSize: 20 })
+		);
+	}, [dispatch, searchTerm, page]);
+
+	// Handle rate limiting
+	useEffect(() => {
+		if (error?.response?.status === 429) {
+			Alert.alert(
+				'Too Many Requests',
+				'Please wait a moment before trying again.',
+				[{ text: 'OK' }]
+			);
+		}
+	}, [error]);
+
+	const handlePageChange = (newPage) => {
+		setPage(newPage);
+	};
+
+	const renderClient = ({ item }) => (
+		<View
+			style={{
+				padding: 16,
+				borderBottomWidth: 1,
+				borderBottomColor: '#e0e0e0',
+			}}
+		>
+			<Text style={{ fontSize: 16, fontWeight: '600' }}>
+				{item.name}
+			</Text>
+			<Text style={{ fontSize: 14, color: '#666' }}>
+				{item.type} • {item.specialization}
+			</Text>
+		</View>
+	);
+
+	return (
+		<View style={{ flex: 1 }}>
+			{/* Search input */}
+			<TextInput
+				value={searchTerm}
+				onChangeText={(text) => {
+					setSearchTerm(text);
+					setPage(1); // Reset to first page on new search
+				}}
+				placeholder="Search clients..."
+				style={{
+					height: 40,
+					borderWidth: 1,
+					borderColor: '#ccc',
+					margin: 16,
+					paddingHorizontal: 12,
+				}}
+			/>
+
+			{/* Client list */}
+			{loading ? (
+				<View
+					style={{
+						flex: 1,
+						justifyContent: 'center',
+						alignItems: 'center',
+					}}
+				>
+					<ActivityIndicator
+						size="large"
+						color="#2196F3"
+					/>
+				</View>
+			) : (
+				<FlatList
+					data={clients}
+					renderItem={renderClient}
+					keyExtractor={(item) =>
+						item.id.toString()
+					}
+				/>
+			)}
+
+			{/* Pagination component */}
+			<Pagination
+				pagination={pagination}
+				onPageChange={handlePageChange}
+			/>
+		</View>
+	);
+};
+
+export default ClientList;
+```
+
 ## Integration Steps Summary
 
 ### Step 1: Install Dependencies
@@ -1719,4 +2109,3 @@ This integration guide provides everything needed to add a complete sales module
 - **Native mobile features** like push notifications and offline support
 
 The integration follows React Native best practices and can be added to any existing React Native application without disrupting current functionality.
-

@@ -48,6 +48,11 @@ namespace SoitMed.DTO
         [MaxLength(50)]
         public string Priority { get; set; } = "Medium";
 
+        [MaxLength(10)]
+        public string? Classification { get; set; }
+
+        public int? Rating { get; set; }
+
         public decimal? PotentialValue { get; set; }
 
         [MaxLength(200)]
@@ -166,6 +171,8 @@ namespace SoitMed.DTO
         public string? Notes { get; set; }
         public string Status { get; set; } = string.Empty;
         public string Priority { get; set; } = string.Empty;
+        public string? Classification { get; set; }
+        public int? Rating { get; set; }
         public decimal? PotentialValue { get; set; }
         public string? ContactPerson { get; set; }
         public string? ContactPersonPhone { get; set; }

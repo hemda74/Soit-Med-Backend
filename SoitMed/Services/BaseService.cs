@@ -1,4 +1,5 @@
 using SoitMed.Repositories;
+using SoitMed.Common;
 
 namespace SoitMed.Services
 {

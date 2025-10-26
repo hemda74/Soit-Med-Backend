@@ -30,7 +30,12 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet("search")]
-        public async Task<IActionResult> SearchClients([FromQuery] SearchClientDTO searchDto)
+        public async Task<IActionResult> SearchClients(
+            [FromQuery] string? searchTerm = null,
+            [FromQuery] string? status = null,
+            [FromQuery] string? priority = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
             try
             {
@@ -38,16 +43,21 @@ namespace SoitMed.Controllers
                 if (currentUser == null)
                     return Unauthorized(CreateErrorResponse("غير مصرح لك"));
 
+                // Map query parameters to SearchClientDTO
+                var searchDto = new SearchClientDTO
+                {
+                    Query = searchTerm ?? string.Empty,
+                    Page = page,
+                    PageSize = pageSize
+                };
+
                 // Validate search parameters
                 var validationResult = _validationService.ValidateClientSearch(searchDto);
                 if (!validationResult.IsValid)
                     return BadRequest(CreateErrorResponse(string.Join(", ", validationResult.Errors)));
 
                 var result = await _clientService.SearchClientsAsync(searchDto, currentUser.Id);
-                if (!result.IsSuccess)
-                    return BadRequest(CreateErrorResponse(result.ErrorMessage));
-
-                return Ok(CreateSuccessResponse(result.Data));
+                return Ok(CreateSuccessResponse(result));
             }
             catch (Exception ex)
             {
@@ -71,11 +81,8 @@ namespace SoitMed.Controllers
                     return BadRequest(CreateErrorResponse(string.Join(", ", validationResult.Errors)));
 
                 var result = await _clientService.CreateClientAsync(createDto, currentUser.Id);
-                if (!result.IsSuccess)
-                    return BadRequest(CreateErrorResponse(result.ErrorMessage));
-
-                return CreatedAtAction(nameof(GetClient), new { id = result.Data!.Id }, 
-                    CreateSuccessResponse(result.Data));
+                return CreatedAtAction(nameof(GetClient), new { id = result.Id }, 
+                    CreateSuccessResponse(result));
             }
             catch (Exception ex)
             {
@@ -93,15 +100,11 @@ namespace SoitMed.Controllers
                 if (currentUser == null)
                     return Unauthorized(CreateErrorResponse("غير مصرح لك"));
 
-                var result = await _clientService.GetClientAsync(id, currentUser.Id);
-                if (!result.IsSuccess)
-                {
-                    return result.ErrorCode == "CLIENT_NOT_FOUND" 
-                        ? NotFound(CreateErrorResponse(result.ErrorMessage))
-                        : BadRequest(CreateErrorResponse(result.ErrorMessage));
-                }
+                var result = await _clientService.GetClientAsync(id);
+                if (result == null)
+                    return NotFound(CreateErrorResponse("العميل غير موجود"));
 
-                return Ok(CreateSuccessResponse(result.Data));
+                return Ok(CreateSuccessResponse(result));
             }
             catch (Exception ex)
             {
@@ -124,17 +127,32 @@ namespace SoitMed.Controllers
                 if (!validationResult.IsValid)
                     return BadRequest(CreateErrorResponse(string.Join(", ", validationResult.Errors)));
 
-                var result = await _clientService.UpdateClientAsync(id, updateDto, currentUser.Id);
-                if (!result.IsSuccess)
+                // Convert UpdateClientDTO to CreateClientDTO
+                var createDto = new CreateClientDTO
                 {
-                    return result.ErrorCode == "CLIENT_NOT_FOUND" 
-                        ? NotFound(CreateErrorResponse(result.ErrorMessage))
-                        : result.ErrorCode == "ACCESS_DENIED"
-                        ? Forbid()
-                        : BadRequest(CreateErrorResponse(result.ErrorMessage));
-                }
+                    Name = updateDto.Name,
+                    Type = updateDto.Type,
+                    Specialization = updateDto.Specialization,
+                    Location = updateDto.Location,
+                    Phone = updateDto.Phone,
+                    Email = updateDto.Email,
+                    Website = updateDto.Website,
+                    Address = updateDto.Address,
+                    City = updateDto.City,
+                    Governorate = updateDto.Governorate,
+                    PostalCode = updateDto.PostalCode,
+                    Notes = updateDto.Notes,
+                    Status = updateDto.Status,
+                    Priority = updateDto.Priority,
+                    PotentialValue = updateDto.PotentialValue,
+                    ContactPerson = updateDto.ContactPerson,
+                    ContactPersonPhone = updateDto.ContactPersonPhone,
+                    ContactPersonEmail = updateDto.ContactPersonEmail,
+                    ContactPersonPosition = updateDto.ContactPersonPosition
+                };
 
-                return Ok(CreateSuccessResponse(result.Data));
+                var result = await _clientService.UpdateClientAsync(id, createDto, currentUser.Id);
+                return Ok(CreateSuccessResponse(result));
             }
             catch (Exception ex)
             {
@@ -158,10 +176,7 @@ namespace SoitMed.Controllers
                     return BadRequest(CreateErrorResponse(string.Join(", ", validationResult.Errors)));
 
                 var result = await _clientService.FindOrCreateClientAsync(findDto, currentUser.Id);
-                if (!result.IsSuccess)
-                    return BadRequest(CreateErrorResponse(result.ErrorMessage));
-
-                return Ok(CreateSuccessResponse(result.Data));
+                return Ok(CreateSuccessResponse(result));
             }
             catch (Exception ex)
             {
@@ -183,11 +198,8 @@ namespace SoitMed.Controllers
                 if (page < 1 || pageSize < 1 || pageSize > 100)
                     return BadRequest(CreateErrorResponse("معاملات الصفحة غير صحيحة"));
 
-                var result = await _clientService.GetMyClientsAsync(currentUser.Id, page, pageSize);
-                if (!result.IsSuccess)
-                    return BadRequest(CreateErrorResponse(result.ErrorMessage));
-
-                return Ok(CreateSuccessResponse(result.Data));
+                var result = await _clientService.GetMyClientsAsync(currentUser.Id);
+                return Ok(CreateSuccessResponse(result));
             }
             catch (Exception ex)
             {
@@ -206,10 +218,7 @@ namespace SoitMed.Controllers
                     return Unauthorized(CreateErrorResponse("غير مصرح لك"));
 
                 var result = await _clientService.GetClientsNeedingFollowUpAsync(currentUser.Id);
-                if (!result.IsSuccess)
-                    return BadRequest(CreateErrorResponse(result.ErrorMessage));
-
-                return Ok(CreateSuccessResponse(result.Data));
+                return Ok(CreateSuccessResponse(result));
             }
             catch (Exception ex)
             {
@@ -228,15 +237,43 @@ namespace SoitMed.Controllers
                     return Unauthorized(CreateErrorResponse("غير مصرح لك"));
 
                 var result = await _clientService.GetClientStatisticsAsync(currentUser.Id);
-                if (!result.IsSuccess)
-                    return BadRequest(CreateErrorResponse(result.ErrorMessage));
-
-                return Ok(CreateSuccessResponse(result.Data));
+                return Ok(CreateSuccessResponse(result));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting client statistics");
                 return StatusCode(500, CreateErrorResponse("حدث خطأ في جلب إحصائيات العملاء"));
+            }
+        }
+
+        /// <summary>
+        /// Get complete client profile with history (NEW - matches plan)
+        /// </summary>
+        [HttpGet("{id}/profile")]
+        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        public async Task<IActionResult> GetClientProfile(long id)
+        {
+            try
+            {
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(CreateErrorResponse("غير مصرح لك"));
+
+                var result = await _clientService.GetClientProfileAsync(id, currentUser.Id);
+                if (result == null)
+                    return NotFound(CreateErrorResponse("العميل غير موجود"));
+
+                return Ok(CreateSuccessResponse(result, "Client profile retrieved successfully"));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access to client profile");
+                return Forbid();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting client profile for client {ClientId}", id);
+                return StatusCode(500, CreateErrorResponse("حدث خطأ في جلب ملف العميل"));
             }
         }
     }
