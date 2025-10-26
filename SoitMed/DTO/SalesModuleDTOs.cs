@@ -190,6 +190,106 @@ namespace SoitMed.DTO
         public DateTime ValidUntil { get; set; }
     }
 
+    // ==================== Enhanced Offer DTOs ====================
+    
+    // Equipment DTOs
+    public class OfferEquipmentDTO
+    {
+        public long Id { get; set; }
+        public long OfferId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Model { get; set; }
+        public string? Provider { get; set; }
+        public string? Country { get; set; }
+        public string? ImagePath { get; set; }
+        public decimal Price { get; set; }
+        public string? Description { get; set; }
+    }
+
+    public class CreateOfferEquipmentDTO
+    {
+        [Required]
+        [MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+        
+        [MaxLength(100)]
+        public string? Model { get; set; }
+        
+        [MaxLength(100)]
+        public string? Provider { get; set; }
+        
+        [MaxLength(100)]
+        public string? Country { get; set; }
+        
+        [Required]
+        [Range(0.01, double.MaxValue)]
+        public decimal Price { get; set; }
+        
+        [MaxLength(500)]
+        public string? Description { get; set; }
+    }
+
+    // Terms DTOs
+    public class OfferTermsDTO
+    {
+        public long Id { get; set; }
+        public long OfferId { get; set; }
+        public string? WarrantyPeriod { get; set; }
+        public string? DeliveryTime { get; set; }
+        public string? MaintenanceTerms { get; set; }
+        public string? OtherTerms { get; set; }
+    }
+
+    public class CreateOfferTermsDTO
+    {
+        [MaxLength(500)]
+        public string? WarrantyPeriod { get; set; }
+        
+        [MaxLength(500)]
+        public string? DeliveryTime { get; set; }
+        
+        [MaxLength(2000)]
+        public string? MaintenanceTerms { get; set; }
+        
+        [MaxLength(2000)]
+        public string? OtherTerms { get; set; }
+    }
+
+    // Installment Plan DTOs
+    public class InstallmentPlanDTO
+    {
+        public long Id { get; set; }
+        public long OfferId { get; set; }
+        public int InstallmentNumber { get; set; }
+        public decimal Amount { get; set; }
+        public DateTime DueDate { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? Notes { get; set; }
+    }
+
+    public class CreateInstallmentPlanDTO
+    {
+        [Required]
+        public int NumberOfInstallments { get; set; }
+        
+        [Required]
+        public DateTime StartDate { get; set; }
+        
+        [MaxLength(50)]
+        public string PaymentFrequency { get; set; } = "Monthly"; // Monthly, Weekly, Quarterly
+    }
+
+    // Enhanced Offer DTOs
+    public class EnhancedOfferResponseDTO : OfferResponseDTO
+    {
+        public string? PaymentType { get; set; }
+        public decimal? FinalPrice { get; set; }
+        public string? OfferDuration { get; set; }
+        public List<OfferEquipmentDTO> Equipment { get; set; } = new();
+        public OfferTermsDTO? Terms { get; set; }
+        public List<InstallmentPlanDTO> Installments { get; set; } = new();
+    }
+
     // ==================== Deal DTOs ====================
     public class CreateDealDTO
     {

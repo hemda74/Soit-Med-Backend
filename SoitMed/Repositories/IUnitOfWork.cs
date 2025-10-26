@@ -52,6 +52,11 @@ namespace SoitMed.Repositories
         IOfferRequestRepository OfferRequests { get; }
         ISalesOfferRepository SalesOffers { get; }
         ISalesDealRepository SalesDeals { get; }
+        
+        // Enhanced offer repositories
+        IOfferEquipmentRepository OfferEquipment { get; }
+        IOfferTermsRepository OfferTerms { get; }
+        IInstallmentPlanRepository InstallmentPlans { get; }
 
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

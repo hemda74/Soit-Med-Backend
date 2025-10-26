@@ -9,6 +9,13 @@ namespace SoitMed.Repositories
         {
         }
 
+        public override async Task<WeeklyPlan?> GetByIdAsync(object id, CancellationToken cancellationToken = default)
+        {
+            return await _context.WeeklyPlans
+                .Include(p => p.Tasks)
+                .FirstOrDefaultAsync(p => p.Id == (long)id, cancellationToken);
+        }
+
         public async Task<IEnumerable<WeeklyPlan>> GetEmployeePlansAsync(string employeeId, int page = 1, int pageSize = 20)
         {
             return await _context.WeeklyPlans

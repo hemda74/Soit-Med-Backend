@@ -40,6 +40,15 @@ namespace SoitMed.Models
         
         [Required]
         public DateTime ValidUntil { get; set; }
+        
+        [MaxLength(50)]
+        public string? PaymentType { get; set; } // Cash, Installments, Other
+        
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? FinalPrice { get; set; }
+        
+        [MaxLength(200)]
+        public string? OfferDuration { get; set; }
         #endregion
 
         #region Status and Workflow
@@ -67,6 +76,9 @@ namespace SoitMed.Models
         public virtual ApplicationUser Creator { get; set; } = null!;
         public virtual ApplicationUser Salesman { get; set; } = null!;
         public virtual SalesDeal? Deal { get; set; }
+        public virtual ICollection<OfferEquipment> Equipment { get; set; } = new List<OfferEquipment>();
+        public virtual OfferTerms? Terms { get; set; }
+        public virtual ICollection<InstallmentPlan> InstallmentPlans { get; set; } = new List<InstallmentPlan>();
         #endregion
 
         #region Business Logic Methods
