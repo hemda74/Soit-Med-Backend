@@ -55,38 +55,38 @@ The Weekly Plan module is the foundation of the sales workflow. Sales employees 
 
 ### WeeklyPlans Table
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `Id` | bigint | Auto-generated plan ID |
-| `EmployeeId` | nvarchar(450) | Sales employee who created plan |
-| `WeekStartDate` | date | Week start date |
-| `WeekEndDate` | date | Week end date |
-| `Title` | nvarchar(200) | Plan title |
-| `Description` | nvarchar(1000) | Plan description |
-| `IsActive` | bit | Whether plan is currently active |
-| `Rating` | int | Manager rating (1-5) |
-| `ManagerComment` | nvarchar(1000) | Manager review comment |
-| `ManagerReviewedAt` | datetime2 | Review timestamp |
-| `ReviewedBy` | nvarchar(450) | Manager who reviewed |
-| `CreatedAt` | datetime2 | Creation timestamp |
-| `UpdatedAt` | datetime2 | Update timestamp |
+| Column              | Type           | Description                      |
+| ------------------- | -------------- | -------------------------------- |
+| `Id`                | bigint         | Auto-generated plan ID           |
+| `EmployeeId`        | nvarchar(450)  | Sales employee who created plan  |
+| `WeekStartDate`     | date           | Week start date                  |
+| `WeekEndDate`       | date           | Week end date                    |
+| `Title`             | nvarchar(200)  | Plan title                       |
+| `Description`       | nvarchar(1000) | Plan description                 |
+| `IsActive`          | bit            | Whether plan is currently active |
+| `Rating`            | int            | Manager rating (1-5)             |
+| `ManagerComment`    | nvarchar(1000) | Manager review comment           |
+| `ManagerReviewedAt` | datetime2      | Review timestamp                 |
+| `ReviewedBy`        | nvarchar(450)  | Manager who reviewed             |
+| `CreatedAt`         | datetime2      | Creation timestamp               |
+| `UpdatedAt`         | datetime2      | Update timestamp                 |
 
 ### WeeklyPlanTasks Table
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `Id` | bigint | Auto-generated task ID |
-| `WeeklyPlanId` | bigint | Parent weekly plan |
-| `Title` | nvarchar(500) | Task title |
-| `TaskType` | nvarchar(50) | Visit, FollowUp, Call, Email, Meeting |
-| `ClientId` | bigint | Link to existing client |
-| `ClientStatus` | nvarchar(20) | "Old" or "New" |
-| `ClientName` | nvarchar(200) | For new clients |
-| `PlannedDate` | datetime2 | When task is planned |
-| `PlannedTime` | nvarchar(20) | Time (e.g., "10:00") |
-| `Purpose` | nvarchar(500) | Task purpose |
-| `Priority` | nvarchar(50) | High, Medium, Low |
-| `Status` | nvarchar(50) | Planned, InProgress, Completed, Cancelled |
+| Column         | Type          | Description                               |
+| -------------- | ------------- | ----------------------------------------- |
+| `Id`           | bigint        | Auto-generated task ID                    |
+| `WeeklyPlanId` | bigint        | Parent weekly plan                        |
+| `Title`        | nvarchar(500) | Task title                                |
+| `TaskType`     | nvarchar(50)  | Visit, FollowUp, Call, Email, Meeting     |
+| `ClientId`     | bigint        | Link to existing client                   |
+| `ClientStatus` | nvarchar(20)  | "Old" or "New"                            |
+| `ClientName`   | nvarchar(200) | For new clients                           |
+| `PlannedDate`  | datetime2     | When task is planned                      |
+| `PlannedTime`  | nvarchar(20)  | Time (e.g., "10:00")                      |
+| `Purpose`      | nvarchar(500) | Task purpose                              |
+| `Priority`     | nvarchar(50)  | High, Medium, Low                         |
+| `Status`       | nvarchar(50)  | Planned, InProgress, Completed, Cancelled |
 
 ---
 
@@ -100,6 +100,7 @@ Authorization: Bearer {token}
 ```
 
 **Returns**:
+
 ```json
 {
   "success": true,
@@ -224,36 +225,36 @@ Weekly Plan
 
 ```typescript
 interface WeeklyPlan {
-  id: number;
-  title: string;
-  weekStartDate: string;
-  weekEndDate: string;
-  isActive: boolean;
-  rating?: number;
-  tasks: WeeklyPlanTask[];
+	id: number;
+	title: string;
+	weekStartDate: string;
+	weekEndDate: string;
+	isActive: boolean;
+	rating?: number;
+	tasks: WeeklyPlanTask[];
 }
 
 interface WeeklyPlanTask {
-  id: number;
-  title: string;
-  taskType: string;
-  clientName?: string;
-  status: string;
-  priority: string;
-  plannedDate?: string;
+	id: number;
+	title: string;
+	taskType: string;
+	clientName?: string;
+	status: string;
+	priority: string;
+	plannedDate?: string;
 }
 
 // Fetch weekly plans
 const fetchWeeklyPlans = async (page = 1, pageSize = 20) => {
-  const response = await fetch(
-    `/api/weeklyplan?page=${page}&pageSize=${pageSize}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    }
-  );
-  return response.json();
+	const response = await fetch(
+		`/api/weeklyplan?page=${page}&pageSize=${pageSize}`,
+		{
+			headers: {
+				Authorization: `Bearer ${token}`,
+			},
+		}
+	);
+	return response.json();
 };
 ```
 
@@ -277,7 +278,7 @@ const WeeklyPlanForm = ({ onSubmit, initialData }) => {
       },
       body: JSON.stringify(formData)
     });
-    
+
     if (response.ok) {
       onSubmit(await response.json());
     }
@@ -299,28 +300,31 @@ const WeeklyPlanForm = ({ onSubmit, initialData }) => {
 
 ```typescript
 const TaskProgressList = ({ tasks }) => {
-  return (
-    <List>
-      {tasks.map(task => (
-        <TaskCard key={task.id} task={task} />
-      ))}
-    </List>
-  );
+	return (
+		<List>
+			{tasks.map((task) => (
+				<TaskCard
+					key={task.id}
+					task={task}
+				/>
+			))}
+		</List>
+	);
 };
 
 const TaskCard = ({ task }) => {
-  return (
-    <Card>
-      <Title>{task.title}</Title>
-      <Badge status={task.status}>{task.status}</Badge>
-      <Badge priority={task.priority}>{task.priority}</Badge>
-      <Text>Client: {task.clientName || 'New Client'}</Text>
-      <Text>Date: {task.plannedDate}</Text>
-      <Button onClick={() => recordProgress(task.id)}>
-        Record Progress
-      </Button>
-    </Card>
-  );
+	return (
+		<Card>
+			<Title>{task.title}</Title>
+			<Badge status={task.status}>{task.status}</Badge>
+			<Badge priority={task.priority}>{task.priority}</Badge>
+			<Text>Client: {task.clientName || 'New Client'}</Text>
+			<Text>Date: {task.plannedDate}</Text>
+			<Button onClick={() => recordProgress(task.id)}>
+				Record Progress
+			</Button>
+		</Card>
+	);
 };
 ```
 
@@ -337,6 +341,7 @@ const TaskCard = ({ task }) => {
 ### Available Data
 
 **Current Database Status:**
+
 - 13 Weekly Plans (various states: Active, Submitted, Reviewed)
 - Multiple Tasks per plan (40+ total tasks)
 - Task Progress entries with client interactions
@@ -345,6 +350,7 @@ const TaskCard = ({ task }) => {
 - 3 Sales Deals (Pending, Approved, Completed)
 
 **Sample Plans:**
+
 - Plan #41: Active plan for next week (3 tasks)
 - Plan #34: Active plan with 2 tasks (1 completed, 1 pending)
 - Plan #38: Current week plan (active)
@@ -386,41 +392,44 @@ curl -X POST "http://localhost:5117/api/weeklyplan" \
 
 ## Complete Endpoint Summary
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/api/weeklyplan` | GET | All | Get all plans (paginated) |
-| `/api/weeklyplan` | POST | All | Create new plan |
-| `/api/weeklyplan/{id}` | GET | All | Get specific plan |
-| `/api/weeklyplan/{id}` | PUT | All | Update plan |
-| `/api/weeklyplan/{id}/submit` | POST | All | Submit for review |
-| `/api/weeklyplan/{id}/review` | POST | Manager | Review and rate |
-| `/api/weeklyplan/current` | GET | All | Get current active plan |
+| Endpoint                      | Method | Auth    | Description               |
+| ----------------------------- | ------ | ------- | ------------------------- |
+| `/api/weeklyplan`             | GET    | All     | Get all plans (paginated) |
+| `/api/weeklyplan`             | POST   | All     | Create new plan           |
+| `/api/weeklyplan/{id}`        | GET    | All     | Get specific plan         |
+| `/api/weeklyplan/{id}`        | PUT    | All     | Update plan               |
+| `/api/weeklyplan/{id}/submit` | POST   | All     | Submit for review         |
+| `/api/weeklyplan/{id}/review` | POST   | Manager | Review and rate           |
+| `/api/weeklyplan/current`     | GET    | All     | Get current active plan   |
 
 ---
 
 ## Error Handling
 
 ### 401 Unauthorized
+
 ```json
 {
-  "success": false,
-  "message": "Unauthorized access"
+	"success": false,
+	"message": "Unauthorized access"
 }
 ```
 
 ### 404 Not Found
+
 ```json
 {
-  "success": false,
-  "message": "Weekly plan not found"
+	"success": false,
+	"message": "Weekly plan not found"
 }
 ```
 
 ### 400 Bad Request
+
 ```json
 {
-  "success": false,
-  "message": "Week end date must be after start date"
+	"success": false,
+	"message": "Week end date must be after start date"
 }
 ```
 
@@ -435,4 +444,3 @@ curl -X POST "http://localhost:5117/api/weeklyplan" \
 ---
 
 **End of Weekly Plan Complete Guide**
-

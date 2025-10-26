@@ -57,6 +57,11 @@ namespace SoitMed.Repositories
         private IOfferRequestRepository? _offerRequests;
         private ISalesOfferRepository? _salesOffers;
         private ISalesDealRepository? _salesDeals;
+        
+        // Enhanced offer repositories
+        private IOfferEquipmentRepository? _offerEquipment;
+        private IOfferTermsRepository? _offerTerms;
+        private IInstallmentPlanRepository? _installmentPlans;
 
         public UnitOfWork(Context context)
         {
@@ -157,6 +162,16 @@ namespace SoitMed.Repositories
 
         public ISalesDealRepository SalesDeals => 
             _salesDeals ??= new SalesDealRepository(_context);
+        
+        // Enhanced offer repositories
+        public IOfferEquipmentRepository OfferEquipment => 
+            _offerEquipment ??= new OfferEquipmentRepository(_context);
+
+        public IOfferTermsRepository OfferTerms => 
+            _offerTerms ??= new OfferTermsRepository(_context);
+
+        public IInstallmentPlanRepository InstallmentPlans => 
+            _installmentPlans ??= new InstallmentPlanRepository(_context);
 
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

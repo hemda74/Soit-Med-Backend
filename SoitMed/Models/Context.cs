@@ -61,6 +61,11 @@ namespace SoitMed.Models
         public DbSet<OfferRequest> OfferRequests { get; set; }
         public DbSet<SalesOffer> SalesOffers { get; set; }
         public DbSet<SalesDeal> SalesDeals { get; set; }
+        
+        // Enhanced offer entities
+        public DbSet<OfferEquipment> OfferEquipment { get; set; }
+        public DbSet<OfferTerms> OfferTerms { get; set; }
+        public DbSet<InstallmentPlan> InstallmentPlans { get; set; }
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -422,6 +427,25 @@ namespace SoitMed.Models
 
             modelBuilder.Entity<SalesDeal>()
                 .HasIndex(sd => new { sd.Status, sd.SuperAdminApprovedBy });
+
+            // Enhanced offer relationships
+            modelBuilder.Entity<OfferEquipment>()
+                .HasOne(oe => oe.Offer)
+                .WithMany(so => so.Equipment)
+                .HasForeignKey(oe => oe.OfferId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<OfferTerms>()
+                .HasOne(ot => ot.Offer)
+                .WithOne(so => so.Terms)
+                .HasForeignKey<OfferTerms>(ot => ot.OfferId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<InstallmentPlan>()
+                .HasOne(ip => ip.Offer)
+                .WithMany(so => so.InstallmentPlans)
+                .HasForeignKey(ip => ip.OfferId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }
