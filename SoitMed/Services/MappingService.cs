@@ -27,6 +27,8 @@ namespace SoitMed.Services
                 Notes = client.Notes,
                 Status = client.Status,
                 Priority = client.Priority,
+                Classification = client.Classification,
+                Rating = client.SatisfactionRating,
                 PotentialValue = client.PotentialValue,
                 ContactPerson = client.ContactPerson,
                 ContactPersonPhone = client.ContactPersonPhone,
@@ -77,9 +79,11 @@ namespace SoitMed.Services
                 Id = client.Id,
                 Name = client.Name,
                 Type = client.Type,
+                LastContactDate = client.LastContactDate,
                 NextContactDate = client.NextContactDate,
                 Priority = client.Priority,
-                Status = client.Status
+                Status = client.Status,
+                AssignedTo = client.AssignedTo
             };
         }
 
@@ -87,11 +91,12 @@ namespace SoitMed.Services
         {
             return new ClientStatisticsDTO
             {
-                MyClientsCount = 1, // This would be calculated differently in practice
-                TotalClientsCount = totalClientsCount,
-                ClientsByType = new List<ClientTypeCount> { new() { Type = client.Type, Count = 1 } },
-                ClientsByStatus = new List<ClientStatusCount> { new() { Status = client.Status, Count = 1 } },
-                ClientsByPriority = new List<ClientPriorityCount> { new() { Priority = client.Priority, Count = 1 } }
+                TotalVisits = 0, // This would be calculated from task progresses
+                TotalOffers = 0, // This would be calculated from offers
+                SuccessfulDeals = 0, // This would be calculated from deals
+                FailedDeals = 0, // This would be calculated from deals
+                TotalRevenue = 0, // This would be calculated from successful deals
+                AverageSatisfaction = null // This would be calculated from task progresses
             };
         }
     }

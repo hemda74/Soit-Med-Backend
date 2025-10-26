@@ -44,48 +44,78 @@ namespace SoitMed.Controllers
 
             try
             {
+                // Validate file first
+                if (!_imageUploadService.IsValidImageFile(profileImage))
+                {
+                    return (null, "Invalid image file. Please upload a valid JPG, JPEG, PNG, or GIF image (max 5MB).");
+                }
+
                 var imageResult = await _imageUploadService.UploadUserImageAsync(profileImage, user, role, departmentName, altText);
                 if (!imageResult.Success)
                 {
-                    // If upload fails, return error message
-                    return (null, imageResult.ErrorMessage);
+                    return (null, imageResult.ErrorMessage ?? "Failed to upload image");
                 }
 
-                // First, deactivate any existing profile images for this user
-                var existingProfileImages = await _unitOfWork.UserImages.GetAllAsync();
-                var userProfileImages = existingProfileImages
-                    .Where(ui => ui.UserId == user.Id && ui.IsProfileImage && ui.IsActive)
-                    .ToList();
-
-                foreach (var existingImage in userProfileImages)
+                // Handle database operations with proper error handling
+                try
                 {
-                    existingImage.IsActive = false;
-                    await _unitOfWork.UserImages.UpdateAsync(existingImage);
+                    // First, deactivate any existing profile images for this user
+                    var existingProfileImages = await _unitOfWork.UserImages.GetAllAsync();
+                    var userProfileImages = existingProfileImages
+                        .Where(ui => ui.UserId == user.Id && ui.IsProfileImage && ui.IsActive)
+                        .ToList();
+
+                    foreach (var existingImage in userProfileImages)
+                    {
+                        existingImage.IsActive = false;
+                        await _unitOfWork.UserImages.UpdateAsync(existingImage);
+                    }
+
+                    // Create new profile image
+                    var userImage = new UserImage
+                    {
+                        UserId = user.Id,
+                        FileName = imageResult.FileName ?? "profile.jpg",
+                        FilePath = imageResult.FilePath ?? "",
+                        ContentType = imageResult.ContentType ?? "image/jpeg",
+                        FileSize = imageResult.FileSize,
+                        AltText = imageResult.AltText,
+                        ImageType = "Profile",
+                        IsProfileImage = true,
+                        IsActive = true,
+                        UploadedAt = DateTime.UtcNow
+                    };
+
+                    await _unitOfWork.UserImages.CreateAsync(userImage);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    return (createImageInfoDelegate(userImage), null);
                 }
-
-                // Create new profile image
-                var userImage = new UserImage
+                catch (Exception dbEx)
                 {
-                    UserId = user.Id,
-                    FileName = imageResult.FileName ?? "profile.jpg",
-                    FilePath = imageResult.FilePath ?? "",
-                    ContentType = imageResult.ContentType ?? "image/jpeg",
-                    FileSize = imageResult.FileSize,
-                    AltText = imageResult.AltText,
-                    ImageType = "Profile",
-                    IsProfileImage = true,
-                    IsActive = true,
-                    UploadedAt = DateTime.UtcNow
-                };
-
-                await _unitOfWork.UserImages.CreateAsync(userImage);
-                await _unitOfWork.SaveChangesAsync();
-
-                return (createImageInfoDelegate(userImage), null);
+                    // If database operation fails, clean up the uploaded file
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(imageResult.FilePath))
+                        {
+                            var fullPath = Path.Combine(_environment.WebRootPath, imageResult.FilePath);
+                            if (System.IO.File.Exists(fullPath))
+                            {
+                                System.IO.File.Delete(fullPath);
+                            }
+                        }
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        // Log cleanup error but don't throw
+                        Console.WriteLine($"Failed to clean up file: {cleanupEx.Message}");
+                    }
+                    
+                    return (null, $"Database error: {dbEx.Message}");
+                }
             }
             catch (Exception ex)
             {
-                // Log the error and return error message
                 return (null, $"Error uploading image: {ex.Message}");
             }
         }
@@ -105,132 +135,144 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateDoctor([FromForm] CreateDoctorWithImageDTO doctorDTO, [FromForm] IFormFile? profileImage = null)
         {
-            if (!ModelState.IsValid)
+            try
             {
-                return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
-            }
-
-            // Check if hospital exists
-            var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(doctorDTO.HospitalId);
-            if (hospital == null)
-            {
-                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
-                    $"Hospital with ID '{doctorDTO.HospitalId}' not found. Please verify the hospital ID is correct.",
-                    "HospitalId",
-                    "HOSPITAL_NOT_FOUND"
-                ));
-            }
-
-            // Get Medical department
-            var medicalDepartment = await _unitOfWork.Departments.GetByNameAsync("Medical");
-            if (medicalDepartment == null)
-            {
-                return BadRequest(ValidationHelperService.CreateBusinessLogicError(
-                    "Medical department not found. Please ensure departments are seeded in the system.",
-                    "DepartmentId",
-                    "DEPARTMENT_NOT_FOUND"
-                ));
-            }
-
-            // Generate custom user ID
-            string customUserId = await userIdGenerationService.GenerateUserIdAsync(
-                doctorDTO.FirstName ?? "Unknown",
-                doctorDTO.LastName ?? "User",
-                UserRoles.Doctor,
-                doctorDTO.DepartmentId ?? medicalDepartment.Id,
-                doctorDTO.HospitalId
-            );
-
-            // Create user account
-            var user = new ApplicationUser
-            {
-                Id = customUserId, // Use custom generated ID
-                UserName = doctorDTO.Email, // Use email as username
-                Email = doctorDTO.Email,
-                FirstName = doctorDTO.FirstName,
-                LastName = doctorDTO.LastName,
-                PhoneNumber = doctorDTO.PhoneNumber,
-                DepartmentId = doctorDTO.DepartmentId ?? medicalDepartment.Id,
-                CreatedAt = DateTime.UtcNow,
-                IsActive = true
-            };
-
-            var result = await userManager.CreateAsync(user, doctorDTO.Password);
-            if (!result.Succeeded)
-            {
-                var identityErrors = result.Errors.Select(e => e.Description).ToList();
-                return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
-                    new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
-                    "User creation failed. Please check the following issues:"
-                ));
-            }
-
-            // Assign Doctor role
-            await userManager.AddToRoleAsync(user, UserRoles.Doctor);
-
-            // Create Doctor entity
-            var doctor = new Doctor
-            {
-                Name = $"{doctorDTO.FirstName} {doctorDTO.LastName}".Trim(),
-                Specialty = doctorDTO.Specialty,
-                UserId = user.Id,
-                HospitalId = doctorDTO.HospitalId,
-                CreatedAt = DateTime.UtcNow,
-                IsActive = true
-            };
-
-            await _unitOfWork.Doctors.CreateAsync(doctor);
-            await _unitOfWork.SaveChangesAsync();
-
-            // Create Doctor-Hospital relationship
-            var doctorHospital = new DoctorHospital
-            {
-                DoctorId = doctor.DoctorId,
-                HospitalId = doctorDTO.HospitalId,
-                IsActive = true,
-                AssignedAt = DateTime.UtcNow
-            };
-            await _unitOfWork.DoctorHospitals.CreateAsync(doctorHospital);
-            await _unitOfWork.SaveChangesAsync();
-
-            var (profileImageInfo, imageError) = await HandleImageUploadAsync(
-                profileImage, 
-                user, 
-                "doctor", 
-                medicalDepartment.Name, 
-                doctorDTO.AltText,
-                userImage => new DoctorImageInfo
+                if (!ModelState.IsValid)
                 {
-                    Id = userImage.Id,
-                    FileName = userImage.FileName,
-                    FilePath = userImage.FilePath,
-                    ContentType = userImage.ContentType,
-                    FileSize = userImage.FileSize,
-                    AltText = userImage.AltText,
-                    IsProfileImage = userImage.IsProfileImage,
-                    UploadedAt = userImage.UploadedAt
+                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                }
+
+                // Check if hospital exists
+                var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(doctorDTO.HospitalId);
+                if (hospital == null)
+                {
+                    return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                        $"Hospital with ID '{doctorDTO.HospitalId}' not found. Please verify the hospital ID is correct.",
+                        "HospitalId",
+                        "HOSPITAL_NOT_FOUND"
+                    ));
+                }
+
+                // Get Medical department
+                var medicalDepartment = await _unitOfWork.Departments.GetByNameAsync("Medical");
+                if (medicalDepartment == null)
+                {
+                    return BadRequest(ValidationHelperService.CreateBusinessLogicError(
+                        "Medical department not found. Please ensure departments are seeded in the system.",
+                        "DepartmentId",
+                        "DEPARTMENT_NOT_FOUND"
+                    ));
+                }
+
+                // Generate custom user ID
+                string customUserId = await userIdGenerationService.GenerateUserIdAsync(
+                    doctorDTO.FirstName ?? "Unknown",
+                    doctorDTO.LastName ?? "User",
+                    UserRoles.Doctor,
+                    doctorDTO.DepartmentId ?? medicalDepartment.Id,
+                    doctorDTO.HospitalId
+                );
+
+                // Create user account
+                var user = new ApplicationUser
+                {
+                    Id = customUserId, // Use custom generated ID
+                    UserName = doctorDTO.Email, // Use email as username
+                    Email = doctorDTO.Email,
+                    FirstName = doctorDTO.FirstName,
+                    LastName = doctorDTO.LastName,
+                    PhoneNumber = doctorDTO.PhoneNumber,
+                    DepartmentId = doctorDTO.DepartmentId ?? medicalDepartment.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = true
+                };
+
+                var result = await userManager.CreateAsync(user, doctorDTO.Password);
+                if (!result.Succeeded)
+                {
+                    var identityErrors = result.Errors.Select(e => e.Description).ToList();
+                    return BadRequest(ValidationHelperService.CreateMultipleBusinessLogicErrors(
+                        new Dictionary<string, string> { { "Password", string.Join("; ", identityErrors) } },
+                        "User creation failed. Please check the following issues:"
+                    ));
+                }
+
+                // Assign Doctor role
+                await userManager.AddToRoleAsync(user, UserRoles.Doctor);
+
+                // Create Doctor entity
+                var doctor = new Doctor
+                {
+                    Name = $"{doctorDTO.FirstName} {doctorDTO.LastName}".Trim(),
+                    Specialty = doctorDTO.Specialty,
+                    UserId = user.Id,
+                    HospitalId = doctorDTO.HospitalId,
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = true
+                };
+
+                await _unitOfWork.Doctors.CreateAsync(doctor);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Create Doctor-Hospital relationship
+                var doctorHospital = new DoctorHospital
+                {
+                    DoctorId = doctor.DoctorId,
+                    HospitalId = doctorDTO.HospitalId,
+                    IsActive = true,
+                    AssignedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.DoctorHospitals.CreateAsync(doctorHospital);
+                await _unitOfWork.SaveChangesAsync();
+
+                var (profileImageInfo, imageError) = await HandleImageUploadAsync(
+                    profileImage, 
+                    user, 
+                    "doctor", 
+                    medicalDepartment.Name, 
+                    doctorDTO.AltText,
+                    userImage => new DoctorImageInfo
+                    {
+                        Id = userImage.Id,
+                        FileName = userImage.FileName,
+                        FilePath = userImage.FilePath,
+                        ContentType = userImage.ContentType,
+                        FileSize = userImage.FileSize,
+                        AltText = userImage.AltText,
+                        IsProfileImage = userImage.IsProfileImage,
+                        UploadedAt = userImage.UploadedAt
+                    });
+
+                if (!string.IsNullOrEmpty(imageError))
+                {
+                    return BadRequest(new { message = imageError });
+                }
+
+                return Ok(new CreatedDoctorWithImageResponseDTO
+                {
+                    UserId = user.Id,
+                    Email = user.Email, // Email is now the username
+                    Role = UserRoles.Doctor,
+                    DepartmentName = medicalDepartment.Name,
+                    CreatedAt = user.CreatedAt,
+                    DoctorId = doctor.DoctorId,
+                    Specialty = doctor.Specialty,
+                    HospitalName = hospital.Name,
+                    ProfileImage = profileImageInfo as DoctorImageInfo,
+                    Message = $"Doctor '{doctor.Name}' created successfully and assigned to hospital '{hospital.Name}'"
                 });
-
-            if (!string.IsNullOrEmpty(imageError))
-            {
-                return BadRequest(new { message = imageError });
             }
-
-
-
-            return Ok(new CreatedDoctorWithImageResponseDTO
+            catch (Exception ex)
             {
-                UserId = user.Id,
-                Email = user.Email, // Email is now the username
-                Role = UserRoles.Doctor,
-                DepartmentName = medicalDepartment.Name,
-                CreatedAt = user.CreatedAt,
-                DoctorId = doctor.DoctorId,
-                Specialty = doctor.Specialty,
-                HospitalName = hospital.Name,
-                ProfileImage = profileImageInfo as DoctorImageInfo,
-                Message = $"Doctor '{doctor.Name}' created successfully and assigned to hospital '{hospital.Name}'"
-            });
+                // Log the exception for debugging
+                Console.WriteLine($"Error in CreateDoctor: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                return BadRequest(new { 
+                    message = "An error occurred while creating the doctor. Please try again.",
+                    error = ex.Message 
+                });
+            }
         }
 
 
@@ -336,7 +378,7 @@ namespace SoitMed.Controllers
                     Id = userImage.Id,
                     FileName = userImage.FileName,
                     FilePath = userImage.FilePath,
-                    ContentType = userImage.ContentType,
+                    ContentType = userImage.ContentType ?? string.Empty,
                     FileSize = userImage.FileSize,
                     AltText = userImage.AltText,
                     IsProfileImage = userImage.IsProfileImage,
@@ -359,7 +401,7 @@ namespace SoitMed.Controllers
                 Specialty = engineer.Specialty,
                 GovernorateNames = governorates?.Select(g => g.Name).ToList() ?? new List<string>(),
                 ProfileImage = profileImageInfo as EngineerImageInfo,
-                Message = $"Engineer '{engineer.Name}' created successfully and assigned to {governorates.Count()} governorate(s)"
+                Message = $"Engineer '{engineer.Name}' created successfully and assigned to {governorates?.Count()} governorate(s)"
             });
         }
 

@@ -50,7 +50,13 @@ namespace SoitMed.Repositories
 
         // Weekly planning repositories
         private IWeeklyPlanRepository? _weeklyPlans;
-        private IWeeklyPlanItemRepository? _weeklyPlanItems;
+        private IWeeklyPlanTaskRepository? _weeklyPlanTasks;
+        private ITaskProgressRepository? _taskProgresses;
+
+        // Sales workflow repositories
+        private IOfferRequestRepository? _offerRequests;
+        private ISalesOfferRepository? _salesOffers;
+        private ISalesDealRepository? _salesDeals;
 
         public UnitOfWork(Context context)
         {
@@ -136,8 +142,22 @@ namespace SoitMed.Repositories
         public IWeeklyPlanRepository WeeklyPlans => 
             _weeklyPlans ??= new WeeklyPlanRepository(_context);
 
-        public IWeeklyPlanItemRepository WeeklyPlanItems => 
-            _weeklyPlanItems ??= new WeeklyPlanItemRepository(_context);
+        public IWeeklyPlanTaskRepository WeeklyPlanTasks => 
+            _weeklyPlanTasks ??= new WeeklyPlanTaskRepository(_context);
+
+        public ITaskProgressRepository TaskProgresses => 
+            _taskProgresses ??= new TaskProgressRepository(_context);
+
+        // Sales workflow repositories
+        public IOfferRequestRepository OfferRequests => 
+            _offerRequests ??= new OfferRequestRepository(_context);
+
+        public ISalesOfferRepository SalesOffers => 
+            _salesOffers ??= new SalesOfferRepository(_context);
+
+        public ISalesDealRepository SalesDeals => 
+            _salesDeals ??= new SalesDealRepository(_context);
+
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

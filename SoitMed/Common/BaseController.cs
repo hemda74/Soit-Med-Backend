@@ -29,6 +29,28 @@ namespace SoitMed.Common
         }
 
         /// <summary>
+        /// Gets the current user role from the JWT token
+        /// </summary>
+        protected async Task<string> GetCurrentUserRoleAsync()
+        {
+            var user = await GetCurrentUserAsync();
+            if (user == null)
+                return string.Empty;
+
+            var roles = await UserManager.GetRolesAsync(user);
+            return roles.FirstOrDefault() ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Gets the current user role synchronously from claims
+        /// </summary>
+        protected string GetCurrentUserRole()
+        {
+            var role = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role);
+            return role?.Value ?? string.Empty;
+        }
+
+        /// <summary>
         /// Gets the current user asynchronously
         /// </summary>
         protected async Task<ApplicationUser?> GetCurrentUserAsync()

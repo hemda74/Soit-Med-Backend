@@ -47,7 +47,11 @@ namespace SoitMed.Repositories
 
         // Weekly planning repositories
         IWeeklyPlanRepository WeeklyPlans { get; }
-        IWeeklyPlanItemRepository WeeklyPlanItems { get; }
+        IWeeklyPlanTaskRepository WeeklyPlanTasks { get; }
+        ITaskProgressRepository TaskProgresses { get; }
+        IOfferRequestRepository OfferRequests { get; }
+        ISalesOfferRepository SalesOffers { get; }
+        ISalesDealRepository SalesDeals { get; }
 
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

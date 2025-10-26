@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using SoitMed.Models.Core;
+using SoitMed.Models.Identity;
 
 namespace SoitMed.Models
 {
@@ -14,33 +15,26 @@ namespace SoitMed.Models
         [Required]
         public DateTime WeekEndDate { get; set; }
 
+        [Required, MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(1000)]
+        public string? Description { get; set; }
+
         [Required]
-        [MaxLength(200)]
-        public string PlanTitle { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
+
+        // Manager Review Fields
+        public int? Rating { get; set; } // 1-5
 
         [MaxLength(1000)]
-        public string? PlanDescription { get; set; }
+        public string? ManagerComment { get; set; }
 
-        [MaxLength(50)]
-        public string Status { get; set; } = "Draft"; // Draft, Submitted, Approved, Rejected
+        public DateTime? ManagerReviewedAt { get; set; }
 
-        [MaxLength(1000)]
-        public string? ApprovalNotes { get; set; }
+        public string? ReviewedBy { get; set; }
 
-        [MaxLength(1000)]
-        public string? RejectionReason { get; set; }
-
-        public DateTime? SubmittedAt { get; set; }
-
-        public DateTime? ApprovedAt { get; set; }
-
-        public DateTime? RejectedAt { get; set; }
-
-        public string? ApprovedBy { get; set; }
-
-        public string? RejectedBy { get; set; }
-
-        // Navigation properties
-        public virtual ICollection<WeeklyPlanItem> PlanItems { get; set; } = new List<WeeklyPlanItem>();
+        // Navigation Properties
+        public virtual ICollection<WeeklyPlanTask> Tasks { get; set; } = new List<WeeklyPlanTask>(); // NEW: Tasks instead of Items
     }
 }

@@ -76,12 +76,20 @@ namespace SoitMed.Services
                 filePath = Path.Combine(uploadPath, fileName);
                 _logger.LogInformation("FilePath: {FilePath}", filePath);
 
-                // Save file with proper stream handling
-                using (var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true))
+                // Save file with proper stream handling and memory management
+                using (var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 8192, useAsync: true))
                 {
-                    await imageFile.CopyToAsync(stream);
+                    // Use a larger buffer for better performance
+                    var buffer = new byte[8192];
+                    using (var inputStream = imageFile.OpenReadStream())
+                    {
+                        int bytesRead;
+                        while ((bytesRead = await inputStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                        {
+                            await stream.WriteAsync(buffer, 0, bytesRead);
+                        }
+                    }
                     await stream.FlushAsync();
-                    await stream.FlushAsync(); // Ensure all data is written
                 }
                 _logger.LogInformation("File saved successfully");
 

@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using SoitMed.Models.Core;
 using SoitMed.Models.Enums;
 
 namespace SoitMed.Models
@@ -14,130 +16,207 @@ namespace SoitMed.Models
         public ActivityLog ActivityLog { get; set; } = null!;
 
         [Required]
-        [MaxLength(2000)]
-        public string OfferDetails { get; set; } = string.Empty;
-
-        [MaxLength(500)]
-        public string? DocumentUrl { get; set; }
+        public long ClientId { get; set; }
+        public Client Client { get; set; } = null!;
 
         [Required]
-        public OfferStatus Status { get; set; } = OfferStatus.Pending;
+        [MaxLength(450)]
+        public string UserId { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(1000)]
+        public string? Description { get; set; }
+
+        [Required]
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal Value { get; set; }
+
+        [Required]
+        public string Status { get; set; } = "Pending";
 
         [MaxLength(1000)]
         public string? Notes { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? ValidUntil { get; set; }
+
+        public DateTime? SentAt { get; set; }
+
+        public DateTime? ResponseAt { get; set; }
+
+        [MaxLength(200)]
+        public string? ContactPerson { get; set; }
+
+        [MaxLength(50)]
+        public string? ContactPhone { get; set; }
+
+        [MaxLength(100)]
+        public string? ContactEmail { get; set; }
+
+        [MaxLength(1000)]
+        public string? RejectionReason { get; set; }
+
+        [MaxLength(1000)]
+        public string? ApprovalNotes { get; set; }
+
+        public string? ApprovedBy { get; set; }
+
+        public DateTime? ApprovedAt { get; set; }
+
+        public string? RejectedBy { get; set; }
+
+        public DateTime? RejectedAt { get; set; }
+
+        [MaxLength(1000)]
+        public string? ClientResponse { get; set; }
         #endregion
 
         #region Business Logic Methods
         /// <summary>
-        /// Determines if this offer is still valid based on creation date
+        /// Approves the offer
         /// </summary>
-        public bool IsValid(int validityDays = 30)
+        public void Approve(string approvedBy, string? notes = null)
         {
-            return CreatedAt.AddDays(validityDays) > DateTime.UtcNow;
+            Status = "Approved";
+            ApprovedBy = approvedBy;
+            ApprovedAt = DateTime.UtcNow;
+            if (!string.IsNullOrEmpty(notes))
+                ApprovalNotes = notes;
         }
 
         /// <summary>
-        /// Calculates the age of this offer in days
+        /// Rejects the offer
         /// </summary>
-        public int GetAgeInDays()
+        public void Reject(string rejectedBy, string reason, string? notes = null)
         {
-            return (DateTime.UtcNow - CreatedAt).Days;
+            Status = "Rejected";
+            RejectedBy = rejectedBy;
+            RejectedAt = DateTime.UtcNow;
+            RejectionReason = reason;
+            if (!string.IsNullOrEmpty(notes))
+                ApprovalNotes = notes;
         }
 
         /// <summary>
-        /// Determines if this offer is overdue for response
+        /// Sends the offer to client
         /// </summary>
-        public bool IsOverdue(int responseDaysThreshold = 7)
+        public void Send()
         {
-            return Status == OfferStatus.Pending && 
-                   CreatedAt.AddDays(responseDaysThreshold) < DateTime.UtcNow;
+            Status = "Sent";
+            SentAt = DateTime.UtcNow;
         }
 
         /// <summary>
-        /// Updates the offer status
+        /// Marks the offer as completed
         /// </summary>
-        public void UpdateStatus(OfferStatus newStatus)
+        public void Complete()
         {
-            Status = newStatus;
-            UpdatedAt = DateTime.UtcNow;
+            Status = "Completed";
         }
 
         /// <summary>
-        /// Adds notes to the offer
+        /// Marks the offer as accepted by client
         /// </summary>
-        public void AddNotes(string additionalNotes)
+        public void Accept(string? clientResponse = null)
         {
-            if (!string.IsNullOrEmpty(additionalNotes))
-            {
-                Notes = string.IsNullOrEmpty(Notes) 
-                    ? additionalNotes 
-                    : $"{Notes}\n{additionalNotes}";
-                UpdatedAt = DateTime.UtcNow;
-            }
+            Status = "Accepted";
+            ResponseAt = DateTime.UtcNow;
+            if (!string.IsNullOrEmpty(clientResponse))
+                ClientResponse = clientResponse;
         }
 
         /// <summary>
-        /// Determines if this offer was accepted
+        /// Records client response
         /// </summary>
-        public bool WasAccepted()
+        public void RecordClientResponse(string response)
         {
-            return Status == OfferStatus.Accepted;
+            ClientResponse = response;
+            ResponseAt = DateTime.UtcNow;
         }
 
         /// <summary>
-        /// Determines if this offer was rejected
-        /// </summary>
-        public bool WasRejected()
-        {
-            return Status == OfferStatus.Rejected;
-        }
-
-        /// <summary>
-        /// Determines if this offer is still pending
+        /// Determines if the offer is pending
         /// </summary>
         public bool IsPending()
         {
-            return Status == OfferStatus.Pending;
+            return Status == "Pending";
         }
 
         /// <summary>
-        /// Marks the offer as accepted
+        /// Determines if the offer is approved
         /// </summary>
-        public void Accept(string? notes = null)
+        public bool IsApproved()
         {
-            Status = OfferStatus.Accepted;
-            UpdatedAt = DateTime.UtcNow;
-            
-            if (!string.IsNullOrEmpty(notes))
-                AddNotes($"Accepted: {notes}");
+            return Status == "Approved";
         }
 
         /// <summary>
-        /// Marks the offer as rejected
+        /// Determines if the offer is rejected
         /// </summary>
-        public void Reject(string? reason = null)
+        public bool IsRejected()
         {
-            Status = OfferStatus.Rejected;
-            UpdatedAt = DateTime.UtcNow;
-            
-            if (!string.IsNullOrEmpty(reason))
-                AddNotes($"Rejected: {reason}");
+            return Status == "Rejected";
         }
 
         /// <summary>
-        /// Determines if this offer needs follow-up
+        /// Determines if the offer is sent
         /// </summary>
-        public bool NeedsFollowUp()
+        public bool IsSent()
         {
-            return Status == OfferStatus.Pending && 
-                   CreatedAt.AddDays(3) < DateTime.UtcNow;
+            return Status == "Sent";
+        }
+
+        /// <summary>
+        /// Determines if the offer is completed
+        /// </summary>
+        public bool IsCompleted()
+        {
+            return Status == "Completed";
+        }
+
+        /// <summary>
+        /// Determines if the offer is accepted
+        /// </summary>
+        public bool IsAccepted()
+        {
+            return Status == "Accepted";
+        }
+
+        /// <summary>
+        /// Determines if the offer is expired
+        /// </summary>
+        public bool IsExpired()
+        {
+            return ValidUntil.HasValue && ValidUntil.Value < DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Updates the offer value
+        /// </summary>
+        public void UpdateValue(decimal newValue)
+        {
+            Value = newValue;
+        }
+
+        /// <summary>
+        /// Updates the validity period
+        /// </summary>
+        public void UpdateValidUntil(DateTime? validUntil)
+        {
+            ValidUntil = validUntil;
+        }
+
+        /// <summary>
+        /// Updates contact information
+        /// </summary>
+        public void UpdateContactInfo(string? person, string? phone, string? email)
+        {
+            if (!string.IsNullOrEmpty(person)) ContactPerson = person;
+            if (!string.IsNullOrEmpty(phone)) ContactPhone = phone;
+            if (!string.IsNullOrEmpty(email)) ContactEmail = email;
         }
         #endregion
     }
 }
-
-
-
