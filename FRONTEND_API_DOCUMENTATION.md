@@ -2,22 +2,7 @@
 
 ## Overview
 
-This document provides complete API documentation for the Enhanced Offer System, designed for React and React Native frontend developers.
-
----
-
-## Base URL
-
-```
-Development: http://localhost:5000/api
-Production: https://your-production-url.com/api
-```
-
----
-
-## Authentication
-
-All endpoints require JWT Bearer token authentication.
+This document provides complete API documentation for the Enhanced Offer System, designed for React and React Native
 
 ```javascript
 const headers = {

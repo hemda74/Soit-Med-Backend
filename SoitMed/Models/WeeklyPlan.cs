@@ -9,6 +9,9 @@ namespace SoitMed.Models
         [Required]
         public string EmployeeId { get; set; } = string.Empty;
 
+        // Navigation Properties
+        public virtual ApplicationUser? Employee { get; set; }
+
         [Required]
         public DateTime WeekStartDate { get; set; }
 

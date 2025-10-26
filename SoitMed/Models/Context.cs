@@ -284,6 +284,13 @@ namespace SoitMed.Models
 
             // ========== NEW SALES MODULE RELATIONSHIPS ==========
             
+            // WeeklyPlan relationships
+            modelBuilder.Entity<WeeklyPlan>()
+                .HasOne(wp => wp.Employee)
+                .WithMany()
+                .HasForeignKey(wp => wp.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
             // WeeklyPlanTask relationships
             modelBuilder.Entity<WeeklyPlanTask>()
                 .HasOne(wpt => wpt.WeeklyPlan)

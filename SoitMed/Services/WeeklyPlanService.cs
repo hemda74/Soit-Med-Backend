@@ -50,15 +50,30 @@ namespace SoitMed.Services
             };
         }
 
-        public async Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansAsync(string userId, int page, int pageSize)
+        public async Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansAsync(string userId, string userRole, int page, int pageSize)
         {
-            var plans = await UnitOfWork.WeeklyPlans.GetEmployeePlansAsync(userId, page, pageSize);
-            var totalCount = await UnitOfWork.WeeklyPlans.CountAsync(p => p.EmployeeId == userId);
+            // SalesManager and SuperAdmin can view all plans
+            var plans = (userRole == "SalesManager" || userRole == "SuperAdmin") 
+                ? await UnitOfWork.WeeklyPlans.GetAllPlansAsync(page, pageSize)
+                : await UnitOfWork.WeeklyPlans.GetEmployeePlansAsync(userId, page, pageSize);
+            
+            var totalCount = (userRole == "SalesManager" || userRole == "SuperAdmin")
+                ? await UnitOfWork.WeeklyPlans.CountAsync()
+                : await UnitOfWork.WeeklyPlans.CountAsync(p => p.EmployeeId == userId);
 
             var planDtos = plans.Select(p => new WeeklyPlanResponseDTO
             {
                 Id = p.Id,
                 EmployeeId = p.EmployeeId,
+                Employee = p.Employee != null ? new EmployeeInfoDTO
+                {
+                    Id = p.Employee.Id,
+                    FirstName = p.Employee.FirstName,
+                    LastName = p.Employee.LastName,
+                    Email = p.Employee.Email ?? string.Empty,
+                    PhoneNumber = p.Employee.PhoneNumber,
+                    UserName = p.Employee.UserName ?? string.Empty
+                } : null,
                 WeekStartDate = p.WeekStartDate,
                 WeekEndDate = p.WeekEndDate,
                 Title = p.Title,
@@ -69,21 +84,7 @@ namespace SoitMed.Services
                 ManagerReviewedAt = p.ManagerReviewedAt,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
-                Tasks = p.Tasks.Select(t => new WeeklyPlanTaskResponseDTO
-                {
-                    Id = t.Id,
-                    TaskType = t.TaskType,
-                    ClientId = t.ClientId,
-                    ClientName = t.ClientName,
-                    ClientStatus = t.ClientStatus,
-                    ClientClassification = t.ClientClassification,
-                    PlannedDate = t.PlannedDate,
-                    PlannedTime = t.PlannedTime,
-                    Purpose = t.Purpose,
-                    Priority = t.Priority,
-                    Status = t.Status,
-                    ProgressCount = t.Progresses.Count
-                }).ToList()
+                Tasks = p.Tasks.Select(t => MapTaskToDTO(t)).ToList()
             });
 
             return (planDtos, totalCount);
@@ -91,7 +92,7 @@ namespace SoitMed.Services
 
         public async Task<WeeklyPlanResponseDTO?> GetWeeklyPlanAsync(long id, string userId)
         {
-            var plan = await UnitOfWork.WeeklyPlans.GetByIdAsync(id);
+            var plan = await UnitOfWork.WeeklyPlans.GetPlanWithFullDetailsAsync(id);
             if (plan == null || plan.EmployeeId != userId)
             {
                 return null;
@@ -111,21 +112,114 @@ namespace SoitMed.Services
                 ManagerReviewedAt = plan.ManagerReviewedAt,
                 CreatedAt = plan.CreatedAt,
                 UpdatedAt = plan.UpdatedAt,
-                Tasks = plan.Tasks.Select(t => new WeeklyPlanTaskResponseDTO
+                Tasks = plan.Tasks.Select(t => MapTaskToDTO(t)).ToList()
+            };
+        }
+
+        private WeeklyPlanTaskResponseDTO MapTaskToDTO(WeeklyPlanTask task)
+        {
+            // Get offer requests from task progresses
+            var offerRequestIds = task.Progresses
+                .Where(p => p.OfferRequestId.HasValue)
+                .Select(p => p.OfferRequestId.Value)
+                .Distinct()
+                .ToList();
+
+            var offerRequests = new List<OfferRequestSimpleDTO>();
+            var offers = new List<SalesOfferSimpleDTO>();
+            var deals = new List<SalesDealSimpleDTO>();
+
+            // Load offer requests, offers, and deals if needed
+            if (offerRequestIds.Any())
+            {
+                var offerRequestsData = UnitOfWork.OfferRequests.GetAllAsync().Result
+                    .Where(or => offerRequestIds.Contains(or.Id))
+                    .ToList();
+
+                offerRequests = offerRequestsData.Select(or => new OfferRequestSimpleDTO
                 {
-                    Id = t.Id,
-                    TaskType = t.TaskType,
-                    ClientId = t.ClientId,
-                    ClientName = t.ClientName,
-                    ClientStatus = t.ClientStatus,
-                    ClientClassification = t.ClientClassification,
-                    PlannedDate = t.PlannedDate,
-                    PlannedTime = t.PlannedTime,
-                    Purpose = t.Purpose,
-                    Priority = t.Priority,
-                    Status = t.Status,
-                    ProgressCount = t.Progresses.Count
-                }).ToList()
+                    Id = or.Id,
+                    RequestedProducts = or.RequestedProducts,
+                    RequestDate = or.RequestDate,
+                    Status = or.Status,
+                    CreatedOfferId = or.CreatedOfferId
+                }).ToList();
+
+                // Get offers created from these offer requests
+                if (offerRequestsData.Any(or => or.CreatedOfferId.HasValue))
+                {
+                    var offerIds = offerRequestsData
+                        .Where(or => or.CreatedOfferId.HasValue)
+                        .Select(or => or.CreatedOfferId.Value)
+                        .Distinct()
+                        .ToList();
+
+                    var offersData = UnitOfWork.SalesOffers.GetAllAsync().Result
+                        .Where(o => offerIds.Contains(o.Id))
+                        .ToList();
+
+                    offers = offersData.Select(o => new SalesOfferSimpleDTO
+                    {
+                        Id = o.Id,
+                        Products = o.Products,
+                        TotalAmount = o.TotalAmount,
+                        ValidUntil = o.ValidUntil,
+                        Status = o.Status,
+                        SentToClientAt = o.SentToClientAt
+                    }).ToList();
+
+                    // Get deals created from these offers
+                    if (offersData.Any(o => o.Deal != null))
+                    {
+                        var dealIds = offersData
+                            .Where(o => o.Deal != null)
+                            .Select(o => o.Deal.Id)
+                            .Distinct()
+                            .ToList();
+
+                        deals = UnitOfWork.SalesDeals.GetAllAsync().Result
+                            .Where(d => dealIds.Contains(d.Id))
+                            .Select(d => new SalesDealSimpleDTO
+                            {
+                                Id = d.Id,
+                                DealValue = d.DealValue,
+                                ClosedDate = d.ClosedDate,
+                                Status = d.Status,
+                                ManagerApprovedAt = d.ManagerApprovedAt,
+                                SuperAdminApprovedAt = d.SuperAdminApprovedAt
+                            })
+                            .ToList();
+                    }
+                }
+            }
+
+            return new WeeklyPlanTaskResponseDTO
+            {
+                Id = task.Id,
+                TaskType = task.TaskType,
+                ClientId = task.ClientId,
+                ClientName = task.ClientName,
+                ClientStatus = task.ClientStatus,
+                ClientClassification = task.ClientClassification,
+                PlannedDate = task.PlannedDate,
+                PlannedTime = task.PlannedTime,
+                Purpose = task.Purpose,
+                Priority = task.Priority,
+                Status = task.Status,
+                ProgressCount = task.Progresses.Count,
+                Progresses = task.Progresses.Select(p => new TaskProgressSimpleDTO
+                {
+                    Id = p.Id,
+                    ProgressDate = p.ProgressDate,
+                    ProgressType = p.ProgressType,
+                    Description = p.Description,
+                    VisitResult = p.VisitResult,
+                    NextStep = p.NextStep,
+                    OfferRequestId = p.OfferRequestId
+                }).ToList(),
+                OfferRequests = offerRequests,
+                Offers = offers,
+                Deals = deals
             };
         }
 

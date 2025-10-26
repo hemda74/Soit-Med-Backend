@@ -59,7 +59,8 @@ namespace SoitMed.Controllers
                 if (currentUser == null)
                     return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
 
-                var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansAsync(currentUser.Id, page, pageSize);
+                var userRole = await GetCurrentUserRoleAsync();
+                var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansAsync(currentUser.Id, userRole, page, pageSize);
 
                 return Ok(ResponseHelper.CreateSuccessResponse(new
                 {

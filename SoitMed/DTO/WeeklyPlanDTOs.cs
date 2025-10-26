@@ -41,6 +41,7 @@ namespace SoitMed.DTO
     {
         public long Id { get; set; }
         public string EmployeeId { get; set; } = string.Empty;
+        public EmployeeInfoDTO? Employee { get; set; } // Employee details for managers
         public DateTime WeekStartDate { get; set; }
         public DateTime WeekEndDate { get; set; }
         public string Title { get; set; } = string.Empty;
@@ -52,6 +53,16 @@ namespace SoitMed.DTO
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public List<WeeklyPlanTaskResponseDTO> Tasks { get; set; } = new();
+    }
+
+    public class EmployeeInfoDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? PhoneNumber { get; set; }
+        public string UserName { get; set; } = string.Empty;
     }
 
     public class WeeklyPlanTaskResponseDTO
@@ -68,6 +79,50 @@ namespace SoitMed.DTO
         public string Priority { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public int ProgressCount { get; set; }
+        public List<TaskProgressSimpleDTO> Progresses { get; set; } = new();
+        public List<OfferRequestSimpleDTO> OfferRequests { get; set; } = new();
+        public List<SalesOfferSimpleDTO> Offers { get; set; } = new();
+        public List<SalesDealSimpleDTO> Deals { get; set; } = new();
+    }
+
+    public class TaskProgressSimpleDTO
+    {
+        public long Id { get; set; }
+        public DateTime ProgressDate { get; set; }
+        public string ProgressType { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? VisitResult { get; set; }
+        public string? NextStep { get; set; }
+        public long? OfferRequestId { get; set; }
+    }
+
+    public class OfferRequestSimpleDTO
+    {
+        public long Id { get; set; }
+        public string RequestedProducts { get; set; } = string.Empty;
+        public DateTime RequestDate { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public long? CreatedOfferId { get; set; }
+    }
+
+    public class SalesOfferSimpleDTO
+    {
+        public long Id { get; set; }
+        public string Products { get; set; } = string.Empty;
+        public decimal TotalAmount { get; set; }
+        public DateTime ValidUntil { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public DateTime? SentToClientAt { get; set; }
+    }
+
+    public class SalesDealSimpleDTO
+    {
+        public long Id { get; set; }
+        public decimal DealValue { get; set; }
+        public DateTime? ClosedDate { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public DateTime? ManagerApprovedAt { get; set; }
+        public DateTime? SuperAdminApprovedAt { get; set; }
     }
 
 }

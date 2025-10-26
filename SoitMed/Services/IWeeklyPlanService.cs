@@ -16,7 +16,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Gets weekly plans for a user with pagination
         /// </summary>
-        Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansAsync(string userId, int page, int pageSize);
+        Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansAsync(string userId, string userRole, int page, int pageSize);
 
         /// <summary>
         /// Gets a specific weekly plan by ID
