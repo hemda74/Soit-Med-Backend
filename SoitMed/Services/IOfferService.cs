@@ -21,6 +21,24 @@ namespace SoitMed.Services
         Task<bool> DeleteOfferAsync(long offerId, string userId);
         #endregion
 
+        #region Enhanced Offer Features - Equipment Management
+        Task<OfferEquipmentDTO> AddEquipmentAsync(long offerId, CreateOfferEquipmentDTO dto);
+        Task<List<OfferEquipmentDTO>> GetEquipmentListAsync(long offerId);
+        Task<bool> DeleteEquipmentAsync(long offerId, long equipmentId);
+        #endregion
+
+        #region Enhanced Offer Features - Terms Management
+        Task<OfferTermsDTO> AddOrUpdateTermsAsync(long offerId, CreateOfferTermsDTO dto);
+        #endregion
+
+        #region Enhanced Offer Features - Installment Plans
+        Task<List<InstallmentPlanDTO>> CreateInstallmentPlanAsync(long offerId, CreateInstallmentPlanDTO dto);
+        #endregion
+
+        #region Enhanced Offer - Complete Details
+        Task<EnhancedOfferResponseDTO> GetEnhancedOfferAsync(long offerId);
+        #endregion
+
         #region Business Logic Methods
         Task<bool> ValidateOfferAsync(CreateOfferDTO offerDto);
         Task<List<OfferResponseDTO>> GetExpiredOffersAsync();
