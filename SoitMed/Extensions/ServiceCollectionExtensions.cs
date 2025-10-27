@@ -23,6 +23,10 @@ namespace SoitMed.Extensions
             services.AddScoped<IOfferRequestService, OfferRequestService>();
             services.AddScoped<IOfferService, OfferService>();
             services.AddScoped<IDealService, DealService>();
+            
+            // Enhanced offer services
+            services.AddScoped<IOfferEquipmentImageService, OfferEquipmentImageService>();
+            services.AddScoped<IPdfExportService, PdfExportService>();
 
             return services;
         }
