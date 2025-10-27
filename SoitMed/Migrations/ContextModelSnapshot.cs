@@ -198,7 +198,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ActivityLogs");
+                    b.ToTable("ActivityLogs", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Client", b =>
@@ -316,7 +316,7 @@ namespace SoitMed.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Clients");
+                    b.ToTable("Clients", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.ClientAnalytics", b =>
@@ -389,7 +389,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientAnalytics");
+                    b.ToTable("ClientAnalytics", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.ClientInteraction", b =>
@@ -457,7 +457,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientInteractions");
+                    b.ToTable("ClientInteractions", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.ClientVisit", b =>
@@ -529,7 +529,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientVisits");
+                    b.ToTable("ClientVisits", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Core.Department", b =>
@@ -557,7 +557,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Departments");
+                    b.ToTable("Departments", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Core.Role", b =>
@@ -588,7 +588,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("RoleName")
                         .IsUnique();
 
-                    b.ToTable("BusinessRoles");
+                    b.ToTable("BusinessRoles", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Deal", b =>
@@ -680,7 +680,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("Deals");
+                    b.ToTable("Deals", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.DeliveryTerms", b =>
@@ -750,7 +750,7 @@ namespace SoitMed.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DeliveryTerms");
+                    b.ToTable("DeliveryTerms", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Equipment.Equipment", b =>
@@ -822,7 +822,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("QRCode")
                         .IsUnique();
 
-                    b.ToTable("Equipment");
+                    b.ToTable("Equipment", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Equipment.RepairRequest", b =>
@@ -903,7 +903,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("TechnicianId");
 
-                    b.ToTable("RepairRequests", t =>
+                    b.ToTable("RepairRequests", null, t =>
                         {
                             t.HasCheckConstraint("CK_RepairRequest_Requestor", "(DoctorId IS NOT NULL AND TechnicianId IS NULL) OR (DoctorId IS NULL AND TechnicianId IS NOT NULL)");
                         });
@@ -946,7 +946,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Doctors");
+                    b.ToTable("Doctors", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.DoctorHospital", b =>
@@ -977,7 +977,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("DoctorId", "HospitalId")
                         .IsUnique();
 
-                    b.ToTable("DoctorHospitals");
+                    b.ToTable("DoctorHospitals", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Hospital", b =>
@@ -1016,7 +1016,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("HospitalId")
                         .IsUnique();
 
-                    b.ToTable("Hospitals");
+                    b.ToTable("Hospitals", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Technician", b =>
@@ -1056,7 +1056,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Technicians");
+                    b.ToTable("Technicians", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Identity.ApplicationUser", b =>
@@ -1200,7 +1200,7 @@ namespace SoitMed.Migrations
                         .IsUnique()
                         .HasFilter("[IsProfileImage] = 1");
 
-                    b.ToTable("UserImages");
+                    b.ToTable("UserImages", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Location.Engineer", b =>
@@ -1238,7 +1238,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Engineers");
+                    b.ToTable("Engineers", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Location.EngineerGovernorate", b =>
@@ -1268,7 +1268,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("EngineerId", "GovernorateId")
                         .IsUnique();
 
-                    b.ToTable("EngineerGovernorates");
+                    b.ToTable("EngineerGovernorates", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Location.Governorate", b =>
@@ -1295,7 +1295,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Governorates");
+                    b.ToTable("Governorates", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Notification", b =>
@@ -1358,7 +1358,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("UserId", "IsRead");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Offer", b =>
@@ -1457,7 +1457,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("Offers");
+                    b.ToTable("Offers", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.OfferRequest", b =>
@@ -1523,7 +1523,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("Status", "RequestedBy");
 
-                    b.ToTable("OfferRequests");
+                    b.ToTable("OfferRequests", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.PaymentTerms", b =>
@@ -1592,7 +1592,7 @@ namespace SoitMed.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PaymentTerms");
+                    b.ToTable("PaymentTerms", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.RequestWorkflow", b =>
@@ -1691,7 +1691,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ToUserId", "Status");
 
-                    b.ToTable("RequestWorkflows");
+                    b.ToTable("RequestWorkflows", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.SalesReport", b =>
@@ -1745,7 +1745,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("SalesReports");
+                    b.ToTable("SalesReports", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.TaskProgress", b =>
@@ -1834,7 +1834,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId", "ProgressDate");
 
-                    b.ToTable("TaskProgresses");
+                    b.ToTable("TaskProgresses", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.WeeklyPlan", b =>
@@ -1888,7 +1888,7 @@ namespace SoitMed.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("WeeklyPlans");
+                    b.ToTable("WeeklyPlans", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.WeeklyPlanTask", b =>
@@ -1979,7 +1979,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("WeeklyPlanId", "Status");
 
-                    b.ToTable("WeeklyPlanTasks");
+                    b.ToTable("WeeklyPlanTasks", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
