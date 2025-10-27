@@ -262,17 +262,30 @@ namespace SoitMed
 						Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecritKey"] ?? ""))
 				};
 				
-				// Configure JWT for SignalR
+				// Configure JWT for SignalR - supports both Authorization header and query string
 				options.Events = new JwtBearerEvents
 				{
 					OnMessageReceived = context =>
 					{
-						var accessToken = context.Request.Query["access_token"];
 						var path = context.HttpContext.Request.Path;
 						
-						if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notificationHub"))
+						// Only process SignalR hub paths
+						if (path.StartsWithSegments("/notificationHub"))
 						{
-							context.Token = accessToken;
+							// First, try to get token from Authorization header (standard approach)
+							var tokenFromHeader = context.Request.Headers["Authorization"].ToString();
+							if (!string.IsNullOrEmpty(tokenFromHeader) && tokenFromHeader.StartsWith("Bearer "))
+							{
+								context.Token = tokenFromHeader.Substring("Bearer ".Length).Trim();
+								return Task.CompletedTask;
+							}
+							
+							// Fallback to query string for WebSocket connections (alternative approach)
+							var accessToken = context.Request.Query["access_token"];
+							if (!string.IsNullOrEmpty(accessToken))
+							{
+								context.Token = accessToken;
+							}
 						}
 						
 						return Task.CompletedTask;
