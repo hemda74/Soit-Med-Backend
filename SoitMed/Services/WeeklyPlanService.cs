@@ -82,6 +82,9 @@ namespace SoitMed.Services
                 Rating = p.Rating,
                 ManagerComment = p.ManagerComment,
                 ManagerReviewedAt = p.ManagerReviewedAt,
+                ManagerViewedAt = p.ManagerViewedAt,
+                ViewedBy = p.ViewedBy,
+                IsViewed = p.ManagerViewedAt.HasValue,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
                 Tasks = p.Tasks.Select(t => MapTaskToDTO(t)).ToList()
@@ -90,12 +93,82 @@ namespace SoitMed.Services
             return (planDtos, totalCount);
         }
 
-        public async Task<WeeklyPlanResponseDTO?> GetWeeklyPlanAsync(long id, string userId)
+        public async Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansWithFiltersAsync(WeeklyPlanFiltersDTO filters, string userRole, int page, int pageSize)
+        {
+            // Only SalesManager and SuperAdmin can use filters
+            if (userRole != "SalesManager" && userRole != "SuperAdmin")
+            {
+                throw new UnauthorizedAccessException("Only SalesManager and SuperAdmin can use filters");
+            }
+
+            var plans = await UnitOfWork.WeeklyPlans.GetAllPlansWithFiltersAsync(
+                filters.EmployeeId,
+                filters.WeekStartDate,
+                filters.WeekEndDate,
+                filters.IsViewed,
+                page,
+                pageSize
+            );
+
+            var totalCount = await UnitOfWork.WeeklyPlans.CountAllPlansWithFiltersAsync(
+                filters.EmployeeId,
+                filters.WeekStartDate,
+                filters.WeekEndDate,
+                filters.IsViewed
+            );
+
+            var planDtos = plans.Select(p => new WeeklyPlanResponseDTO
+            {
+                Id = p.Id,
+                EmployeeId = p.EmployeeId,
+                Employee = p.Employee != null ? new EmployeeInfoDTO
+                {
+                    Id = p.Employee.Id,
+                    FirstName = p.Employee.FirstName,
+                    LastName = p.Employee.LastName,
+                    Email = p.Employee.Email ?? string.Empty,
+                    PhoneNumber = p.Employee.PhoneNumber,
+                    UserName = p.Employee.UserName ?? string.Empty
+                } : null,
+                WeekStartDate = p.WeekStartDate,
+                WeekEndDate = p.WeekEndDate,
+                Title = p.Title,
+                Description = p.Description,
+                IsActive = p.IsActive,
+                Rating = p.Rating,
+                ManagerComment = p.ManagerComment,
+                ManagerReviewedAt = p.ManagerReviewedAt,
+                ManagerViewedAt = p.ManagerViewedAt,
+                ViewedBy = p.ViewedBy,
+                IsViewed = p.ManagerViewedAt.HasValue,
+                CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt,
+                Tasks = p.Tasks.Select(t => MapTaskToDTO(t)).ToList()
+            });
+
+            return (planDtos, totalCount);
+        }
+
+        public async Task<WeeklyPlanResponseDTO?> GetWeeklyPlanAsync(long id, string userId, string userRole)
         {
             var plan = await UnitOfWork.WeeklyPlans.GetPlanWithFullDetailsAsync(id);
-            if (plan == null || plan.EmployeeId != userId)
+            if (plan == null)
             {
                 return null;
+            }
+
+            // Check authorization: managers can view any plan, users can only view their own
+            if (userRole != "SalesManager" && userRole != "SuperAdmin" && plan.EmployeeId != userId)
+            {
+                return null;
+            }
+
+            // Mark as viewed if manager/admin is viewing
+            if ((userRole == "SalesManager" || userRole == "SuperAdmin") && !plan.ManagerViewedAt.HasValue)
+            {
+                plan.ManagerViewedAt = DateTime.UtcNow;
+                plan.ViewedBy = userId;
+                await UnitOfWork.SaveChangesAsync();
             }
 
             return new WeeklyPlanResponseDTO
@@ -110,6 +183,9 @@ namespace SoitMed.Services
                 Rating = plan.Rating,
                 ManagerComment = plan.ManagerComment,
                 ManagerReviewedAt = plan.ManagerReviewedAt,
+                ManagerViewedAt = plan.ManagerViewedAt,
+                ViewedBy = plan.ViewedBy,
+                IsViewed = plan.ManagerViewedAt.HasValue,
                 CreatedAt = plan.CreatedAt,
                 UpdatedAt = plan.UpdatedAt,
                 Tasks = plan.Tasks.Select(t => MapTaskToDTO(t)).ToList()

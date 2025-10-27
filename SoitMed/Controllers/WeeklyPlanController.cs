@@ -51,7 +51,13 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetWeeklyPlans([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetWeeklyPlans(
+            [FromQuery] int page = 1, 
+            [FromQuery] int pageSize = 20,
+            [FromQuery] string? employeeId = null,
+            [FromQuery] DateTime? weekStartDate = null,
+            [FromQuery] DateTime? weekEndDate = null,
+            [FromQuery] bool? isViewed = null)
         {
             try
             {
@@ -60,24 +66,95 @@ namespace SoitMed.Controllers
                     return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
 
                 var userRole = await GetCurrentUserRoleAsync();
-                var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansAsync(currentUser.Id, userRole, page, pageSize);
 
-                return Ok(ResponseHelper.CreateSuccessResponse(new
+                // If filters are provided, use filtered endpoint (only for managers/admins)
+                if (!string.IsNullOrEmpty(employeeId) || weekStartDate.HasValue || weekEndDate.HasValue || isViewed.HasValue)
                 {
-                    plans,
-                    pagination = new
+                    if (userRole != "SalesManager" && userRole != "SuperAdmin")
                     {
-                        page,
-                        pageSize,
-                        totalCount,
-                        totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                        return StatusCode(403, ResponseHelper.CreateErrorResponse("Only SalesManager and SuperAdmin can use filters"));
                     }
-                }));
+
+                    var filters = new WeeklyPlanFiltersDTO
+                    {
+                        EmployeeId = employeeId,
+                        WeekStartDate = weekStartDate,
+                        WeekEndDate = weekEndDate,
+                        IsViewed = isViewed
+                    };
+
+                    var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansWithFiltersAsync(filters, userRole, page, pageSize);
+
+                    return Ok(ResponseHelper.CreateSuccessResponse(new
+                    {
+                        plans,
+                        pagination = new
+                        {
+                            page,
+                            pageSize,
+                            totalCount,
+                            totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                        }
+                    }));
+                }
+                else
+                {
+                    // No filters, use regular endpoint
+                    var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansAsync(currentUser.Id, userRole, page, pageSize);
+
+                    return Ok(ResponseHelper.CreateSuccessResponse(new
+                    {
+                        plans,
+                        pagination = new
+                        {
+                            page,
+                            pageSize,
+                            totalCount,
+                            totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                        }
+                    }));
+                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting weekly plans");
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving weekly plans"));
+            }
+        }
+
+        [HttpGet("salesmen")]
+        [Authorize(Roles = "SalesManager,SuperAdmin")]
+        public async Task<IActionResult> GetAllSalesmen()
+        {
+            try
+            {
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
+
+                var salesmen = await UserManager.GetUsersInRoleAsync("Salesman");
+                
+                var salesmenList = salesmen.Select(u => new
+                {
+                    id = u.Id,
+                    firstName = u.FirstName,
+                    lastName = u.LastName,
+                    email = u.Email,
+                    phoneNumber = u.PhoneNumber,
+                    userName = u.UserName,
+                    isActive = u.IsActive
+                }).ToList();
+
+                return Ok(ResponseHelper.CreateSuccessResponse(salesmenList));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all salesmen");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving salesmen"));
             }
         }
 
@@ -90,7 +167,8 @@ namespace SoitMed.Controllers
                 if (currentUser == null)
                     return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
 
-                var plan = await _weeklyPlanService.GetWeeklyPlanAsync(id, currentUser.Id);
+                var userRole = await GetCurrentUserRoleAsync();
+                var plan = await _weeklyPlanService.GetWeeklyPlanAsync(id, currentUser.Id, userRole);
                 if (plan == null)
                 {
                     return NotFound(ResponseHelper.CreateErrorResponse("Weekly plan not found"));

@@ -6,6 +6,8 @@ namespace SoitMed.Repositories
     {
         Task<IEnumerable<WeeklyPlan>> GetEmployeePlansAsync(string employeeId, int page = 1, int pageSize = 20);
         Task<IEnumerable<WeeklyPlan>> GetAllPlansAsync(int page = 1, int pageSize = 20);
+        Task<IEnumerable<WeeklyPlan>> GetAllPlansWithFiltersAsync(string? employeeId, DateTime? weekStartDate, DateTime? weekEndDate, bool? isViewed, int page = 1, int pageSize = 20);
+        Task<int> CountAllPlansWithFiltersAsync(string? employeeId, DateTime? weekStartDate, DateTime? weekEndDate, bool? isViewed);
         Task<WeeklyPlan?> GetCurrentWeekPlanAsync(string employeeId);
         Task<WeeklyPlan?> GetPlanByWeekAsync(string employeeId, DateTime weekStart);
         Task<IEnumerable<WeeklyPlan>> GetPendingApprovalPlansAsync(int page = 1, int pageSize = 20);

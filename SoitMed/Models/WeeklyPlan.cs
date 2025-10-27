@@ -37,6 +37,11 @@ namespace SoitMed.Models
 
         public string? ReviewedBy { get; set; }
 
+        // Manager View Tracking
+        public DateTime? ManagerViewedAt { get; set; }
+
+        public string? ViewedBy { get; set; }
+
         // Navigation Properties
         public virtual ICollection<WeeklyPlanTask> Tasks { get; set; } = new List<WeeklyPlanTask>(); // NEW: Tasks instead of Items
     }

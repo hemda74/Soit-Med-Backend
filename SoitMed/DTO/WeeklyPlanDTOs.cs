@@ -36,6 +36,14 @@ namespace SoitMed.DTO
         public string? Comment { get; set; }
     }
 
+    public class WeeklyPlanFiltersDTO
+    {
+        public string? EmployeeId { get; set; }
+        public DateTime? WeekStartDate { get; set; }
+        public DateTime? WeekEndDate { get; set; }
+        public bool? IsViewed { get; set; }
+    }
+
 
     public class WeeklyPlanResponseDTO
     {
@@ -50,6 +58,9 @@ namespace SoitMed.DTO
         public int? Rating { get; set; }
         public string? ManagerComment { get; set; }
         public DateTime? ManagerReviewedAt { get; set; }
+        public DateTime? ManagerViewedAt { get; set; }
+        public string? ViewedBy { get; set; }
+        public bool IsViewed { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public List<WeeklyPlanTaskResponseDTO> Tasks { get; set; } = new();

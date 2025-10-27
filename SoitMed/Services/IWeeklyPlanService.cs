@@ -19,9 +19,14 @@ namespace SoitMed.Services
         Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansAsync(string userId, string userRole, int page, int pageSize);
 
         /// <summary>
+        /// Gets weekly plans with filters for managers/admins
+        /// </summary>
+        Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansWithFiltersAsync(WeeklyPlanFiltersDTO filters, string userRole, int page, int pageSize);
+
+        /// <summary>
         /// Gets a specific weekly plan by ID
         /// </summary>
-        Task<WeeklyPlanResponseDTO?> GetWeeklyPlanAsync(long id, string userId);
+        Task<WeeklyPlanResponseDTO?> GetWeeklyPlanAsync(long id, string userId, string userRole);
 
         /// <summary>
         /// Updates a weekly plan
