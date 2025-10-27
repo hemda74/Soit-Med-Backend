@@ -67,35 +67,71 @@ namespace SoitMed.Controllers
 
                 var userRole = await GetCurrentUserRoleAsync();
 
-                // If filters are provided, use filtered endpoint (only for managers/admins)
-                if (!string.IsNullOrEmpty(employeeId) || weekStartDate.HasValue || weekEndDate.HasValue || isViewed.HasValue)
+                // Check if filters are provided
+                bool hasFilters = !string.IsNullOrEmpty(employeeId) || weekStartDate.HasValue || weekEndDate.HasValue || isViewed.HasValue;
+
+                if (hasFilters)
                 {
-                    if (userRole != "SalesManager" && userRole != "SuperAdmin")
+                    // Salesmen can only filter by date, not by employee or viewed status
+                    if (userRole == "Salesman")
                     {
-                        return StatusCode(403, ResponseHelper.CreateErrorResponse("Only SalesManager and SuperAdmin can use filters"));
-                    }
-
-                    var filters = new WeeklyPlanFiltersDTO
-                    {
-                        EmployeeId = employeeId,
-                        WeekStartDate = weekStartDate,
-                        WeekEndDate = weekEndDate,
-                        IsViewed = isViewed
-                    };
-
-                    var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansWithFiltersAsync(filters, userRole, page, pageSize);
-
-                    return Ok(ResponseHelper.CreateSuccessResponse(new
-                    {
-                        plans,
-                        pagination = new
+                        if (!string.IsNullOrEmpty(employeeId) || isViewed.HasValue)
                         {
-                            page,
-                            pageSize,
-                            totalCount,
-                            totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                            return StatusCode(403, ResponseHelper.CreateErrorResponse("Salesmen can only filter by date range"));
                         }
-                    }));
+
+                        // For salesmen, only date filtering is allowed on their own plans
+                        var filters = new WeeklyPlanFiltersDTO
+                        {
+                            EmployeeId = currentUser.Id, // Force their own ID
+                            WeekStartDate = weekStartDate,
+                            WeekEndDate = weekEndDate,
+                            IsViewed = null // Salesmen can't filter by viewed status
+                        };
+
+                        var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansWithFiltersAsync(filters, userRole, page, pageSize);
+
+                        return Ok(ResponseHelper.CreateSuccessResponse(new
+                        {
+                            plans,
+                            pagination = new
+                            {
+                                page,
+                                pageSize,
+                                totalCount,
+                                totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                            }
+                        }));
+                    }
+                    else if (userRole == "SalesManager" || userRole == "SuperAdmin")
+                    {
+                        // Managers/admins can use all filters
+                        var filters = new WeeklyPlanFiltersDTO
+                        {
+                            EmployeeId = employeeId,
+                            WeekStartDate = weekStartDate,
+                            WeekEndDate = weekEndDate,
+                            IsViewed = isViewed
+                        };
+
+                        var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansWithFiltersAsync(filters, userRole, page, pageSize);
+
+                        return Ok(ResponseHelper.CreateSuccessResponse(new
+                        {
+                            plans,
+                            pagination = new
+                            {
+                                page,
+                                pageSize,
+                                totalCount,
+                                totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                            }
+                        }));
+                    }
+                    else
+                    {
+                        return StatusCode(403, ResponseHelper.CreateErrorResponse("You do not have permission to use filters"));
+                    }
                 }
                 else
                 {
