@@ -34,6 +34,8 @@ namespace SoitMed.Models
         [MaxLength(500)]
         public string? Description { get; set; }
         
+        public bool InStock { get; set; } = true;
+        
         // Navigation property
         public virtual SalesOffer Offer { get; set; } = null!;
     }

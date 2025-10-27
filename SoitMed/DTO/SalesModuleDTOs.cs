@@ -204,6 +204,7 @@ namespace SoitMed.DTO
         public string? ImagePath { get; set; }
         public decimal Price { get; set; }
         public string? Description { get; set; }
+        public bool InStock { get; set; } = true;
     }
 
     public class CreateOfferEquipmentDTO
@@ -227,6 +228,8 @@ namespace SoitMed.DTO
         
         [MaxLength(500)]
         public string? Description { get; set; }
+        
+        public bool InStock { get; set; } = true;
     }
 
     // Terms DTOs

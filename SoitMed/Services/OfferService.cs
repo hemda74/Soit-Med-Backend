@@ -360,6 +360,309 @@ namespace SoitMed.Services
 
         #endregion
 
+        #region Enhanced Offer Features - Equipment Management
+
+        public async Task<OfferEquipmentDTO> AddEquipmentAsync(long offerId, CreateOfferEquipmentDTO dto)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    throw new ArgumentException("Offer not found", nameof(offerId));
+
+                var equipment = new OfferEquipment
+                {
+                    OfferId = offerId,
+                    Name = dto.Name,
+                    Model = dto.Model,
+                    Provider = dto.Provider,
+                    Country = dto.Country,
+                    Price = dto.Price,
+                    Description = dto.Description,
+                    InStock = dto.InStock
+                };
+
+                await _unitOfWork.OfferEquipment.CreateAsync(equipment);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Equipment added to offer. OfferId: {OfferId}, EquipmentId: {EquipmentId}", offerId, equipment.Id);
+
+                return new OfferEquipmentDTO
+                {
+                    Id = equipment.Id,
+                    OfferId = equipment.OfferId,
+                    Name = equipment.Name,
+                    Model = equipment.Model,
+                    Provider = equipment.Provider,
+                    Country = equipment.Country,
+                    ImagePath = equipment.ImagePath,
+                    Price = equipment.Price,
+                    Description = equipment.Description,
+                    InStock = equipment.InStock
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding equipment to offer. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        public async Task<List<OfferEquipmentDTO>> GetEquipmentListAsync(long offerId)
+        {
+            try
+            {
+                var equipment = await _unitOfWork.OfferEquipment.GetByOfferIdAsync(offerId);
+                return equipment.Select(e => new OfferEquipmentDTO
+                {
+                    Id = e.Id,
+                    OfferId = e.OfferId,
+                    Name = e.Name,
+                    Model = e.Model,
+                    Provider = e.Provider,
+                    Country = e.Country,
+                    ImagePath = e.ImagePath,
+                    Price = e.Price,
+                    Description = e.Description,
+                    InStock = e.InStock
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting equipment list. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        public async Task<bool> DeleteEquipmentAsync(long offerId, long equipmentId)
+        {
+            try
+            {
+                var equipment = await _unitOfWork.OfferEquipment.GetByIdAsync(equipmentId);
+                if (equipment == null || equipment.OfferId != offerId)
+                    return false;
+
+                await _unitOfWork.OfferEquipment.DeleteAsync(equipment);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Equipment deleted. OfferId: {OfferId}, EquipmentId: {EquipmentId}", offerId, equipmentId);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting equipment. OfferId: {OfferId}, EquipmentId: {EquipmentId}", offerId, equipmentId);
+                throw;
+            }
+        }
+
+        #endregion
+
+        #region Enhanced Offer Features - Terms Management
+
+        public async Task<OfferTermsDTO> AddOrUpdateTermsAsync(long offerId, CreateOfferTermsDTO dto)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    throw new ArgumentException("Offer not found", nameof(offerId));
+
+                var existingTerms = await _unitOfWork.OfferTerms.GetByOfferIdAsync(offerId);
+
+                if (existingTerms != null)
+                {
+                    existingTerms.WarrantyPeriod = dto.WarrantyPeriod;
+                    existingTerms.DeliveryTime = dto.DeliveryTime;
+                    existingTerms.MaintenanceTerms = dto.MaintenanceTerms;
+                    existingTerms.OtherTerms = dto.OtherTerms;
+
+                    await _unitOfWork.OfferTerms.UpdateAsync(existingTerms);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    return new OfferTermsDTO
+                    {
+                        Id = existingTerms.Id,
+                        OfferId = existingTerms.OfferId,
+                        WarrantyPeriod = existingTerms.WarrantyPeriod,
+                        DeliveryTime = existingTerms.DeliveryTime,
+                        MaintenanceTerms = existingTerms.MaintenanceTerms,
+                        OtherTerms = existingTerms.OtherTerms
+                    };
+                }
+                else
+                {
+                    var terms = new OfferTerms
+                    {
+                        OfferId = offerId,
+                        WarrantyPeriod = dto.WarrantyPeriod,
+                        DeliveryTime = dto.DeliveryTime,
+                        MaintenanceTerms = dto.MaintenanceTerms,
+                        OtherTerms = dto.OtherTerms
+                    };
+
+                    await _unitOfWork.OfferTerms.CreateAsync(terms);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    return new OfferTermsDTO
+                    {
+                        Id = terms.Id,
+                        OfferId = terms.OfferId,
+                        WarrantyPeriod = terms.WarrantyPeriod,
+                        DeliveryTime = terms.DeliveryTime,
+                        MaintenanceTerms = terms.MaintenanceTerms,
+                        OtherTerms = terms.OtherTerms
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding/updating terms. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        #endregion
+
+        #region Enhanced Offer Features - Installment Plans
+
+        public async Task<List<InstallmentPlanDTO>> CreateInstallmentPlanAsync(long offerId, CreateInstallmentPlanDTO dto)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    throw new ArgumentException("Offer not found", nameof(offerId));
+
+                if (!offer.FinalPrice.HasValue || offer.FinalPrice.Value <= 0)
+                    throw new InvalidOperationException("Offer must have a valid FinalPrice to create installment plan");
+
+                var existingInstallments = await _unitOfWork.InstallmentPlans.GetByOfferIdAsync(offerId);
+                foreach (var existing in existingInstallments)
+                {
+                    await _unitOfWork.InstallmentPlans.DeleteAsync(existing);
+                }
+
+                var installments = new List<InstallmentPlan>();
+                decimal installmentAmount = offer.FinalPrice.Value / dto.NumberOfInstallments;
+                DateTime dueDate = dto.StartDate;
+
+                for (int i = 0; i < dto.NumberOfInstallments; i++)
+                {
+                    var installment = new InstallmentPlan
+                    {
+                        OfferId = offerId,
+                        InstallmentNumber = i + 1,
+                        Amount = i == dto.NumberOfInstallments - 1 
+                            ? offer.FinalPrice.Value - (installmentAmount * (dto.NumberOfInstallments - 1))
+                            : installmentAmount,
+                        DueDate = dueDate,
+                        Status = "Pending"
+                    };
+
+                    if (dto.PaymentFrequency == "Monthly")
+                        dueDate = dueDate.AddMonths(1);
+                    else if (dto.PaymentFrequency == "Quarterly")
+                        dueDate = dueDate.AddMonths(3);
+                    else if (dto.PaymentFrequency == "Weekly")
+                        dueDate = dueDate.AddDays(7);
+
+                    installments.Add(installment);
+                    await _unitOfWork.InstallmentPlans.CreateAsync(installment);
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+
+                return installments.Select(i => new InstallmentPlanDTO
+                {
+                    Id = i.Id,
+                    OfferId = i.OfferId,
+                    InstallmentNumber = i.InstallmentNumber,
+                    Amount = i.Amount,
+                    DueDate = i.DueDate,
+                    Status = i.Status,
+                    Notes = i.Notes
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating installment plan. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        #endregion
+
+        #region Enhanced Offer - Complete Details
+
+        public async Task<EnhancedOfferResponseDTO> GetEnhancedOfferAsync(long offerId)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    return null;
+
+                var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                var creator = await _unitOfWork.Users.GetByIdAsync(offer.CreatedBy);
+                var salesman = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
+
+                var equipment = await GetEquipmentListAsync(offerId);
+                var terms = await _unitOfWork.OfferTerms.GetByOfferIdAsync(offerId);
+                var installments = (await _unitOfWork.InstallmentPlans.GetByOfferIdAsync(offerId)).ToList();
+
+                return new EnhancedOfferResponseDTO
+                {
+                    Id = offer.Id,
+                    OfferRequestId = offer.OfferRequestId,
+                    ClientId = offer.ClientId,
+                    ClientName = client?.Name ?? "Unknown Client",
+                    CreatedBy = offer.CreatedBy,
+                    CreatedByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown Creator",
+                    AssignedTo = offer.AssignedTo,
+                    AssignedToName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Unknown Salesman",
+                    Products = offer.Products,
+                    TotalAmount = offer.TotalAmount,
+                    PaymentTerms = offer.PaymentTerms,
+                    DeliveryTerms = offer.DeliveryTerms,
+                    ValidUntil = offer.ValidUntil,
+                    Status = offer.Status,
+                    SentToClientAt = offer.SentToClientAt,
+                    ClientResponse = offer.ClientResponse,
+                    CreatedAt = offer.CreatedAt,
+                    PaymentType = offer.PaymentType,
+                    FinalPrice = offer.FinalPrice,
+                    OfferDuration = offer.OfferDuration,
+                    Equipment = equipment,
+                    Terms = terms != null ? new OfferTermsDTO
+                    {
+                        Id = terms.Id,
+                        OfferId = terms.OfferId,
+                        WarrantyPeriod = terms.WarrantyPeriod,
+                        DeliveryTime = terms.DeliveryTime,
+                        MaintenanceTerms = terms.MaintenanceTerms,
+                        OtherTerms = terms.OtherTerms
+                    } : null,
+                    Installments = installments.Select(i => new InstallmentPlanDTO
+                    {
+                        Id = i.Id,
+                        OfferId = i.OfferId,
+                        InstallmentNumber = i.InstallmentNumber,
+                        Amount = i.Amount,
+                        DueDate = i.DueDate,
+                        Status = i.Status,
+                        Notes = i.Notes
+                    }).ToList()
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting enhanced offer. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        #endregion
+
         #region Mapping Methods
 
         private async Task<OfferResponseDTO> MapToOfferResponseDTO(SalesOffer offer)
