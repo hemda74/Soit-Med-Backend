@@ -1,48 +1,58 @@
 using System.ComponentModel.DataAnnotations;
-using SoitMed.Models.Core;
+using System.ComponentModel.DataAnnotations.Schema;
 using SoitMed.Models.Identity;
 
 namespace SoitMed.Models
 {
-    public class WeeklyPlan : BaseEntity
+    /// <summary>
+    /// Weekly plan created by salesman at the beginning of each week
+    /// </summary>
+    public class WeeklyPlan
     {
-        [Required]
-        public string EmployeeId { get; set; } = string.Empty;
-
-        // Navigation Properties
-        public virtual ApplicationUser? Employee { get; set; }
+        [Key]
+        public int Id { get; set; }
 
         [Required]
-        public DateTime WeekStartDate { get; set; }
-
-        [Required]
-        public DateTime WeekEndDate { get; set; }
-
-        [Required, MaxLength(200)]
+        [MaxLength(200)]
         public string Title { get; set; } = string.Empty;
 
         [MaxLength(1000)]
         public string? Description { get; set; }
 
         [Required]
-        public bool IsActive { get; set; } = true;
+        public DateOnly WeekStartDate { get; set; }
 
-        // Manager Review Fields
-        public int? Rating { get; set; } // 1-5
+        [Required]
+        public DateOnly WeekEndDate { get; set; }
+
+        [Required]
+        [MaxLength(450)]
+        public string EmployeeId { get; set; } = string.Empty;
+
+        // Manager review fields
+        public int? Rating { get; set; } // 1-5 stars, nullable
 
         [MaxLength(1000)]
         public string? ManagerComment { get; set; }
 
         public DateTime? ManagerReviewedAt { get; set; }
 
-        public string? ReviewedBy { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        // Manager View Tracking
-        public DateTime? ManagerViewedAt { get; set; }
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        public string? ViewedBy { get; set; }
+        public bool IsActive { get; set; } = true;
 
-        // Navigation Properties
-        public virtual ICollection<WeeklyPlanTask> Tasks { get; set; } = new List<WeeklyPlanTask>(); // NEW: Tasks instead of Items
+        // Navigation properties
+        [ForeignKey("EmployeeId")]
+        public virtual ApplicationUser Employee { get; set; } = null!;
+
+        public virtual ICollection<WeeklyPlanTask> Tasks { get; set; } = new List<WeeklyPlanTask>();
+        
+        public virtual ICollection<DailyProgress> DailyProgresses { get; set; } = new List<DailyProgress>();
     }
 }
+
+
+
+
