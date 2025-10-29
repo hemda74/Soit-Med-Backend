@@ -180,16 +180,32 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SalesSupport,SalesManager")]
         public async Task<IActionResult> AddEquipment(long offerId, [FromBody] CreateOfferEquipmentDTO dto)
         {
-            var result = await _offerService.AddEquipmentAsync(offerId, dto);
-            return Ok(ResponseHelper.CreateSuccessResponse(result, "Equipment added"));
+            try
+            {
+                var result = await _offerService.AddEquipmentAsync(offerId, dto);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Equipment added"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding equipment to offer {OfferId}", offerId);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse($"Error adding equipment: {ex.Message}"));
+            }
         }
 
         [HttpGet("{offerId}/equipment")]
         [Authorize(Roles = "SalesSupport,SalesManager,Salesman")]
         public async Task<IActionResult> GetEquipment(long offerId)
         {
-            var result = await _offerService.GetEquipmentListAsync(offerId);
-            return Ok(ResponseHelper.CreateSuccessResponse(result, "Equipment retrieved"));
+            try
+            {
+                var result = await _offerService.GetEquipmentListAsync(offerId);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Equipment retrieved"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving equipment for offer {OfferId}", offerId);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse($"Error retrieving equipment: {ex.Message}"));
+            }
         }
 
         [HttpDelete("{offerId}/equipment/{equipmentId}")]
@@ -250,6 +266,47 @@ namespace SoitMed.Controllers
         {
             var result = await _offerService.GetOffersBySalesmanAsync(GetCurrentUserId());
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Retrieved"));
+        }
+
+        /// <summary>
+        /// Get offers assigned to a specific salesman (Manager/SuperAdmin only)
+        /// </summary>
+        [HttpGet("by-salesman/{salesmanId}")]
+        [Authorize(Roles = "SalesManager,SuperAdmin")]
+        public async Task<IActionResult> GetOffersBySalesman(string salesmanId)
+        {
+            try
+            {
+                var result = await _offerService.GetOffersBySalesmanAsync(salesmanId);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Salesman offers retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving offers for salesman {SalesmanId}", salesmanId);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving salesman offers"));
+            }
+        }
+
+        /// <summary>
+        /// Get offer request details for creating an offer
+        /// </summary>
+        [HttpGet("request/{requestId}/details")]
+        [Authorize(Roles = "SalesSupport,SalesManager")]
+        public async Task<IActionResult> GetOfferRequestDetails(long requestId)
+        {
+            try
+            {
+                var result = await _offerService.GetOfferRequestDetailsAsync(requestId);
+                if (result == null)
+                    return NotFound(ResponseHelper.CreateErrorResponse("Offer request not found"));
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer request details retrieved"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting offer request details for request {RequestId}", requestId);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving offer request details"));
+            }
         }
     }
 }

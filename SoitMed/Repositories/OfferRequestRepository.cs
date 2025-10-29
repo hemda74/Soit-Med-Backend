@@ -15,6 +15,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetRequestsByStatusAsync(string status)
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.Status == status)
                 .OrderByDescending(or => or.RequestDate)
                 .ToListAsync();
@@ -23,6 +24,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetRequestsBySalesmanAsync(string salesmanId)
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.RequestedBy == salesmanId)
                 .OrderByDescending(or => or.RequestDate)
                 .ToListAsync();
@@ -31,6 +33,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetRequestsAssignedToAsync(string supportId)
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.AssignedTo == supportId)
                 .OrderByDescending(or => or.RequestDate)
                 .ToListAsync();
@@ -39,6 +42,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetRequestsByClientIdAsync(long clientId)
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.ClientId == clientId)
                 .OrderByDescending(or => or.RequestDate)
                 .ToListAsync();
@@ -47,6 +51,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetRequestsByDateRangeAsync(DateTime startDate, DateTime endDate)
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.RequestDate >= startDate && or.RequestDate <= endDate)
                 .OrderByDescending(or => or.RequestDate)
                 .ToListAsync();
@@ -55,6 +60,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetPendingRequestsAsync()
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.Status == "Requested" || or.Status == "InProgress")
                 .OrderBy(or => or.RequestDate)
                 .ToListAsync();
@@ -63,6 +69,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetCompletedRequestsAsync()
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.Status == "Ready" || or.Status == "Sent")
                 .OrderByDescending(or => or.CompletedAt)
                 .ToListAsync();
@@ -71,6 +78,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetCancelledRequestsAsync()
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.Status == "Cancelled")
                 .OrderByDescending(or => or.RequestDate)
                 .ToListAsync();
@@ -90,6 +98,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetRequestsByTaskProgressIdAsync(long taskProgressId)
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.TaskProgressId == taskProgressId)
                 .OrderByDescending(or => or.RequestDate)
                 .ToListAsync();
@@ -98,12 +107,14 @@ namespace SoitMed.Repositories
         public async Task<int> GetRequestCountByStatusAsync(string status)
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .CountAsync(or => or.Status == status);
         }
 
         public async Task<int> GetRequestCountBySalesmanAsync(string salesmanId, DateTime? startDate, DateTime? endDate)
         {
             var query = _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.RequestedBy == salesmanId);
 
             if (startDate.HasValue)
@@ -118,6 +129,7 @@ namespace SoitMed.Repositories
         public async Task<int> GetRequestCountBySupportAsync(string supportId, DateTime? startDate, DateTime? endDate)
         {
             var query = _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.AssignedTo == supportId);
 
             if (startDate.HasValue)
@@ -134,6 +146,7 @@ namespace SoitMed.Repositories
             var overdueDate = DateTime.UtcNow.AddDays(-3); // Requests older than 3 days
 
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.Status == "Requested" && or.RequestDate <= overdueDate)
                 .OrderBy(or => or.RequestDate)
                 .ToListAsync();
@@ -142,6 +155,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetRequestsWithOffersAsync()
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.CreatedOffer != null)
                 .OrderByDescending(or => or.RequestDate)
                 .ToListAsync();
@@ -150,6 +164,7 @@ namespace SoitMed.Repositories
         public async Task<List<OfferRequest>> GetRequestsWithoutOffersAsync()
         {
             return await _context.OfferRequests
+                .AsNoTracking()
                 .Where(or => or.CreatedOffer == null && or.Status != "Cancelled")
                 .OrderBy(or => or.RequestDate)
                 .ToListAsync();

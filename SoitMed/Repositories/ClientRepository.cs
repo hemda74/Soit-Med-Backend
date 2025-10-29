@@ -11,14 +11,27 @@ namespace SoitMed.Repositories
 
         public async Task<IEnumerable<Client>> SearchClientsAsync(string query, int page = 1, int pageSize = 20)
         {
-            var normalizedQuery = query.ToLower();
+            var baseQuery = _context.Clients
+                .AsNoTracking()
+                .AsQueryable();
             
-            return await _context.Clients
-                .Where(c => c.Name.ToLower().Contains(normalizedQuery) ||
-                           (c.Specialization != null && c.Specialization.ToLower().Contains(normalizedQuery)) ||
-                           (c.Location != null && c.Location.ToLower().Contains(normalizedQuery)) ||
-                           (c.Phone != null && c.Phone.Contains(query)) ||
-                           (c.Email != null && c.Email.ToLower().Contains(normalizedQuery)))
+            // If query is provided, filter by it
+            // Note: After migration adds computed columns, use NameLower and EmailLower
+            // For now, using EF.Functions.Like for better index usage
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                var normalizedQuery = query.ToLower();
+                // Use EF.Functions.Like for case-insensitive search that can use indexes
+                baseQuery = baseQuery.Where(c => 
+                    EF.Functions.Like(c.Name, $"%{query}%") ||
+                    (c.Specialization != null && EF.Functions.Like(c.Specialization, $"%{query}%")) ||
+                    (c.Location != null && EF.Functions.Like(c.Location, $"%{query}%")) ||
+                    (c.Phone != null && EF.Functions.Like(c.Phone, $"%{query}%")) ||
+                    (c.Email != null && EF.Functions.Like(c.Email, $"%{query}%")));
+            }
+            
+            // Apply pagination
+            return await baseQuery
                 .OrderBy(c => c.Name)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -28,19 +41,22 @@ namespace SoitMed.Repositories
         public async Task<Client?> FindByNameAsync(string name)
         {
             return await _context.Clients
-                .FirstOrDefaultAsync(c => c.Name.ToLower() == name.ToLower());
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, name));
         }
 
         public async Task<Client?> FindByNameAndTypeAsync(string name, string type)
         {
             return await _context.Clients
-                .FirstOrDefaultAsync(c => c.Name.ToLower() == name.ToLower() && 
-                                        c.Type.ToLower() == type.ToLower());
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, name) && 
+                                        EF.Functions.Like(c.Type, type));
         }
 
         public async Task<IEnumerable<Client>> GetMyClientsAsync(string userId, int page = 1, int pageSize = 20)
         {
             return await _context.Clients
+                .AsNoTracking()
                 .Where(c => c.CreatedBy == userId || c.AssignedTo == userId)
                 .OrderByDescending(c => c.CreatedAt)
                 .Skip((page - 1) * pageSize)
@@ -53,6 +69,7 @@ namespace SoitMed.Repositories
             var today = DateTime.UtcNow.Date;
             
             return await _context.Clients
+                .AsNoTracking()
                 .Where(c => (c.CreatedBy == userId || c.AssignedTo == userId) &&
                            c.NextContactDate.HasValue &&
                            c.NextContactDate.Value.Date <= today &&
@@ -91,10 +108,13 @@ namespace SoitMed.Repositories
         public async Task<object> GetClientStatisticsAsync(string userId)
         {
             var myClients = await _context.Clients
+                .AsNoTracking()
                 .Where(c => c.CreatedBy == userId || c.AssignedTo == userId)
                 .ToListAsync();
 
-            var totalClients = await _context.Clients.CountAsync();
+            var totalClients = await _context.Clients
+                .AsNoTracking()
+                .CountAsync();
 
             var clientsByType = myClients
                 .GroupBy(c => c.Type)

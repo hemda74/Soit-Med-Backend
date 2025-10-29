@@ -11,13 +11,16 @@ namespace SoitMed.Services
     public class OfferRequestService : IOfferRequestService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly INotificationService _notificationService;
         private readonly ILogger<OfferRequestService> _logger;
 
         public OfferRequestService(
             IUnitOfWork unitOfWork,
+            INotificationService notificationService,
             ILogger<OfferRequestService> logger)
         {
             _unitOfWork = unitOfWork;
+            _notificationService = notificationService;
             _logger = logger;
         }
 
@@ -55,6 +58,42 @@ namespace SoitMed.Services
                 await _unitOfWork.SaveChangesAsync();
 
                 _logger.LogInformation("Offer request created successfully. RequestId: {RequestId}, ClientId: {ClientId}", offerRequest.Id, createDto.ClientId);
+
+                // Send notification to SalesSupport users
+                try
+                {
+                    var salesman = await _unitOfWork.Users.GetByIdAsync(userId);
+                    var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Salesman";
+                    
+                    var notificationTitle = "New Offer Request";
+                    var notificationMessage = $"{salesmanName} requested an offer for client: {client.Name}";
+                    
+                    // Get all SalesSupport users
+                    var salesSupportUsers = await _unitOfWork.Users.GetUsersInRoleAsync("SalesSupport");
+                    
+                    foreach (var supportUser in salesSupportUsers)
+                    {
+                        await _notificationService.CreateNotificationAsync(
+                            supportUser.Id,
+                            notificationTitle,
+                            notificationMessage,
+                            "OfferRequest",
+                            "High", // High priority for new offer requests
+                            null,
+                            null,
+                            true, // Mobile push notification
+                            CancellationToken.None
+                        );
+                        
+                        _logger.LogInformation("Notification sent to SalesSupport: {SupportUserId} for OfferRequest: {RequestId}", 
+                            supportUser.Id, offerRequest.Id);
+                    }
+                }
+                catch (Exception notifEx)
+                {
+                    // Log but don't fail the offer request creation
+                    _logger.LogWarning(notifEx, "Failed to send notification for offer request {RequestId}", offerRequest.Id);
+                }
 
                 return await MapToResponseDTO(offerRequest);
             }

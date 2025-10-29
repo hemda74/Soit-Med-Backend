@@ -11,7 +11,7 @@ namespace SoitMed.Services
         Task<ClientResponseDTO> CreateClientAsync(CreateClientDTO createClientDto, string userId);
         Task<ClientResponseDTO?> GetClientAsync(long clientId);
         Task<ClientProfileDTO?> GetClientProfileAsync(long clientId, string userId);
-        Task<List<ClientResponseDTO>> GetMyClientsAsync(string userId);
+        Task<List<ClientResponseDTO>> GetMyClientsAsync(string userId, int page = 1, int pageSize = 20);
         Task<List<ClientResponseDTO>> GetClientsNeedingFollowUpAsync(string userId);
         Task<ClientResponseDTO> UpdateClientAsync(long clientId, CreateClientDTO updateClientDto, string userId);
         Task<bool> DeleteClientAsync(long clientId, string userId);

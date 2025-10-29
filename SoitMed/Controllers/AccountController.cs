@@ -63,17 +63,20 @@ namespace SoitMed.Controllers
 					bool found= await userManager.CheckPasswordAsync(UserFromDB,userDTO.Password);
 					if (found)
 					{
-						//Create Token
-						List<Claim> myclaims = new List<Claim>();
-						myclaims.Add(new Claim(ClaimTypes.Name,UserFromDB.UserName ?? ""));
-						myclaims.Add(new Claim(ClaimTypes.NameIdentifier, UserFromDB.Id));
-						myclaims.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
+					//Create Token
+					List<Claim> myclaims = new List<Claim>();
+					myclaims.Add(new Claim(ClaimTypes.Name,UserFromDB.UserName ?? ""));
+					myclaims.Add(new Claim(ClaimTypes.NameIdentifier, UserFromDB.Id));
+					myclaims.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
+					
+					// Add Soit-Med branding claim
+					myclaims.Add(new Claim("application", "Soit-Med"));
 
-						var roles=await userManager.GetRolesAsync(UserFromDB);
-						foreach (var role in roles)
-						{
-							myclaims.Add(new Claim(ClaimTypes.Role, role));
-						}
+					var roles=await userManager.GetRolesAsync(UserFromDB);
+					foreach (var role in roles)
+					{
+						myclaims.Add(new Claim(ClaimTypes.Role, role));
+					}
 
 						var SignKey = new SymmetricSecurityKey(
 						   Encoding.UTF8.GetBytes(config["JWT:SecritKey"] ?? ""));

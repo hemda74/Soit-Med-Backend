@@ -15,6 +15,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetProgressesByTaskIdAsync(long taskId)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.TaskId == taskId)
                 .OrderBy(tp => tp.ProgressDate)
                 .ToListAsync();
@@ -23,6 +24,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetProgressesByClientIdAsync(long clientId)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.ClientId == clientId)
                 .OrderByDescending(tp => tp.ProgressDate)
                 .ToListAsync();
@@ -31,6 +33,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetProgressesByEmployeeAsync(string employeeId, DateTime? startDate, DateTime? endDate)
         {
             var query = _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.EmployeeId == employeeId);
 
             if (startDate.HasValue)
@@ -46,7 +49,9 @@ namespace SoitMed.Repositories
 
         public async Task<List<TaskProgress>> GetAllProgressesAsync(DateTime? startDate, DateTime? endDate)
         {
-            var query = _context.TaskProgresses.AsQueryable();
+            var query = _context.TaskProgresses
+                .AsNoTracking()
+                .AsQueryable();
 
             if (startDate.HasValue)
                 query = query.Where(tp => tp.ProgressDate >= startDate.Value);
@@ -62,6 +67,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetProgressesByDateRangeAsync(DateTime startDate, DateTime endDate)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.ProgressDate >= startDate && tp.ProgressDate <= endDate)
                 .OrderByDescending(tp => tp.ProgressDate)
                 .ToListAsync();
@@ -70,6 +76,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetProgressesByProgressTypeAsync(string progressType)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.ProgressType == progressType)
                 .OrderByDescending(tp => tp.ProgressDate)
                 .ToListAsync();
@@ -78,6 +85,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetProgressesByVisitResultAsync(string visitResult)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.VisitResult == visitResult)
                 .OrderByDescending(tp => tp.ProgressDate)
                 .ToListAsync();
@@ -86,6 +94,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetProgressesByNextStepAsync(string nextStep)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.NextStep == nextStep)
                 .OrderByDescending(tp => tp.ProgressDate)
                 .ToListAsync();
@@ -94,6 +103,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetOverdueFollowUpsAsync(string employeeId, DateTime currentDate)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.EmployeeId == employeeId &&
                            tp.NextFollowUpDate.HasValue &&
                            tp.NextFollowUpDate.Value.Date <= currentDate.Date)
@@ -104,6 +114,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetProgressesWithOfferRequestsAsync()
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.OfferRequestId.HasValue)
                 .OrderByDescending(tp => tp.ProgressDate)
                 .ToListAsync();
@@ -114,6 +125,7 @@ namespace SoitMed.Repositories
             // Since TaskProgress doesn't have DealId, we'll return all progresses
             // In a real implementation, you might want to join with a deals table
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .OrderByDescending(tp => tp.ProgressDate)
                 .ToListAsync();
         }
@@ -131,6 +143,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetProgressesBySatisfactionRatingAsync(int minRating, int maxRating)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.SatisfactionRating.HasValue &&
                            tp.SatisfactionRating.Value >= minRating &&
                            tp.SatisfactionRating.Value <= maxRating)
@@ -141,6 +154,7 @@ namespace SoitMed.Repositories
         public async Task<int> GetProgressCountByEmployeeAsync(string employeeId, DateTime? startDate, DateTime? endDate)
         {
             var query = _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.EmployeeId == employeeId);
 
             if (startDate.HasValue)
@@ -155,12 +169,14 @@ namespace SoitMed.Repositories
         public async Task<int> GetProgressCountByClientAsync(long clientId)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .CountAsync(tp => tp.ClientId == clientId);
         }
 
         public async Task<double> GetAverageSatisfactionRatingByEmployeeAsync(string employeeId, DateTime? startDate, DateTime? endDate)
         {
             var query = _context.TaskProgresses
+                .AsNoTracking()
                 .Where(tp => tp.EmployeeId == employeeId && tp.SatisfactionRating.HasValue);
 
             if (startDate.HasValue)
@@ -175,6 +191,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetRecentProgressesAsync(int count)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .OrderByDescending(tp => tp.CreatedAt)
                 .Take(count)
                 .ToListAsync();
@@ -183,6 +200,7 @@ namespace SoitMed.Repositories
         public async Task<List<TaskProgress>> GetProgressesByTaskStatusAsync(string taskStatus)
         {
             return await _context.TaskProgresses
+                .AsNoTracking()
                 .Include(tp => tp.Task)
                 .Where(tp => tp.Task.Status == taskStatus)
                 .OrderByDescending(tp => tp.ProgressDate)

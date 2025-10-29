@@ -63,6 +63,9 @@ namespace SoitMed.Repositories
         private IOfferTermsRepository? _offerTerms;
         private IInstallmentPlanRepository? _installmentPlans;
 
+        // Salesman targets repository
+        private ISalesmanTargetRepository? _salesmanTargets;
+
         public UnitOfWork(Context context)
         {
             _context = context;
@@ -173,6 +176,8 @@ namespace SoitMed.Repositories
         public IInstallmentPlanRepository InstallmentPlans => 
             _installmentPlans ??= new InstallmentPlanRepository(_context);
 
+        public ISalesmanTargetRepository SalesmanTargets => 
+            _salesmanTargets ??= new SalesmanTargetRepository(_context);
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

@@ -25,7 +25,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace SoitMed
 {
-    public class Program
+    public partial class Program
     {
         public static async Task Main(string[] args)
         {
@@ -142,9 +142,34 @@ namespace SoitMed
            
             builder.Services.AddCors(options => {
                 options.AddPolicy("MyPolicy",
-                                  policy => policy.AllowAnyMethod()
-                                  .AllowAnyOrigin()
-                                  .AllowAnyHeader());
+                                  policy => policy
+                                  .SetIsOriginAllowed(origin => 
+                                  {
+                                      // Allow any localhost origin (any port) in development
+                                      var allowedOrigins = new[] 
+                                      {
+                                          "http://localhost",
+                                          "https://localhost",
+                                          "http://127.0.0.1",
+                                          "https://127.0.0.1"
+                                      };
+                                      
+                                      // Check if origin contains allowed patterns
+                                      if (builder.Environment.IsDevelopment())
+                                      {
+                                          // In development, allow any localhost on any port
+                                          return origin != null && (
+                                              origin.Contains("localhost") || 
+                                              origin.Contains("127.0.0.1")
+                                          );
+                                      }
+                                      
+                                      // In production, check against allowed origins
+                                      return allowedOrigins.Any(allowed => origin?.StartsWith(allowed) == true);
+                                  })
+                                  .AllowAnyMethod()
+                                  .AllowAnyHeader()
+                                  .AllowCredentials());  // Required for JWT tokens
             });
 			///this for make authorization to Admin
 			builder.Services.AddAuthorization(options =>
@@ -168,6 +193,7 @@ namespace SoitMed
             // Register Sales Report Services
             builder.Services.AddScoped<ISalesReportRepository, SalesReportRepository>();
             builder.Services.AddScoped<ISalesReportService, SalesReportService>();
+            builder.Services.AddScoped<ISalesmanStatisticsService, SalesmanStatisticsService>();
             
             // Register Image Upload Services
             builder.Services.AddScoped<IImageUploadService, ImageUploadService>();

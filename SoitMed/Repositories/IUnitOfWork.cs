@@ -58,6 +58,9 @@ namespace SoitMed.Repositories
         IOfferTermsRepository OfferTerms { get; }
         IInstallmentPlanRepository InstallmentPlans { get; }
 
+        // Salesman targets repository
+        ISalesmanTargetRepository SalesmanTargets { get; }
+
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
         Task BeginTransactionAsync(CancellationToken cancellationToken = default);

@@ -198,7 +198,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ActivityLogs", (string)null);
+                    b.ToTable("ActivityLogs");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Client", b =>
@@ -316,7 +316,7 @@ namespace SoitMed.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Clients", (string)null);
+                    b.ToTable("Clients");
                 });
 
             modelBuilder.Entity("SoitMed.Models.ClientAnalytics", b =>
@@ -389,7 +389,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientAnalytics", (string)null);
+                    b.ToTable("ClientAnalytics");
                 });
 
             modelBuilder.Entity("SoitMed.Models.ClientInteraction", b =>
@@ -457,7 +457,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientInteractions", (string)null);
+                    b.ToTable("ClientInteractions");
                 });
 
             modelBuilder.Entity("SoitMed.Models.ClientVisit", b =>
@@ -529,7 +529,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientVisits", (string)null);
+                    b.ToTable("ClientVisits");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Core.Department", b =>
@@ -557,7 +557,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Departments", (string)null);
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Core.Role", b =>
@@ -588,7 +588,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("RoleName")
                         .IsUnique();
 
-                    b.ToTable("BusinessRoles", (string)null);
+                    b.ToTable("BusinessRoles");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Deal", b =>
@@ -654,8 +654,9 @@ namespace SoitMed.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -680,7 +681,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("Deals", (string)null);
+                    b.ToTable("Deals");
                 });
 
             modelBuilder.Entity("SoitMed.Models.DeliveryTerms", b =>
@@ -750,7 +751,7 @@ namespace SoitMed.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DeliveryTerms", (string)null);
+                    b.ToTable("DeliveryTerms");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Equipment.Equipment", b =>
@@ -822,7 +823,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("QRCode")
                         .IsUnique();
 
-                    b.ToTable("Equipment", (string)null);
+                    b.ToTable("Equipment");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Equipment.RepairRequest", b =>
@@ -903,7 +904,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("TechnicianId");
 
-                    b.ToTable("RepairRequests", null, t =>
+                    b.ToTable("RepairRequests", t =>
                         {
                             t.HasCheckConstraint("CK_RepairRequest_Requestor", "(DoctorId IS NOT NULL AND TechnicianId IS NULL) OR (DoctorId IS NULL AND TechnicianId IS NOT NULL)");
                         });
@@ -946,7 +947,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Doctors", (string)null);
+                    b.ToTable("Doctors");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.DoctorHospital", b =>
@@ -977,7 +978,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("DoctorId", "HospitalId")
                         .IsUnique();
 
-                    b.ToTable("DoctorHospitals", (string)null);
+                    b.ToTable("DoctorHospitals");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Hospital", b =>
@@ -1016,7 +1017,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("HospitalId")
                         .IsUnique();
 
-                    b.ToTable("Hospitals", (string)null);
+                    b.ToTable("Hospitals");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Technician", b =>
@@ -1056,7 +1057,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Technicians", (string)null);
+                    b.ToTable("Technicians");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Identity.ApplicationUser", b =>
@@ -1200,7 +1201,49 @@ namespace SoitMed.Migrations
                         .IsUnique()
                         .HasFilter("[IsProfileImage] = 1");
 
-                    b.ToTable("UserImages", (string)null);
+                    b.ToTable("UserImages");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.InstallmentPlan", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("InstallmentNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<long>("OfferId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OfferId");
+
+                    b.ToTable("InstallmentPlan", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.Location.Engineer", b =>
@@ -1238,7 +1281,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Engineers", (string)null);
+                    b.ToTable("Engineers");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Location.EngineerGovernorate", b =>
@@ -1268,7 +1311,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("EngineerId", "GovernorateId")
                         .IsUnique();
 
-                    b.ToTable("EngineerGovernorates", (string)null);
+                    b.ToTable("EngineerGovernorates");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Location.Governorate", b =>
@@ -1295,7 +1338,7 @@ namespace SoitMed.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Governorates", (string)null);
+                    b.ToTable("Governorates");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Notification", b =>
@@ -1358,7 +1401,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("UserId", "IsRead");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Offer", b =>
@@ -1428,8 +1471,9 @@ namespace SoitMed.Migrations
                     b.Property<DateTime?>("SentAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -1457,7 +1501,62 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("Offers", (string)null);
+                    b.ToTable("Offers");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.OfferEquipment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ImagePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("InStock")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long>("OfferId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OfferId");
+
+                    b.ToTable("OfferEquipment", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.OfferRequest", b =>
@@ -1483,6 +1582,9 @@ namespace SoitMed.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<long?>("CreatedOfferId")
+                        .HasColumnType("bigint");
 
                     b.Property<DateTime>("RequestDate")
                         .HasColumnType("datetime2");
@@ -1517,13 +1619,58 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
+                    b.HasIndex("CreatedOfferId")
+                        .IsUnique()
+                        .HasFilter("[CreatedOfferId] IS NOT NULL");
+
                     b.HasIndex("RequestedBy");
 
                     b.HasIndex("TaskProgressId");
 
                     b.HasIndex("Status", "RequestedBy");
 
-                    b.ToTable("OfferRequests", (string)null);
+                    b.ToTable("OfferRequests");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.OfferTerms", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeliveryTime")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("MaintenanceTerms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<long>("OfferId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("OtherTerms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WarrantyPeriod")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OfferId")
+                        .IsUnique();
+
+                    b.ToTable("OfferTerms", (string)null);
                 });
 
             modelBuilder.Entity("SoitMed.Models.PaymentTerms", b =>
@@ -1592,7 +1739,7 @@ namespace SoitMed.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PaymentTerms", (string)null);
+                    b.ToTable("PaymentTerms");
                 });
 
             modelBuilder.Entity("SoitMed.Models.RequestWorkflow", b =>
@@ -1691,7 +1838,209 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ToUserId", "Status");
 
-                    b.ToTable("RequestWorkflows", (string)null);
+                    b.ToTable("RequestWorkflows");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.SalesDeal", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ClientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("ClosedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CompletionNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("DealValue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("DeliveryTerms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("ExpectedDeliveryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ManagerApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ManagerApprovedBy")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ManagerComments")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ManagerRejectionReason")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<long?>("OfferId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("PaymentTerms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("SalesmanId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("SentToLegalAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("SuperAdminApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SuperAdminApprovedBy")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("SuperAdminComments")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("SuperAdminRejectionReason")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("ManagerApprovedBy");
+
+                    b.HasIndex("OfferId")
+                        .IsUnique()
+                        .HasFilter("[OfferId] IS NOT NULL");
+
+                    b.HasIndex("SalesmanId");
+
+                    b.HasIndex("SuperAdminApprovedBy");
+
+                    b.HasIndex("Status", "ManagerApprovedBy");
+
+                    b.HasIndex("Status", "SalesmanId");
+
+                    b.HasIndex("Status", "SuperAdminApprovedBy");
+
+                    b.ToTable("SalesDeals");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.SalesOffer", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AssignedTo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<long>("ClientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ClientResponse")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("DeliveryTerms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Documents")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<decimal?>("FinalPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("OfferDuration")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long?>("OfferRequestId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("PaymentTerms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("PaymentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Products")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("SentToClientAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ValidUntil")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedTo");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("Status", "AssignedTo");
+
+                    b.ToTable("SalesOffers");
                 });
 
             modelBuilder.Entity("SoitMed.Models.SalesReport", b =>
@@ -1745,7 +2094,67 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("SalesReports", (string)null);
+                    b.ToTable("SalesReports");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.SalesmanTarget", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByManagerId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsTeamTarget")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int?>("Quarter")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SalesmanId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("TargetDeals")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("TargetOfferAcceptanceRate")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("TargetOffers")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetSuccessfulVisits")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetVisits")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByManagerId");
+
+                    b.HasIndex("SalesmanId", "Year", "Quarter")
+                        .IsUnique()
+                        .HasFilter("[SalesmanId] IS NOT NULL AND [Quarter] IS NOT NULL");
+
+                    b.ToTable("SalesmanTargets");
                 });
 
             modelBuilder.Entity("SoitMed.Models.TaskProgress", b =>
@@ -1800,9 +2209,6 @@ namespace SoitMed.Migrations
                     b.Property<long?>("OfferRequestId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("OfferRequestId1")
-                        .HasColumnType("bigint");
-
                     b.Property<DateTime>("ProgressDate")
                         .HasColumnType("datetime2");
 
@@ -1828,13 +2234,11 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.HasIndex("OfferRequestId1");
-
                     b.HasIndex("TaskId");
 
                     b.HasIndex("ClientId", "ProgressDate");
 
-                    b.ToTable("TaskProgresses", (string)null);
+                    b.ToTable("TaskProgresses");
                 });
 
             modelBuilder.Entity("SoitMed.Models.WeeklyPlan", b =>
@@ -1854,7 +2258,7 @@ namespace SoitMed.Migrations
 
                     b.Property<string>("EmployeeId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -1864,6 +2268,9 @@ namespace SoitMed.Migrations
                         .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTime?>("ManagerReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ManagerViewedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int?>("Rating")
@@ -1880,6 +2287,9 @@ namespace SoitMed.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("ViewedBy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("WeekEndDate")
                         .HasColumnType("datetime2");
 
@@ -1888,7 +2298,9 @@ namespace SoitMed.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("WeeklyPlans", (string)null);
+                    b.HasIndex("EmployeeId");
+
+                    b.ToTable("WeeklyPlans");
                 });
 
             modelBuilder.Entity("SoitMed.Models.WeeklyPlanTask", b =>
@@ -1941,7 +2353,7 @@ namespace SoitMed.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<DateTime>("PlannedDate")
+                    b.Property<DateTime?>("PlannedDate")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("PlannedTime")
@@ -1967,6 +2379,11 @@ namespace SoitMed.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -1979,7 +2396,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("WeeklyPlanId", "Status");
 
-                    b.ToTable("WeeklyPlanTasks", (string)null);
+                    b.ToTable("WeeklyPlanTasks");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -2058,7 +2475,7 @@ namespace SoitMed.Migrations
             modelBuilder.Entity("SoitMed.Models.ClientInteraction", b =>
                 {
                     b.HasOne("SoitMed.Models.Client", "Client")
-                        .WithMany("Interactions")
+                        .WithMany()
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2069,7 +2486,7 @@ namespace SoitMed.Migrations
             modelBuilder.Entity("SoitMed.Models.ClientVisit", b =>
                 {
                     b.HasOne("SoitMed.Models.Client", "Client")
-                        .WithMany("Visits")
+                        .WithMany()
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2086,7 +2503,7 @@ namespace SoitMed.Migrations
                         .IsRequired();
 
                     b.HasOne("SoitMed.Models.Client", "Client")
-                        .WithMany()
+                        .WithMany("Deals")
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2215,6 +2632,17 @@ namespace SoitMed.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.InstallmentPlan", b =>
+                {
+                    b.HasOne("SoitMed.Models.SalesOffer", "Offer")
+                        .WithMany("InstallmentPlans")
+                        .HasForeignKey("OfferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Offer");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Location.Engineer", b =>
                 {
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "User")
@@ -2270,7 +2698,7 @@ namespace SoitMed.Migrations
                         .IsRequired();
 
                     b.HasOne("SoitMed.Models.Client", "Client")
-                        .WithMany()
+                        .WithMany("Offers")
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2278,6 +2706,17 @@ namespace SoitMed.Migrations
                     b.Navigation("ActivityLog");
 
                     b.Navigation("Client");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.OfferEquipment", b =>
+                {
+                    b.HasOne("SoitMed.Models.SalesOffer", "Offer")
+                        .WithMany("Equipment")
+                        .HasForeignKey("OfferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Offer");
                 });
 
             modelBuilder.Entity("SoitMed.Models.OfferRequest", b =>
@@ -2292,6 +2731,11 @@ namespace SoitMed.Migrations
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("SoitMed.Models.SalesOffer", "CreatedOffer")
+                        .WithOne("OfferRequest")
+                        .HasForeignKey("SoitMed.Models.OfferRequest", "CreatedOfferId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Requester")
                         .WithMany()
@@ -2308,9 +2752,22 @@ namespace SoitMed.Migrations
 
                     b.Navigation("Client");
 
+                    b.Navigation("CreatedOffer");
+
                     b.Navigation("Requester");
 
                     b.Navigation("TaskProgress");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.OfferTerms", b =>
+                {
+                    b.HasOne("SoitMed.Models.SalesOffer", "Offer")
+                        .WithOne("Terms")
+                        .HasForeignKey("SoitMed.Models.OfferTerms", "OfferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Offer");
                 });
 
             modelBuilder.Entity("SoitMed.Models.RequestWorkflow", b =>
@@ -2368,6 +2825,73 @@ namespace SoitMed.Migrations
                     b.Navigation("ToUser");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.SalesDeal", b =>
+                {
+                    b.HasOne("SoitMed.Models.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "ManagerApprover")
+                        .WithMany()
+                        .HasForeignKey("ManagerApprovedBy")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SoitMed.Models.SalesOffer", "Offer")
+                        .WithOne("Deal")
+                        .HasForeignKey("SoitMed.Models.SalesDeal", "OfferId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Salesman")
+                        .WithMany()
+                        .HasForeignKey("SalesmanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "SuperAdminApprover")
+                        .WithMany()
+                        .HasForeignKey("SuperAdminApprovedBy")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Client");
+
+                    b.Navigation("ManagerApprover");
+
+                    b.Navigation("Offer");
+
+                    b.Navigation("Salesman");
+
+                    b.Navigation("SuperAdminApprover");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.SalesOffer", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Salesman")
+                        .WithMany()
+                        .HasForeignKey("AssignedTo")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Creator")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+
+                    b.Navigation("Creator");
+
+                    b.Navigation("Salesman");
+                });
+
             modelBuilder.Entity("SoitMed.Models.SalesReport", b =>
                 {
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Employee")
@@ -2377,6 +2901,24 @@ namespace SoitMed.Migrations
                         .IsRequired();
 
                     b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.SalesmanTarget", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Manager")
+                        .WithMany()
+                        .HasForeignKey("CreatedByManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Salesman")
+                        .WithMany()
+                        .HasForeignKey("SalesmanId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Manager");
+
+                    b.Navigation("Salesman");
                 });
 
             modelBuilder.Entity("SoitMed.Models.TaskProgress", b =>
@@ -2392,10 +2934,6 @@ namespace SoitMed.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SoitMed.Models.OfferRequest", "OfferRequest")
-                        .WithMany()
-                        .HasForeignKey("OfferRequestId1");
-
                     b.HasOne("SoitMed.Models.WeeklyPlanTask", "Task")
                         .WithMany("Progresses")
                         .HasForeignKey("TaskId")
@@ -2406,9 +2944,18 @@ namespace SoitMed.Migrations
 
                     b.Navigation("Employee");
 
-                    b.Navigation("OfferRequest");
-
                     b.Navigation("Task");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.WeeklyPlan", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
                 });
 
             modelBuilder.Entity("SoitMed.Models.WeeklyPlanTask", b =>
@@ -2438,11 +2985,11 @@ namespace SoitMed.Migrations
 
             modelBuilder.Entity("SoitMed.Models.Client", b =>
                 {
-                    b.Navigation("Interactions");
+                    b.Navigation("Deals");
+
+                    b.Navigation("Offers");
 
                     b.Navigation("TaskProgresses");
-
-                    b.Navigation("Visits");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Core.Department", b =>
@@ -2491,6 +3038,19 @@ namespace SoitMed.Migrations
             modelBuilder.Entity("SoitMed.Models.Location.Governorate", b =>
                 {
                     b.Navigation("EngineerGovernorates");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.SalesOffer", b =>
+                {
+                    b.Navigation("Deal");
+
+                    b.Navigation("Equipment");
+
+                    b.Navigation("InstallmentPlans");
+
+                    b.Navigation("OfferRequest");
+
+                    b.Navigation("Terms");
                 });
 
             modelBuilder.Entity("SoitMed.Models.WeeklyPlan", b =>
