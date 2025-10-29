@@ -217,6 +217,27 @@ namespace SoitMed.Controllers
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving assigned offer requests"));
             }
         }
+
+        /// <summary>
+        /// Get my own offer requests (for salesmen)
+        /// </summary>
+        [HttpGet("my-requests")]
+        [Authorize(Roles = "Salesman,SalesManager")]
+        public async Task<IActionResult> GetMyOfferRequests([FromQuery] string? status = null)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await _offerRequestService.GetOfferRequestsBySalesmanAsync(userId, status);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "My offer requests retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving my offer requests");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving your offer requests"));
+            }
+        }
     }
 }
 

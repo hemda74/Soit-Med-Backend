@@ -92,17 +92,20 @@ namespace SoitMed.Services
                 // The controller's [Authorize(Roles="Salesman,SalesManager,SuperAdmin")] handles role check
                 // For data filtering, check if client is assigned to user when needed
 
-                // Get all task progresses (visits/interactions)
-                var taskProgresses = await _unitOfWork.TaskProgresses
+                // Use parallel queries for better performance
+                var taskProgressesTask = _unitOfWork.TaskProgresses
                     .GetProgressesByClientIdAsync(clientId);
-
-                // Get all offers
-                var offers = await _unitOfWork.SalesOffers
+                var offersTask = _unitOfWork.SalesOffers
                     .GetOffersByClientIdAsync(clientId);
-
-                // Get all deals
-                var deals = await _unitOfWork.SalesDeals
+                var dealsTask = _unitOfWork.SalesDeals
                     .GetDealsByClientIdAsync(clientId);
+
+                // Wait for all queries to complete in parallel
+                await Task.WhenAll(taskProgressesTask, offersTask, dealsTask);
+
+                var taskProgresses = await taskProgressesTask;
+                var offers = await offersTask;
+                var deals = await dealsTask;
 
                 // Calculate statistics
                 var statistics = new ClientStatisticsDTO
@@ -133,11 +136,11 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<List<ClientResponseDTO>> GetMyClientsAsync(string userId)
+        public async Task<List<ClientResponseDTO>> GetMyClientsAsync(string userId, int page = 1, int pageSize = 20)
         {
             try
             {
-                var clients = await _unitOfWork.Clients.GetMyClientsAsync(userId, 1, 20);
+                var clients = await _unitOfWork.Clients.GetMyClientsAsync(userId, page, pageSize);
                 return clients.Select(MapToClientResponseDTO).ToList();
             }
             catch (Exception ex)
@@ -232,7 +235,8 @@ namespace SoitMed.Services
         {
             try
             {
-                var clients = await _unitOfWork.Clients.SearchClientsAsync(searchDto.Query);
+                // Repository now handles empty search terms and returns all clients
+                var clients = await _unitOfWork.Clients.SearchClientsAsync(searchDto.Query ?? string.Empty, searchDto.Page, searchDto.PageSize);
                 return clients.Select(MapToClientResponseDTO).ToList();
             }
             catch (Exception ex)

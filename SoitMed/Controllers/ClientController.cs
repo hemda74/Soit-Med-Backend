@@ -198,7 +198,7 @@ namespace SoitMed.Controllers
                 if (page < 1 || pageSize < 1 || pageSize > 100)
                     return BadRequest(CreateErrorResponse("معاملات الصفحة غير صحيحة"));
 
-                var result = await _clientService.GetMyClientsAsync(currentUser.Id);
+                var result = await _clientService.GetMyClientsAsync(currentUser.Id, page, pageSize);
                 return Ok(CreateSuccessResponse(result));
             }
             catch (Exception ex)

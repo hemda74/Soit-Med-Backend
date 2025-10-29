@@ -108,10 +108,9 @@ namespace SoitMed.Services
         {
             var errors = new List<string>();
 
-            if (string.IsNullOrWhiteSpace(searchDto.Query))
-                errors.Add("نص البحث مطلوب");
-
-            if (searchDto.Query.Length < 2)
+            // Search term is optional - allow empty search for browsing all clients
+            // Only validate length if a search term is provided
+            if (!string.IsNullOrWhiteSpace(searchDto.Query) && searchDto.Query.Length < 2)
                 errors.Add("نص البحث يجب أن يكون حرفين على الأقل");
 
             if (searchDto.Page < 1)

@@ -130,8 +130,7 @@ namespace SoitMed.DTO
     // ==================== Offer DTOs ====================
     public class CreateOfferDTO
     {
-        [Required]
-        public long OfferRequestId { get; set; }
+        public long? OfferRequestId { get; set; } // Optional - can create offer without request
 
         [Required]
         public long ClientId { get; set; }
@@ -158,6 +157,16 @@ namespace SoitMed.DTO
 
         [MaxLength(2000)]
         public string? Notes { get; set; }
+        
+        // Optional fields for enhanced offer features
+        [MaxLength(50)]
+        public string? PaymentType { get; set; } // Cash, Installments, Other
+        
+        [Range(0.01, double.MaxValue)]
+        public decimal? FinalPrice { get; set; } // Required if creating installments
+        
+        [MaxLength(200)]
+        public string? OfferDuration { get; set; }
     }
 
     public class OfferResponseDTO
@@ -321,7 +330,7 @@ namespace SoitMed.DTO
     public class DealResponseDTO
     {
         public long Id { get; set; }
-        public long OfferId { get; set; }
+        public long? OfferId { get; set; }
         public long ClientId { get; set; }
         public string ClientName { get; set; } = string.Empty;
         public string SalesmanId { get; set; } = string.Empty;

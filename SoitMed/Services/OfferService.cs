@@ -41,6 +41,9 @@ namespace SoitMed.Services
                     DeliveryTerms = createOfferDto.DeliveryTerms,
                     ValidUntil = createOfferDto.ValidUntil,
                     Notes = createOfferDto.Notes,
+                    PaymentType = createOfferDto.PaymentType,
+                    FinalPrice = createOfferDto.FinalPrice,
+                    OfferDuration = createOfferDto.OfferDuration,
                     Status = "Draft"
                 };
 
@@ -80,6 +83,9 @@ namespace SoitMed.Services
                     DeliveryTerms = createOfferDto.DeliveryTerms,
                     ValidUntil = createOfferDto.ValidUntil,
                     Notes = createOfferDto.Notes,
+                    PaymentType = createOfferDto.PaymentType,
+                    FinalPrice = createOfferDto.FinalPrice,
+                    OfferDuration = createOfferDto.OfferDuration,
                     Status = "Draft"
                 };
 
@@ -354,6 +360,42 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting expired offers");
+                throw;
+            }
+        }
+
+        public async Task<object?> GetOfferRequestDetailsAsync(long requestId)
+        {
+            try
+            {
+                var request = await _unitOfWork.OfferRequests.GetByIdAsync(requestId);
+                if (request == null)
+                    return null;
+
+                var requester = await _unitOfWork.Users.GetByIdAsync(request.RequestedBy);
+                var client = await _unitOfWork.Clients.GetByIdAsync(request.ClientId);
+                var assignedSupport = request.AssignedTo != null ? await _unitOfWork.Users.GetByIdAsync(request.AssignedTo) : null;
+
+                return new
+                {
+                    id = request.Id,
+                    requestedBy = request.RequestedBy,
+                    requestedByName = requester != null ? $"{requester.FirstName} {requester.LastName}" : "Unknown",
+                    clientId = request.ClientId,
+                    clientName = client?.Name ?? "Unknown Client",
+                    requestedProducts = request.RequestedProducts,
+                    specialNotes = request.SpecialNotes,
+                    requestDate = request.RequestDate,
+                    status = request.Status,
+                    assignedTo = request.AssignedTo,
+                    assignedToName = assignedSupport != null ? $"{assignedSupport.FirstName} {assignedSupport.LastName}" : null,
+                    completedAt = request.CompletedAt,
+                    completionNotes = request.CompletionNotes
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting offer request details for request {RequestId}", requestId);
                 throw;
             }
         }

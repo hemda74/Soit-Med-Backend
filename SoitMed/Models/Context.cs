@@ -66,6 +66,9 @@ namespace SoitMed.Models
         public DbSet<OfferEquipment> OfferEquipment { get; set; }
         public DbSet<OfferTerms> OfferTerms { get; set; }
         public DbSet<InstallmentPlan> InstallmentPlans { get; set; }
+        
+        // Salesman targets and statistics
+        public DbSet<SalesmanTarget> SalesmanTargets { get; set; }
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -391,12 +394,13 @@ namespace SoitMed.Models
                 .HasForeignKey(so => so.AssignedTo)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // SalesDeal relationships
+            // SalesDeal relationships - Configure as optional to handle orphaned deals
             modelBuilder.Entity<SalesDeal>()
                 .HasOne(sd => sd.Offer)
                 .WithOne(so => so.Deal)
                 .HasForeignKey<SalesDeal>(sd => sd.OfferId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
 
             modelBuilder.Entity<SalesDeal>()
                 .HasOne(sd => sd.Client)
@@ -435,24 +439,45 @@ namespace SoitMed.Models
             modelBuilder.Entity<SalesDeal>()
                 .HasIndex(sd => new { sd.Status, sd.SuperAdminApprovedBy });
 
-            // Enhanced offer relationships
+            // Enhanced offer relationships - Configure table names to match database
             modelBuilder.Entity<OfferEquipment>()
+                .ToTable("OfferEquipment")
                 .HasOne(oe => oe.Offer)
                 .WithMany(so => so.Equipment)
                 .HasForeignKey(oe => oe.OfferId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<OfferTerms>()
+                .ToTable("OfferTerms")
                 .HasOne(ot => ot.Offer)
                 .WithOne(so => so.Terms)
                 .HasForeignKey<OfferTerms>(ot => ot.OfferId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<InstallmentPlan>()
+                .ToTable("InstallmentPlan")
                 .HasOne(ip => ip.Offer)
                 .WithMany(so => so.InstallmentPlans)
                 .HasForeignKey(ip => ip.OfferId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // SalesmanTarget relationships
+            modelBuilder.Entity<SalesmanTarget>()
+                .HasOne(st => st.Manager)
+                .WithMany()
+                .HasForeignKey(st => st.CreatedByManagerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesmanTarget>()
+                .HasOne(st => st.Salesman)
+                .WithMany()
+                .HasForeignKey(st => st.SalesmanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Index for efficient queries
+            modelBuilder.Entity<SalesmanTarget>()
+                .HasIndex(st => new { st.SalesmanId, st.Year, st.Quarter })
+                .IsUnique();
         }
     }
 }

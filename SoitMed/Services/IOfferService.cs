@@ -35,6 +35,8 @@ namespace SoitMed.Services
         Task<List<InstallmentPlanDTO>> CreateInstallmentPlanAsync(long offerId, CreateInstallmentPlanDTO dto);
         #endregion
 
+        Task<object?> GetOfferRequestDetailsAsync(long requestId);
+
         #region Enhanced Offer - Complete Details
         Task<EnhancedOfferResponseDTO> GetEnhancedOfferAsync(long offerId);
         #endregion

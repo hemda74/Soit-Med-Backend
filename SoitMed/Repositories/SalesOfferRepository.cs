@@ -15,6 +15,7 @@ namespace SoitMed.Repositories
         public async Task<List<SalesOffer>> GetOffersByClientIdAsync(long clientId)
         {
             return await _context.SalesOffers
+                .AsNoTracking()
                 .Where(o => o.ClientId == clientId)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
@@ -23,6 +24,7 @@ namespace SoitMed.Repositories
         public async Task<List<SalesOffer>> GetOffersBySalesmanAsync(string salesmanId)
         {
             return await _context.SalesOffers
+                .AsNoTracking()
                 .Where(o => o.AssignedTo == salesmanId)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
@@ -31,6 +33,7 @@ namespace SoitMed.Repositories
         public async Task<List<SalesOffer>> GetOffersByStatusAsync(string status)
         {
             return await _context.SalesOffers
+                .AsNoTracking()
                 .Where(o => o.Status == status)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
@@ -39,6 +42,7 @@ namespace SoitMed.Repositories
         public async Task<List<SalesOffer>> GetOffersByCreatorAsync(string creatorId)
         {
             return await _context.SalesOffers
+                .AsNoTracking()
                 .Where(o => o.CreatedBy == creatorId)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
@@ -48,6 +52,7 @@ namespace SoitMed.Repositories
         {
             var today = DateTime.UtcNow.Date;
             return await _context.SalesOffers
+                .AsNoTracking()
                 .Where(o => o.ValidUntil < today && o.Status != "Expired")
                 .OrderByDescending(o => o.ValidUntil)
                 .ToListAsync();
@@ -56,6 +61,7 @@ namespace SoitMed.Repositories
         public async Task<List<SalesOffer>> GetOffersByDateRangeAsync(DateTime startDate, DateTime endDate)
         {
             return await _context.SalesOffers
+                .AsNoTracking()
                 .Where(o => o.CreatedAt >= startDate && o.CreatedAt <= endDate)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
@@ -64,6 +70,7 @@ namespace SoitMed.Repositories
         public async Task<List<SalesOffer>> GetOffersByOfferRequestAsync(long offerRequestId)
         {
             return await _context.SalesOffers
+                .AsNoTracking()
                 .Where(o => o.OfferRequestId == offerRequestId)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
@@ -85,6 +92,7 @@ namespace SoitMed.Repositories
             var followUpDate = today.AddDays(-7); // Follow up after 7 days
 
             return await _context.SalesOffers
+                .AsNoTracking()
                 .Where(o => o.SentToClientAt.HasValue && 
                            o.SentToClientAt.Value.Date <= followUpDate &&
                            o.Status == "Sent")
@@ -95,12 +103,14 @@ namespace SoitMed.Repositories
         public async Task<int> GetOfferCountByStatusAsync(string status)
         {
             return await _context.SalesOffers
+                .AsNoTracking()
                 .CountAsync(o => o.Status == status);
         }
 
         public async Task<decimal> GetTotalOfferValueByStatusAsync(string status)
         {
             return await _context.SalesOffers
+                .AsNoTracking()
                 .Where(o => o.Status == status)
                 .SumAsync(o => o.TotalAmount);
         }

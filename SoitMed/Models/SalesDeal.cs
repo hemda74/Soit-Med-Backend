@@ -11,8 +11,7 @@ namespace SoitMed.Models
     public class SalesDeal : BaseEntity
     {
         #region Basic Information
-        [Required]
-        public long OfferId { get; set; }
+        public long? OfferId { get; set; }
         
         [Required]
         public long ClientId { get; set; }
@@ -79,7 +78,7 @@ namespace SoitMed.Models
         #endregion
 
         #region Navigation Properties
-        public virtual SalesOffer Offer { get; set; } = null!;
+        public virtual SalesOffer? Offer { get; set; }
         public virtual Client Client { get; set; } = null!;
         public virtual ApplicationUser Salesman { get; set; } = null!;
         public virtual ApplicationUser? ManagerApprover { get; set; }
