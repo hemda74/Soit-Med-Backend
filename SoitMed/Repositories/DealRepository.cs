@@ -10,16 +10,25 @@ namespace SoitMed.Repositories
         {
         }
 
+<<<<<<< HEAD
         public async Task<IEnumerable<Deal>> GetByUserIdAsync(string userId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(d => d.ActivityLog)
                 .Include(d => d.User)
                 .Where(d => d.UserId == userId)
+=======
+        public async Task<IEnumerable<Deal>> GetByUserAsync(string userId, CancellationToken cancellationToken = default)
+        {
+            return await _context.Deals
+                .Where(d => d.ActivityLog.UserId == userId)
+                .Include(d => d.ActivityLog)
+>>>>>>> dev
                 .OrderByDescending(d => d.CreatedAt)
                 .ToListAsync(cancellationToken);
         }
 
+<<<<<<< HEAD
         public async Task<IEnumerable<Deal>> GetByStatusAsync(DealStatus status, CancellationToken cancellationToken = default)
         {
             return await _dbSet
@@ -87,3 +96,15 @@ namespace SoitMed.Repositories
         }
     }
 }
+=======
+        public async Task<IEnumerable<Deal>> GetByStatusAsync(string status, CancellationToken cancellationToken = default)
+        {
+            return await _context.Deals
+                .Where(d => d.Status == status)
+                .Include(d => d.ActivityLog)
+                .OrderByDescending(d => d.CreatedAt)
+                .ToListAsync(cancellationToken);
+        }
+    }
+}
+>>>>>>> dev

@@ -33,15 +33,38 @@ namespace SoitMed.Repositories
         // Sales report repository
         private ISalesReportRepository? _salesReports;
 
-        // Weekly plan repositories
-        private IWeeklyPlanRepository? _weeklyPlans;
-        private IWeeklyPlanTaskRepository? _weeklyPlanTasks;
-        private IDailyProgressRepository? _dailyProgresses;
-
         // Sales funnel repositories
         private IActivityLogRepository? _activityLogs;
         private IDealRepository? _deals;
         private IOfferRepository? _offers;
+
+        // Workflow and notification repositories
+        private IRequestWorkflowRepository? _requestWorkflows;
+        private INotificationRepository? _notifications;
+
+        // Client tracking repositories
+        private IClientRepository? _clients;
+        private IClientVisitRepository? _clientVisits;
+        private IClientInteractionRepository? _clientInteractions;
+        private IClientAnalyticsRepository? _clientAnalytics;
+
+        // Weekly planning repositories
+        private IWeeklyPlanRepository? _weeklyPlans;
+        private IWeeklyPlanTaskRepository? _weeklyPlanTasks;
+        private ITaskProgressRepository? _taskProgresses;
+
+        // Sales workflow repositories
+        private IOfferRequestRepository? _offerRequests;
+        private ISalesOfferRepository? _salesOffers;
+        private ISalesDealRepository? _salesDeals;
+        
+        // Enhanced offer repositories
+        private IOfferEquipmentRepository? _offerEquipment;
+        private IOfferTermsRepository? _offerTerms;
+        private IInstallmentPlanRepository? _installmentPlans;
+
+        // Salesman targets repository
+        private ISalesmanTargetRepository? _salesmanTargets;
 
         public UnitOfWork(Context context)
         {
@@ -93,16 +116,6 @@ namespace SoitMed.Repositories
         public ISalesReportRepository SalesReports => 
             _salesReports ??= new SalesReportRepository(_context);
 
-        // Weekly plan repositories
-        public IWeeklyPlanRepository WeeklyPlans => 
-            _weeklyPlans ??= new WeeklyPlanRepository(_context);
-
-        public IWeeklyPlanTaskRepository WeeklyPlanTasks =>
-            _weeklyPlanTasks ??= new WeeklyPlanTaskRepository(_context);
-
-        public IDailyProgressRepository DailyProgresses => 
-            _dailyProgresses ??= new DailyProgressRepository(_context);
-
         // Sales funnel repositories
         public IActivityLogRepository ActivityLogs => 
             _activityLogs ??= new ActivityLogRepository(_context);
@@ -112,6 +125,59 @@ namespace SoitMed.Repositories
 
         public IOfferRepository Offers => 
             _offers ??= new OfferRepository(_context);
+
+        // Workflow and notification repositories
+        public IRequestWorkflowRepository RequestWorkflows => 
+            _requestWorkflows ??= new RequestWorkflowRepository(_context);
+
+        public INotificationRepository Notifications => 
+            _notifications ??= new NotificationRepository(_context);
+
+        // Client tracking repositories
+        public IClientRepository Clients => 
+            _clients ??= new ClientRepository(_context);
+
+        public IClientVisitRepository ClientVisits => 
+            _clientVisits ??= new ClientVisitRepository(_context);
+
+        public IClientInteractionRepository ClientInteractions => 
+            _clientInteractions ??= new ClientInteractionRepository(_context);
+
+        public IClientAnalyticsRepository ClientAnalytics => 
+            _clientAnalytics ??= new ClientAnalyticsRepository(_context);
+
+        // Weekly planning repositories
+        public IWeeklyPlanRepository WeeklyPlans => 
+            _weeklyPlans ??= new WeeklyPlanRepository(_context);
+
+        public IWeeklyPlanTaskRepository WeeklyPlanTasks => 
+            _weeklyPlanTasks ??= new WeeklyPlanTaskRepository(_context);
+
+        public ITaskProgressRepository TaskProgresses => 
+            _taskProgresses ??= new TaskProgressRepository(_context);
+
+        // Sales workflow repositories
+        public IOfferRequestRepository OfferRequests => 
+            _offerRequests ??= new OfferRequestRepository(_context);
+
+        public ISalesOfferRepository SalesOffers => 
+            _salesOffers ??= new SalesOfferRepository(_context);
+
+        public ISalesDealRepository SalesDeals => 
+            _salesDeals ??= new SalesDealRepository(_context);
+        
+        // Enhanced offer repositories
+        public IOfferEquipmentRepository OfferEquipment => 
+            _offerEquipment ??= new OfferEquipmentRepository(_context);
+
+        public IOfferTermsRepository OfferTerms => 
+            _offerTerms ??= new OfferTermsRepository(_context);
+
+        public IInstallmentPlanRepository InstallmentPlans => 
+            _installmentPlans ??= new InstallmentPlanRepository(_context);
+
+        public ISalesmanTargetRepository SalesmanTargets => 
+            _salesmanTargets ??= new SalesmanTargetRepository(_context);
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

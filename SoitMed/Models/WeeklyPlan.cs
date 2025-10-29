@@ -1,58 +1,48 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using SoitMed.Models.Core;
 using SoitMed.Models.Identity;
 
 namespace SoitMed.Models
 {
-    /// <summary>
-    /// Weekly plan created by salesman at the beginning of each week
-    /// </summary>
-    public class WeeklyPlan
+    public class WeeklyPlan : BaseEntity
     {
-        [Key]
-        public int Id { get; set; }
+        [Required]
+        public string EmployeeId { get; set; } = string.Empty;
+
+        // Navigation Properties
+        public virtual ApplicationUser? Employee { get; set; }
 
         [Required]
-        [MaxLength(200)]
+        public DateTime WeekStartDate { get; set; }
+
+        [Required]
+        public DateTime WeekEndDate { get; set; }
+
+        [Required, MaxLength(200)]
         public string Title { get; set; } = string.Empty;
 
         [MaxLength(1000)]
         public string? Description { get; set; }
 
         [Required]
-        public DateOnly WeekStartDate { get; set; }
+        public bool IsActive { get; set; } = true;
 
-        [Required]
-        public DateOnly WeekEndDate { get; set; }
-
-        [Required]
-        [MaxLength(450)]
-        public string EmployeeId { get; set; } = string.Empty;
-
-        // Manager review fields
-        public int? Rating { get; set; } // 1-5 stars, nullable
+        // Manager Review Fields
+        public int? Rating { get; set; } // 1-5
 
         [MaxLength(1000)]
         public string? ManagerComment { get; set; }
 
         public DateTime? ManagerReviewedAt { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public string? ReviewedBy { get; set; }
 
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        // Manager View Tracking
+        public DateTime? ManagerViewedAt { get; set; }
 
-        public bool IsActive { get; set; } = true;
+        public string? ViewedBy { get; set; }
 
-        // Navigation properties
-        [ForeignKey("EmployeeId")]
-        public virtual ApplicationUser Employee { get; set; } = null!;
-
-        public virtual ICollection<WeeklyPlanTask> Tasks { get; set; } = new List<WeeklyPlanTask>();
-        
-        public virtual ICollection<DailyProgress> DailyProgresses { get; set; } = new List<DailyProgress>();
+        // Navigation Properties
+        public virtual ICollection<WeeklyPlanTask> Tasks { get; set; } = new List<WeeklyPlanTask>(); // NEW: Tasks instead of Items
     }
 }
-
-
-
-

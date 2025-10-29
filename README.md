@@ -1,12 +1,12 @@
 # Soit-Med Hospital Management System
 
-A comprehensive hospital management system with equipment tracking, repair request management, and multi-departmental user roles. Built with ASP.NET Core 8, Entity Framework Core, and JWT authentication.
+A comprehensive hospital management system with equipment tracking, repair request management, sales module, and multi-departmental user roles. Built with ASP.NET Core 8, Entity Framework Core, and JWT authentication.
 
 ## Features
 
 ### Multi-Departmental Organization
 - **6 Departments**: Administration, Medical, Sales, Engineering, Finance, Legal
-- **10 User Roles**: SuperAdmin, Admin, Doctor, Technician, Salesman, Engineer, FinanceManager, FinanceEmployee, LegalManager, LegalEmployee
+- **10+ User Roles**: SuperAdmin, Admin, Doctor, Technician, Salesman, SalesManager, SalesSupport, Engineer, FinanceManager, FinanceEmployee, LegalManager, LegalEmployee
 - **Role-based Access Control** with hierarchical permissions
 
 ### Hospital Network Management
@@ -26,6 +26,15 @@ A comprehensive hospital management system with equipment tracking, repair reque
 - **Complete Workflow**: Pending → Assigned → In Progress → Completed
 - **Cost Tracking** with parts and labor documentation
 - **Time Estimation** vs actual hours reporting
+
+### Sales Module (Complete CRM System)
+- **Client Management**: Full client lifecycle tracking with profiles, history, and statistics
+- **Weekly Planning**: Salesmen create weekly plans with tasks and track progress
+- **Task Progress Tracking**: Record visits, calls, meetings with detailed notes and follow-ups
+- **Offer Request System**: Salesmen request offers, SalesSupport creates detailed offers with equipment, terms, and installments
+- **Deal Management**: Multi-level approval workflow (Salesman → Manager → SuperAdmin)
+- **Statistics & Reporting**: Performance tracking, targets, and progress monitoring
+- **Target Management**: Set and track quarterly/yearly targets for salesmen and teams
 
 ### Advanced Security
 - **JWT Authentication** with 5-year token validity
@@ -165,6 +174,16 @@ SoitMed/
 
 ## Recent Changes
 
+### Sales Module Implementation (2025)
+- Complete Sales CRM system with client management
+- Weekly planning and task tracking system
+- Offer creation workflow (Salesman → SalesSupport → Salesman)
+- Deal management with multi-level approval (Salesman → Manager → SuperAdmin)
+- Statistics and performance tracking
+- Target management system
+- Performance optimizations with database indexes and computed columns
+- Comprehensive unit tests for all sales endpoints
+
 ### Major System Overhaul
 - Equipment Management System with QR code integration
 - Repair Request Workflow with automated engineer assignment
@@ -195,6 +214,16 @@ SoitMed/
 - **Equipment** - Medical equipment with QR codes and hospital assignments
 - **RepairRequests** - Repair requests with complete workflow tracking
 
+### Sales Domain
+- **Clients** - Client information with complete history tracking
+- **WeeklyPlans** - Weekly planning system for salesmen
+- **WeeklyPlanTasks** - Tasks within weekly plans
+- **TaskProgresses** - Progress records for visits, calls, meetings
+- **SalesOffers** - Sales offers with equipment, terms, and installments
+- **SalesDeals** - Deals with multi-level approval workflow
+- **OfferRequests** - Requests from salesmen to SalesSupport
+- **SalesmanTargets** - Target tracking for salesmen and teams
+
 ## Contributing
 
 1. Fork the repository
@@ -203,12 +232,29 @@ SoitMed/
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+## API Documentation
+
+Role-specific API documentation is available:
+
+- **Salesman API**: See `SALESMAN_API_DOCUMENTATION.md`
+- **Sales Manager API**: See `SALES_MANAGER_API_DOCUMENTATION.md`
+- **Sales Support API**: See `SALES_SUPPORT_API_DOCUMENTATION.md`
+- **Super Admin API**: See `SUPER_ADMIN_API_DOCUMENTATION.md`
+
+Each documentation includes:
+- User stories for the role
+- Complete endpoint details with request/response examples
+- Status values reference
+- Common workflows
+- Error handling guide
+
 ## Support
 
 For support and questions:
 - Create an issue in the repository
 - Check the API documentation at `/swagger`
 - Review the comprehensive endpoint documentation above
+- Refer to role-specific API documentation files
 
 ## License
 

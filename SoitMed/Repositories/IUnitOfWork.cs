@@ -27,18 +27,39 @@ namespace SoitMed.Repositories
         IApplicationUserRepository Users { get; }
         IUserImageRepository UserImages { get; }
 
-        // Sales report repository (Legacy)
+        // Sales report repository (already exists)
         ISalesReportRepository SalesReports { get; }
-
-        // Weekly plan repositories (New system)
-        IWeeklyPlanRepository WeeklyPlans { get; }
-        IWeeklyPlanTaskRepository WeeklyPlanTasks { get; }
-        IDailyProgressRepository DailyProgresses { get; }
 
         // Sales funnel repositories
         IActivityLogRepository ActivityLogs { get; }
         IDealRepository Deals { get; }
         IOfferRepository Offers { get; }
+
+        // Workflow and notification repositories
+        IRequestWorkflowRepository RequestWorkflows { get; }
+        INotificationRepository Notifications { get; }
+
+        // Client tracking repositories
+        IClientRepository Clients { get; }
+        IClientVisitRepository ClientVisits { get; }
+        IClientInteractionRepository ClientInteractions { get; }
+        IClientAnalyticsRepository ClientAnalytics { get; }
+
+        // Weekly planning repositories
+        IWeeklyPlanRepository WeeklyPlans { get; }
+        IWeeklyPlanTaskRepository WeeklyPlanTasks { get; }
+        ITaskProgressRepository TaskProgresses { get; }
+        IOfferRequestRepository OfferRequests { get; }
+        ISalesOfferRepository SalesOffers { get; }
+        ISalesDealRepository SalesDeals { get; }
+        
+        // Enhanced offer repositories
+        IOfferEquipmentRepository OfferEquipment { get; }
+        IOfferTermsRepository OfferTerms { get; }
+        IInstallmentPlanRepository InstallmentPlans { get; }
+
+        // Salesman targets repository
+        ISalesmanTargetRepository SalesmanTargets { get; }
 
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -46,7 +67,7 @@ namespace SoitMed.Repositories
         Task CommitTransactionAsync(CancellationToken cancellationToken = default);
         Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
         
-        // Context access for execution strategy
+        // Context access
         Context GetContext();
     }
 }

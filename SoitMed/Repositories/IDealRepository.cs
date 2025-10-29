@@ -5,6 +5,7 @@ namespace SoitMed.Repositories
 {
     public interface IDealRepository : IBaseRepository<Deal>
     {
+<<<<<<< HEAD
         Task<IEnumerable<Deal>> GetByUserIdAsync(string userId, CancellationToken cancellationToken = default);
         Task<IEnumerable<Deal>> GetByStatusAsync(DealStatus status, CancellationToken cancellationToken = default);
         Task<IEnumerable<Deal>> GetByUserIdAndStatusAsync(string userId, DealStatus status, CancellationToken cancellationToken = default);
@@ -15,3 +16,9 @@ namespace SoitMed.Repositories
         Task<Dictionary<string, decimal>> GetWonValuesByUserAsync(IEnumerable<string> userIds, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     }
 }
+=======
+        Task<IEnumerable<Deal>> GetByUserAsync(string userId, CancellationToken cancellationToken = default);
+        Task<IEnumerable<Deal>> GetByStatusAsync(string status, CancellationToken cancellationToken = default);
+    }
+}
+>>>>>>> dev

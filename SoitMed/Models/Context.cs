@@ -32,18 +32,43 @@ namespace SoitMed.Models
         // User image entities
         public DbSet<UserImage> UserImages { get; set; }
 
-        // Sales report entities (Legacy - kept for backward compatibility)
+        // Sales report entities
         public DbSet<SalesReport> SalesReports { get; set; }
-
-        // Weekly plan entities (New system)
-        public DbSet<WeeklyPlan> WeeklyPlans { get; set; }
-        public DbSet<WeeklyPlanTask> WeeklyPlanTasks { get; set; }
-        public DbSet<DailyProgress> DailyProgresses { get; set; }
 
         // Sales funnel entities
         public DbSet<ActivityLog> ActivityLogs { get; set; }
         public DbSet<Deal> Deals { get; set; }
         public DbSet<Offer> Offers { get; set; }
+
+        // Workflow and notification entities
+        public DbSet<RequestWorkflow> RequestWorkflows { get; set; }
+        public DbSet<DeliveryTerms> DeliveryTerms { get; set; }
+        public DbSet<PaymentTerms> PaymentTerms { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+
+        // Client tracking entities
+        public DbSet<Client> Clients { get; set; }
+        public DbSet<ClientVisit> ClientVisits { get; set; }
+        public DbSet<ClientInteraction> ClientInteractions { get; set; }
+        public DbSet<ClientAnalytics> ClientAnalytics { get; set; }
+
+        // Weekly planning entities
+        public DbSet<WeeklyPlan> WeeklyPlans { get; set; }
+        public DbSet<WeeklyPlanTask> WeeklyPlanTasks { get; set; }
+        public DbSet<TaskProgress> TaskProgresses { get; set; }
+
+        // Sales workflow entities
+        public DbSet<OfferRequest> OfferRequests { get; set; }
+        public DbSet<SalesOffer> SalesOffers { get; set; }
+        public DbSet<SalesDeal> SalesDeals { get; set; }
+        
+        // Enhanced offer entities
+        public DbSet<OfferEquipment> OfferEquipment { get; set; }
+        public DbSet<OfferTerms> OfferTerms { get; set; }
+        public DbSet<InstallmentPlan> InstallmentPlans { get; set; }
+        
+        // Salesman targets and statistics
+        public DbSet<SalesmanTarget> SalesmanTargets { get; set; }
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -76,7 +101,7 @@ namespace SoitMed.Models
                 .HasOne(dh => dh.Hospital)
                 .WithMany(h => h.DoctorHospitals)
                 .HasForeignKey(dh => dh.HospitalId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.NoAction);
 
             // Ensure unique combination of Doctor-Hospital
             modelBuilder.Entity<DoctorHospital>()
@@ -200,141 +225,259 @@ namespace SoitMed.Models
                 .HasFilter("[IsProfileImage] = 1")
                 .IsUnique();
 
-            // Configure WeeklyPlan relationships
+            // Configure Sales Funnel entities
+            // Note: ActivityLog relationships with Deal and Offer are handled in their respective models
+
+            // Configure RequestWorkflow relationships
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasOne(rw => rw.ActivityLog)
+                .WithMany()
+                .HasForeignKey(rw => rw.ActivityLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasOne(rw => rw.Offer)
+                .WithMany()
+                .HasForeignKey(rw => rw.OfferId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasOne(rw => rw.Deal)
+                .WithMany()
+                .HasForeignKey(rw => rw.DealId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasOne(rw => rw.DeliveryTerms)
+                .WithMany()
+                .HasForeignKey(rw => rw.DeliveryTermsId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasOne(rw => rw.PaymentTerms)
+                .WithMany()
+                .HasForeignKey(rw => rw.PaymentTermsId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Configure Notification relationships
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.RequestWorkflow)
+                .WithMany()
+                .HasForeignKey(n => n.RequestWorkflowId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.ActivityLog)
+                .WithMany()
+                .HasForeignKey(n => n.ActivityLogId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Configure indexes for better performance
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasIndex(rw => new { rw.FromUserId, rw.Status });
+
+            modelBuilder.Entity<RequestWorkflow>()
+                .HasIndex(rw => new { rw.ToUserId, rw.Status });
+
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => new { n.UserId, n.IsRead });
+
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => n.CreatedAt);
+
+            // ========== NEW SALES MODULE RELATIONSHIPS ==========
+            
+            // WeeklyPlan relationships
             modelBuilder.Entity<WeeklyPlan>()
                 .HasOne(wp => wp.Employee)
                 .WithMany()
                 .HasForeignKey(wp => wp.EmployeeId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Ensure unique week per employee (one plan per week per employee)
-            modelBuilder.Entity<WeeklyPlan>()
-                .HasIndex(wp => new { wp.EmployeeId, wp.WeekStartDate })
-                .IsUnique();
-
-            // Configure WeeklyPlanTask relationships
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            // WeeklyPlanTask relationships
             modelBuilder.Entity<WeeklyPlanTask>()
                 .HasOne(wpt => wpt.WeeklyPlan)
                 .WithMany(wp => wp.Tasks)
                 .HasForeignKey(wpt => wpt.WeeklyPlanId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Configure DailyProgress relationships
-            modelBuilder.Entity<DailyProgress>()
-                .HasOne(dp => dp.WeeklyPlan)
-                .WithMany(wp => wp.DailyProgresses)
-                .HasForeignKey(dp => dp.WeeklyPlanId)
+            modelBuilder.Entity<WeeklyPlanTask>()
+                .HasOne(wpt => wpt.Client)
+                .WithMany()
+                .HasForeignKey(wpt => wpt.ClientId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // TaskProgress relationships
+            modelBuilder.Entity<TaskProgress>()
+                .HasOne(tp => tp.Task)
+                .WithMany(wpt => wpt.Progresses)
+                .HasForeignKey(tp => tp.TaskId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Ensure one daily progress per day per weekly plan
-            modelBuilder.Entity<DailyProgress>()
-                .HasIndex(dp => new { dp.WeeklyPlanId, dp.ProgressDate })
+            modelBuilder.Entity<TaskProgress>()
+                .HasOne(tp => tp.Client)
+                .WithMany(c => c.TaskProgresses)
+                .HasForeignKey(tp => tp.ClientId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TaskProgress>()
+                .HasOne(tp => tp.Employee)
+                .WithMany()
+                .HasForeignKey(tp => tp.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // OfferRequest relationships
+            modelBuilder.Entity<OfferRequest>()
+                .HasOne(or => or.Requester)
+                .WithMany()
+                .HasForeignKey(or => or.RequestedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<OfferRequest>()
+                .HasOne(or => or.Client)
+                .WithMany()
+                .HasForeignKey(or => or.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure OfferRequest -> TaskProgress relationship (one-way: OfferRequest references TaskProgress)
+            modelBuilder.Entity<OfferRequest>()
+                .HasOne(or => or.TaskProgress)
+                .WithMany()
+                .HasForeignKey(or => or.TaskProgressId)
+                .OnDelete(DeleteBehavior.SetNull);
+            
+            // Ignore the TaskProgress.OfferRequest navigation to avoid shadow property
+            modelBuilder.Entity<TaskProgress>()
+                .Ignore(tp => tp.OfferRequest);
+            
+            modelBuilder.Entity<OfferRequest>()
+                .HasOne<ApplicationUser>("AssignedSupportUser")
+                .WithMany()
+                .HasForeignKey("AssignedTo")
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
+            // Indexes for performance
+            modelBuilder.Entity<OfferRequest>()
+                .HasIndex(or => new { or.Status, or.RequestedBy });
+
+            modelBuilder.Entity<TaskProgress>()
+                .HasIndex(tp => new { tp.ClientId, tp.ProgressDate });
+
+            modelBuilder.Entity<WeeklyPlanTask>()
+                .HasIndex(wpt => new { wpt.WeeklyPlanId, wpt.Status });
+
+            // ==================== Sales Module Relationships ====================
+            
+            // SalesOffer relationships
+            modelBuilder.Entity<OfferRequest>()
+                .HasOne(or => or.CreatedOffer)
+                .WithOne(so => so.OfferRequest)
+                .HasForeignKey<OfferRequest>(or => or.CreatedOfferId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<SalesOffer>()
+                .HasOne(so => so.Client)
+                .WithMany()
+                .HasForeignKey(so => so.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesOffer>()
+                .HasOne(so => so.Creator)
+                .WithMany()
+                .HasForeignKey(so => so.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesOffer>()
+                .HasOne(so => so.Salesman)
+                .WithMany()
+                .HasForeignKey(so => so.AssignedTo)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // SalesDeal relationships - Configure as optional to handle orphaned deals
+            modelBuilder.Entity<SalesDeal>()
+                .HasOne(sd => sd.Offer)
+                .WithOne(so => so.Deal)
+                .HasForeignKey<SalesDeal>(sd => sd.OfferId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasOne(sd => sd.Client)
+                .WithMany()
+                .HasForeignKey(sd => sd.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasOne(sd => sd.Salesman)
+                .WithMany()
+                .HasForeignKey(sd => sd.SalesmanId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasOne(sd => sd.ManagerApprover)
+                .WithMany()
+                .HasForeignKey(sd => sd.ManagerApprovedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasOne(sd => sd.SuperAdminApprover)
+                .WithMany()
+                .HasForeignKey(sd => sd.SuperAdminApprovedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes for performance
+            modelBuilder.Entity<SalesOffer>()
+                .HasIndex(so => new { so.Status, so.AssignedTo });
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasIndex(sd => new { sd.Status, sd.SalesmanId });
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasIndex(sd => new { sd.Status, sd.ManagerApprovedBy });
+
+            modelBuilder.Entity<SalesDeal>()
+                .HasIndex(sd => new { sd.Status, sd.SuperAdminApprovedBy });
+
+            // Enhanced offer relationships - Configure table names to match database
+            modelBuilder.Entity<OfferEquipment>()
+                .ToTable("OfferEquipment")
+                .HasOne(oe => oe.Offer)
+                .WithMany(so => so.Equipment)
+                .HasForeignKey(oe => oe.OfferId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<OfferTerms>()
+                .ToTable("OfferTerms")
+                .HasOne(ot => ot.Offer)
+                .WithOne(so => so.Terms)
+                .HasForeignKey<OfferTerms>(ot => ot.OfferId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<InstallmentPlan>()
+                .ToTable("InstallmentPlan")
+                .HasOne(ip => ip.Offer)
+                .WithMany(so => so.InstallmentPlans)
+                .HasForeignKey(ip => ip.OfferId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // SalesmanTarget relationships
+            modelBuilder.Entity<SalesmanTarget>()
+                .HasOne(st => st.Manager)
+                .WithMany()
+                .HasForeignKey(st => st.CreatedByManagerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesmanTarget>()
+                .HasOne(st => st.Salesman)
+                .WithMany()
+                .HasForeignKey(st => st.SalesmanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Index for efficient queries
+            modelBuilder.Entity<SalesmanTarget>()
+                .HasIndex(st => new { st.SalesmanId, st.Year, st.Quarter })
                 .IsUnique();
-
-            // Configure Sales Funnel entities
-            ConfigureSalesFunnelEntities(modelBuilder);
-        }
-
-        private void ConfigureSalesFunnelEntities(ModelBuilder modelBuilder)
-        {
-            // Configure ActivityLog entity
-            modelBuilder.Entity<ActivityLog>()
-                .HasOne(al => al.PlanTask)
-                .WithMany()
-                .HasForeignKey(al => al.PlanTaskId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<ActivityLog>()
-                .HasOne(al => al.User)
-                .WithMany()
-                .HasForeignKey(al => al.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Configure indexes for performance
-            modelBuilder.Entity<ActivityLog>()
-                .HasIndex(al => al.PlanTaskId);
-
-            modelBuilder.Entity<ActivityLog>()
-                .HasIndex(al => al.UserId);
-
-            modelBuilder.Entity<ActivityLog>()
-                .HasIndex(al => al.CreatedAt);
-
-            // Configure Deal entity
-            modelBuilder.Entity<Deal>()
-                .HasOne(d => d.ActivityLog)
-                .WithOne(al => al.Deal)
-                .HasForeignKey<Deal>(d => d.ActivityLogId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<Deal>()
-                .HasOne(d => d.User)
-                .WithMany()
-                .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Configure decimal precision for DealValue
-            modelBuilder.Entity<Deal>()
-                .Property(d => d.DealValue)
-                .HasPrecision(18, 2);
-
-            // Configure indexes for performance
-            modelBuilder.Entity<Deal>()
-                .HasIndex(d => d.UserId);
-
-            modelBuilder.Entity<Deal>()
-                .HasIndex(d => d.Status);
-
-            modelBuilder.Entity<Deal>()
-                .HasIndex(d => d.CreatedAt);
-
-            // Configure Offer entity
-            modelBuilder.Entity<Offer>()
-                .HasOne(o => o.ActivityLog)
-                .WithOne(al => al.Offer)
-                .HasForeignKey<Offer>(o => o.ActivityLogId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<Offer>()
-                .HasOne(o => o.User)
-                .WithMany()
-                .HasForeignKey(o => o.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Configure indexes for performance
-            modelBuilder.Entity<Offer>()
-                .HasIndex(o => o.UserId);
-
-            modelBuilder.Entity<Offer>()
-                .HasIndex(o => o.Status);
-
-            modelBuilder.Entity<Offer>()
-                .HasIndex(o => o.CreatedAt);
-
-            // Configure enum conversions
-            modelBuilder.Entity<ActivityLog>()
-                .Property(al => al.InteractionType)
-                .HasConversion<int>();
-
-            modelBuilder.Entity<ActivityLog>()
-                .Property(al => al.ClientType)
-                .HasConversion<int>();
-
-            modelBuilder.Entity<ActivityLog>()
-                .Property(al => al.Result)
-                .HasConversion<int>();
-
-            modelBuilder.Entity<ActivityLog>()
-                .Property(al => al.Reason)
-                .HasConversion<int>();
-
-            modelBuilder.Entity<Deal>()
-                .Property(d => d.Status)
-                .HasConversion<int>();
-
-            modelBuilder.Entity<Offer>()
-                .Property(o => o.Status)
-                .HasConversion<int>();
         }
     }
 }

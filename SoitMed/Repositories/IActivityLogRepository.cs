@@ -4,6 +4,7 @@ namespace SoitMed.Repositories
 {
     public interface IActivityLogRepository : IBaseRepository<ActivityLog>
     {
+<<<<<<< HEAD
         Task<IEnumerable<ActivityLog>> GetByUserIdAsync(string userId, CancellationToken cancellationToken = default);
         Task<IEnumerable<ActivityLog>> GetByPlanTaskIdAsync(long planTaskId, CancellationToken cancellationToken = default);
         Task<IEnumerable<ActivityLog>> GetByDateRangeAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
@@ -13,3 +14,12 @@ namespace SoitMed.Repositories
         Task<Dictionary<string, decimal>> GetDealValuesByUserAsync(IEnumerable<string> userIds, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     }
 }
+=======
+        Task<IEnumerable<ActivityLog>> GetWithDealsAndOffersAsync(string userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
+        Task<IEnumerable<ActivityLog>> GetByUserAsync(string userId, DateTime? startDate = null, DateTime? endDate = null, CancellationToken cancellationToken = default);
+    }
+}
+
+
+
+>>>>>>> dev

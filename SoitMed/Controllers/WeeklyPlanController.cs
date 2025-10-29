@@ -1,351 +1,337 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
 using SoitMed.Common;
 using SoitMed.DTO;
 using SoitMed.Models.Identity;
 using SoitMed.Services;
-using FluentValidation;
 
 namespace SoitMed.Controllers
 {
+    [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class WeeklyPlanController : BaseController
     {
         private readonly IWeeklyPlanService _weeklyPlanService;
-        private readonly IValidator<CreateWeeklyPlanDto> _createPlanValidator;
-        private readonly IValidator<UpdateWeeklyPlanDto> _updatePlanValidator;
-        private readonly IValidator<AddTaskToWeeklyPlanDto> _addTaskValidator;
-        private readonly IValidator<UpdateWeeklyPlanTaskDto> _updateTaskValidator;
-        private readonly IValidator<CreateDailyProgressDto> _createProgressValidator;
-        private readonly IValidator<UpdateDailyProgressDto> _updateProgressValidator;
-        private readonly IValidator<ReviewWeeklyPlanDto> _reviewValidator;
-        private readonly IValidator<FilterWeeklyPlansDto> _filterValidator;
+        private readonly ILogger<WeeklyPlanController> _logger;
 
         public WeeklyPlanController(
-            IWeeklyPlanService weeklyPlanService,
-            UserManager<ApplicationUser> userManager,
-            IValidator<CreateWeeklyPlanDto> createPlanValidator,
-            IValidator<UpdateWeeklyPlanDto> updatePlanValidator,
-            IValidator<AddTaskToWeeklyPlanDto> addTaskValidator,
-            IValidator<UpdateWeeklyPlanTaskDto> updateTaskValidator,
-            IValidator<CreateDailyProgressDto> createProgressValidator,
-            IValidator<UpdateDailyProgressDto> updateProgressValidator,
-            IValidator<ReviewWeeklyPlanDto> reviewValidator,
-            IValidator<FilterWeeklyPlansDto> filterValidator) : base(userManager)
+            IWeeklyPlanService weeklyPlanService, 
+            ILogger<WeeklyPlanController> logger, 
+            UserManager<ApplicationUser> userManager) 
+            : base(userManager)
         {
             _weeklyPlanService = weeklyPlanService;
-            _createPlanValidator = createPlanValidator;
-            _updatePlanValidator = updatePlanValidator;
-            _addTaskValidator = addTaskValidator;
-            _updateTaskValidator = updateTaskValidator;
-            _createProgressValidator = createProgressValidator;
-            _updateProgressValidator = updateProgressValidator;
-            _reviewValidator = reviewValidator;
-            _filterValidator = filterValidator;
+            _logger = logger;
         }
 
-        #region Weekly Plan CRUD
-
-        /// <summary>
-        /// Create a new weekly plan with tasks (Salesman only)
-        /// </summary>
         [HttpPost]
-        [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> CreateWeeklyPlan([FromBody] CreateWeeklyPlanDto createDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> CreateWeeklyPlan([FromBody] CreateWeeklyPlanDTO createDto)
         {
-            var validationError = await ValidateDtoAsync(createDto, _createPlanValidator, cancellationToken);
-            if (validationError != null)
-                return validationError;
-
-            var userId = GetCurrentUserId();
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var result = await _weeklyPlanService.CreateWeeklyPlanAsync(createDto, userId, cancellationToken);
-            if (result == null)
+            try
             {
-                return ErrorResponse("A plan already exists for this week or invalid data provided.", 409);
-            }
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
 
-            return CreatedAtAction(nameof(GetWeeklyPlanById), new { id = result.Id },
-                CreateSuccessResponse(result, "Weekly plan created successfully"));
+                var plan = await _weeklyPlanService.CreateWeeklyPlanAsync(createDto, currentUser.Id);
+                return CreatedAtAction(nameof(GetWeeklyPlan), new { id = plan.Id }, 
+                    ResponseHelper.CreateSuccessResponse(plan));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating weekly plan");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while creating the weekly plan"));
+            }
         }
 
-        /// <summary>
-        /// Update an existing weekly plan (Salesman only - own plans)
-        /// </summary>
-        [HttpPut("{id}")]
-        [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> UpdateWeeklyPlan(int id, [FromBody] UpdateWeeklyPlanDto updateDto, CancellationToken cancellationToken = default)
-        {
-            var validationError = await ValidateDtoAsync(updateDto, _updatePlanValidator, cancellationToken);
-            if (validationError != null)
-                return validationError;
-
-            var userId = GetCurrentUserId();
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var result = await _weeklyPlanService.UpdateWeeklyPlanAsync(id, updateDto, userId, cancellationToken);
-            if (result == null)
-            {
-                return ErrorResponse("Plan not found or you don't have permission to update it.", 404);
-            }
-
-            return SuccessResponse(result, "Weekly plan updated successfully");
-        }
-
-        /// <summary>
-        /// Delete a weekly plan (Salesman only - own plans)
-        /// </summary>
-        [HttpDelete("{id}")]
-        [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> DeleteWeeklyPlan(int id, CancellationToken cancellationToken = default)
-        {
-            var userId = GetCurrentUserId();
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var result = await _weeklyPlanService.DeleteWeeklyPlanAsync(id, userId, cancellationToken);
-            if (!result)
-            {
-                return ErrorResponse("Plan not found or you don't have permission to delete it.", 404);
-            }
-
-            return SuccessResponse(message: "Weekly plan deleted successfully");
-        }
-
-        /// <summary>
-        /// Get a specific weekly plan by ID
-        /// </summary>
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetWeeklyPlanById(int id, CancellationToken cancellationToken = default)
-        {
-            var userId = GetCurrentUserId();
-            var (user, authError) = await ControllerAuthorizationHelper.GetCurrentUserAsync(userId, UserManager);
-            if (authError != null)
-                return authError;
-
-            var isManager = await ControllerAuthorizationHelper.IsManagerAsync(user!, UserManager);
-
-            var canAccess = await _weeklyPlanService.CanAccessWeeklyPlanAsync(id, userId!, isManager, cancellationToken);
-            if (!canAccess)
-            {
-                return ErrorResponse("Plan not found or you don't have permission to view it.", 404);
-            }
-
-            var result = await _weeklyPlanService.GetWeeklyPlanByIdAsync(id, cancellationToken);
-            if (result == null)
-            {
-                return ErrorResponse("Plan not found.", 404);
-            }
-
-            return SuccessResponse(result, "Weekly plan retrieved successfully");
-        }
-
-        /// <summary>
-        /// Get weekly plans with optional filtering (SalesManager/SuperAdmin: all plans, Salesman: own plans)
-        /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetWeeklyPlans([FromQuery] FilterWeeklyPlansDto filterDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> GetWeeklyPlans(
+            [FromQuery] int page = 1, 
+            [FromQuery] int pageSize = 20,
+            [FromQuery] string? employeeId = null,
+            [FromQuery] DateTime? weekStartDate = null,
+            [FromQuery] DateTime? weekEndDate = null,
+            [FromQuery] bool? isViewed = null)
         {
-            var validationError = await ValidateDtoAsync(filterDto, _filterValidator, cancellationToken);
-            if (validationError != null)
-                return validationError;
-
-            var userId = GetCurrentUserId();
-            var (user, authError) = await ControllerAuthorizationHelper.GetCurrentUserAsync(userId, UserManager);
-            if (authError != null)
-                return authError;
-
-            var isManager = await ControllerAuthorizationHelper.IsManagerAsync(user!, UserManager);
-
-            PaginatedWeeklyPlansResponseDto result = isManager
-                ? await _weeklyPlanService.GetWeeklyPlansAsync(filterDto, cancellationToken)
-                : await _weeklyPlanService.GetWeeklyPlansForEmployeeAsync(userId!, filterDto, cancellationToken);
-
-            return SuccessResponse(result, $"Found {result.TotalCount} weekly plan(s)");
-        }
-
-        #endregion
-
-        #region Task Operations
-
-        /// <summary>
-        /// Add a new task to an existing weekly plan (Salesman only - own plans)
-        /// </summary>
-        [HttpPost("{weeklyPlanId}/tasks")]
-        [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> AddTask(int weeklyPlanId, [FromBody] AddTaskToWeeklyPlanDto taskDto, CancellationToken cancellationToken = default)
-        {
-            var validationError = await ValidateDtoAsync(taskDto, _addTaskValidator, cancellationToken);
-            if (validationError != null)
-                return validationError;
-
-            var userId = GetCurrentUserId();
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var result = await _weeklyPlanService.AddTaskToWeeklyPlanAsync(weeklyPlanId, taskDto, userId, cancellationToken);
-            if (result == null)
+            try
             {
-                return ErrorResponse("Plan not found or you don't have permission to add tasks to it.", 404);
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
+
+                var userRole = await GetCurrentUserRoleAsync();
+
+                // Check if filters are provided
+                bool hasFilters = !string.IsNullOrEmpty(employeeId) || weekStartDate.HasValue || weekEndDate.HasValue || isViewed.HasValue;
+
+                if (hasFilters)
+                {
+                    // Salesmen can only filter by date, not by employee or viewed status
+                    if (userRole == "Salesman")
+                    {
+                        if (!string.IsNullOrEmpty(employeeId) || isViewed.HasValue)
+                        {
+                            return StatusCode(403, ResponseHelper.CreateErrorResponse("Salesmen can only filter by date range"));
+                        }
+
+                        // For salesmen, only date filtering is allowed on their own plans
+                        var filters = new WeeklyPlanFiltersDTO
+                        {
+                            EmployeeId = currentUser.Id, // Force their own ID
+                            WeekStartDate = weekStartDate,
+                            WeekEndDate = weekEndDate,
+                            IsViewed = null // Salesmen can't filter by viewed status
+                        };
+
+                        var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansWithFiltersAsync(filters, userRole, page, pageSize);
+
+                        return Ok(ResponseHelper.CreateSuccessResponse(new
+                        {
+                            plans,
+                            pagination = new
+                            {
+                                page,
+                                pageSize,
+                                totalCount,
+                                totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                            }
+                        }));
+                    }
+                    else if (userRole == "SalesManager" || userRole == "SuperAdmin")
+                    {
+                        // Managers/admins can use all filters
+                        var filters = new WeeklyPlanFiltersDTO
+                        {
+                            EmployeeId = employeeId,
+                            WeekStartDate = weekStartDate,
+                            WeekEndDate = weekEndDate,
+                            IsViewed = isViewed
+                        };
+
+                        var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansWithFiltersAsync(filters, userRole, page, pageSize);
+
+                        return Ok(ResponseHelper.CreateSuccessResponse(new
+                        {
+                            plans,
+                            pagination = new
+                            {
+                                page,
+                                pageSize,
+                                totalCount,
+                                totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                            }
+                        }));
+                    }
+                    else
+                    {
+                        return StatusCode(403, ResponseHelper.CreateErrorResponse("You do not have permission to use filters"));
+                    }
+                }
+                else
+                {
+                    // No filters, use regular endpoint
+                    var (plans, totalCount) = await _weeklyPlanService.GetWeeklyPlansAsync(currentUser.Id, userRole, page, pageSize);
+
+                    return Ok(ResponseHelper.CreateSuccessResponse(new
+                    {
+                        plans,
+                        pagination = new
+                        {
+                            page,
+                            pageSize,
+                            totalCount,
+                            totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                        }
+                    }));
+                }
             }
-
-            return SuccessResponse(result, "Task added successfully");
-        }
-
-        /// <summary>
-        /// Update a task in a weekly plan (Salesman only - own plans)
-        /// </summary>
-        [HttpPut("{weeklyPlanId}/tasks/{taskId}")]
-        [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> UpdateTask(int weeklyPlanId, int taskId, [FromBody] UpdateWeeklyPlanTaskDto updateDto, CancellationToken cancellationToken = default)
-        {
-            var validationError = await ValidateDtoAsync(updateDto, _updateTaskValidator, cancellationToken);
-            if (validationError != null)
-                return validationError;
-
-            var userId = GetCurrentUserId();
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var result = await _weeklyPlanService.UpdateTaskAsync(weeklyPlanId, taskId, updateDto, userId, cancellationToken);
-            if (result == null)
+            catch (UnauthorizedAccessException ex)
             {
-                return ErrorResponse("Plan or task not found, or you don't have permission to update it.", 404);
+                return Forbid();
             }
-
-            return SuccessResponse(result, "Task updated successfully");
-        }
-
-        /// <summary>
-        /// Delete a task from a weekly plan (Salesman only - own plans)
-        /// </summary>
-        [HttpDelete("{weeklyPlanId}/tasks/{taskId}")]
-        [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> DeleteTask(int weeklyPlanId, int taskId, CancellationToken cancellationToken = default)
-        {
-            var userId = GetCurrentUserId();
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var result = await _weeklyPlanService.DeleteTaskAsync(weeklyPlanId, taskId, userId, cancellationToken);
-            if (!result)
+            catch (Exception ex)
             {
-                return ErrorResponse("Plan or task not found, or you don't have permission to delete it.", 404);
+                _logger.LogError(ex, "Error getting weekly plans");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving weekly plans"));
             }
-
-            return SuccessResponse(message: "Task deleted successfully");
         }
 
-        #endregion
-
-        #region Daily Progress Operations
-
-        /// <summary>
-        /// Add daily progress to a weekly plan (Salesman only - own plans)
-        /// </summary>
-        [HttpPost("{weeklyPlanId}/progress")]
-        [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> AddDailyProgress(int weeklyPlanId, [FromBody] CreateDailyProgressDto progressDto, CancellationToken cancellationToken = default)
-        {
-            var validationError = await ValidateDtoAsync(progressDto, _createProgressValidator, cancellationToken);
-            if (validationError != null)
-                return validationError;
-
-            var userId = GetCurrentUserId();
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var result = await _weeklyPlanService.AddDailyProgressAsync(weeklyPlanId, progressDto, userId, cancellationToken);
-            if (result == null)
-            {
-                return ErrorResponse("Plan not found, progress already exists for this date, or date is outside the week range.", 409);
-            }
-
-            return SuccessResponse(result, "Daily progress added successfully");
-        }
-
-        /// <summary>
-        /// Update daily progress in a weekly plan (Salesman only - own plans)
-        /// </summary>
-        [HttpPut("{weeklyPlanId}/progress/{progressId}")]
-        [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> UpdateDailyProgress(int weeklyPlanId, int progressId, [FromBody] UpdateDailyProgressDto updateDto, CancellationToken cancellationToken = default)
-        {
-            var validationError = await ValidateDtoAsync(updateDto, _updateProgressValidator, cancellationToken);
-            if (validationError != null)
-                return validationError;
-
-            var userId = GetCurrentUserId();
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var result = await _weeklyPlanService.UpdateDailyProgressAsync(weeklyPlanId, progressId, updateDto, userId, cancellationToken);
-            if (result == null)
-            {
-                return ErrorResponse("Plan or progress not found, or you don't have permission to update it.", 404);
-            }
-
-            return SuccessResponse(result, "Daily progress updated successfully");
-        }
-
-        /// <summary>
-        /// Delete daily progress from a weekly plan (Salesman only - own plans)
-        /// </summary>
-        [HttpDelete("{weeklyPlanId}/progress/{progressId}")]
-        [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> DeleteDailyProgress(int weeklyPlanId, int progressId, CancellationToken cancellationToken = default)
-        {
-            var userId = GetCurrentUserId();
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
-
-            var result = await _weeklyPlanService.DeleteDailyProgressAsync(weeklyPlanId, progressId, userId, cancellationToken);
-            if (!result)
-            {
-                return ErrorResponse("Plan or progress not found, or you don't have permission to delete it.", 404);
-            }
-
-            return SuccessResponse(message: "Daily progress deleted successfully");
-        }
-
-        #endregion
-
-        #region Manager Review
-
-        /// <summary>
-        /// Review/rate a weekly plan (SalesManager and SuperAdmin only)
-        /// </summary>
-        [HttpPost("{id}/review")]
+        [HttpGet("salesmen")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> ReviewWeeklyPlan(int id, [FromBody] ReviewWeeklyPlanDto reviewDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> GetAllSalesmen()
         {
-            var validationError = await ValidateDtoAsync(reviewDto, _reviewValidator, cancellationToken);
-            if (validationError != null)
-                return validationError;
-
-            var result = await _weeklyPlanService.ReviewWeeklyPlanAsync(id, reviewDto, cancellationToken);
-            if (result == null)
+            try
             {
-                return ErrorResponse("Plan not found.", 404);
-            }
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
 
-            return SuccessResponse(result, "Weekly plan reviewed successfully");
+                var salesmen = await UserManager.GetUsersInRoleAsync("Salesman");
+                
+                var salesmenList = salesmen.Select(u => new
+                {
+                    id = u.Id,
+                    firstName = u.FirstName,
+                    lastName = u.LastName,
+                    email = u.Email,
+                    phoneNumber = u.PhoneNumber,
+                    userName = u.UserName,
+                    isActive = u.IsActive
+                }).ToList();
+
+                return Ok(ResponseHelper.CreateSuccessResponse(salesmenList));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all salesmen");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving salesmen"));
+            }
         }
 
-        #endregion
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetWeeklyPlan(long id)
+        {
+            try
+            {
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
+
+                var userRole = await GetCurrentUserRoleAsync();
+                var plan = await _weeklyPlanService.GetWeeklyPlanAsync(id, currentUser.Id, userRole);
+                if (plan == null)
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("Weekly plan not found"));
+                }
+
+                return Ok(ResponseHelper.CreateSuccessResponse(plan));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting weekly plan {PlanId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving the weekly plan"));
+            }
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateWeeklyPlan(long id, [FromBody] UpdateWeeklyPlanDTO updateDto)
+        {
+            try
+            {
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
+
+                var plan = await _weeklyPlanService.UpdateWeeklyPlanAsync(id, updateDto, currentUser.Id);
+                if (plan == null)
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("Weekly plan not found"));
+                }
+
+                return Ok(ResponseHelper.CreateSuccessResponse(new
+                {
+                    Id = plan.Id,
+                    Title = plan.Title,
+                    Description = plan.Description,
+                    UpdatedAt = plan.UpdatedAt
+                }));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating weekly plan {PlanId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while updating the weekly plan"));
+            }
+        }
+
+        [HttpPost("{id}/submit")]
+        public async Task<IActionResult> SubmitWeeklyPlan(long id)
+        {
+            try
+            {
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
+
+                var success = await _weeklyPlanService.SubmitWeeklyPlanAsync(id, currentUser.Id);
+                if (!success)
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("Weekly plan not found"));
+                }
+
+                return Ok(ResponseHelper.CreateSuccessResponse("Weekly plan submitted successfully"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting weekly plan {PlanId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while submitting the weekly plan"));
+            }
+        }
+
+        [HttpPost("{id}/review")]
+        [Authorize(Roles = "Admin,SalesManager")]
+        public async Task<IActionResult> ReviewWeeklyPlan(long id, [FromBody] ReviewWeeklyPlanDTO reviewDto)
+        {
+            try
+            {
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
+
+                var success = await _weeklyPlanService.ReviewWeeklyPlanAsync(id, reviewDto, currentUser.Id);
+                if (!success)
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("Weekly plan not found"));
+                }
+
+                return Ok(ResponseHelper.CreateSuccessResponse("Weekly plan reviewed successfully"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reviewing weekly plan {PlanId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while reviewing the weekly plan"));
+            }
+        }
+
+        [HttpGet("current")]
+        public async Task<IActionResult> GetCurrentWeeklyPlan()
+        {
+            try
+            {
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
+
+                var plan = await _weeklyPlanService.GetCurrentWeeklyPlanAsync(currentUser.Id);
+                if (plan == null)
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("No current weekly plan found"));
+                }
+
+                return Ok(ResponseHelper.CreateSuccessResponse(plan));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting current weekly plan");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving the current weekly plan"));
+            }
+        }
     }
 }
-
-
-
-
-
-
-
-
-
-

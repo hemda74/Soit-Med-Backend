@@ -7,6 +7,7 @@ using SoitMed.Models;
 using SoitMed.Models.Identity;
 using SoitMed.Services;
 using System.Security.Claims;
+using Microsoft.Extensions.Logging;
 
 namespace SoitMed.Controllers
 {
@@ -17,15 +18,18 @@ namespace SoitMed.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly Context _context;
         private readonly IRoleBasedImageUploadService _imageUploadService;
+        private readonly ILogger<UserImageController> _logger;
 
         public UserImageController(
             UserManager<ApplicationUser> userManager,
             Context context,
-            IRoleBasedImageUploadService imageUploadService)
+            IRoleBasedImageUploadService imageUploadService,
+            ILogger<UserImageController> logger)
         {
             _userManager = userManager;
             _context = context;
             _imageUploadService = imageUploadService;
+            _logger = logger;
         }
 
         // Upload user profile image (POST)
@@ -145,9 +149,7 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                // Log the exception for debugging
-                Console.WriteLine($"Error in UploadProfileImage: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                _logger.LogError(ex, "Error in UploadProfileImage: {Message}", ex.Message);
                 
                 return StatusCode(500, new { error = "An unexpected error occurred while uploading the image. Please try again.", code = "UPLOAD_ERROR" });
             }
@@ -195,7 +197,7 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in GetProfileImage: {ex.Message}");
+                _logger.LogError(ex, "Error in GetProfileImage: {Message}", ex.Message);
                 return StatusCode(500, new { error = "An unexpected error occurred while retrieving the image.", code = "GET_ERROR" });
             }
         }
@@ -317,9 +319,7 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                // Log the exception for debugging
-                Console.WriteLine($"Error in UpdateProfileImage: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                _logger.LogError(ex, "Error in UpdateProfileImage: {Message}", ex.Message);
                 
                 return StatusCode(500, new { error = "An unexpected error occurred while updating the image. Please try again.", code = "UPDATE_ERROR" });
             }

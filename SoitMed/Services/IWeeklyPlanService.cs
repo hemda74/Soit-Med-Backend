@@ -1,39 +1,56 @@
 using SoitMed.DTO;
+using SoitMed.Models;
 
 namespace SoitMed.Services
 {
+    /// <summary>
+    /// Service interface for weekly plan business operations
+    /// </summary>
     public interface IWeeklyPlanService
     {
-        // Weekly Plan operations
-        Task<WeeklyPlanResponseDto?> CreateWeeklyPlanAsync(CreateWeeklyPlanDto createDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<WeeklyPlanResponseDto?> UpdateWeeklyPlanAsync(int id, UpdateWeeklyPlanDto updateDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<bool> DeleteWeeklyPlanAsync(int id, string employeeId, CancellationToken cancellationToken = default);
-        Task<WeeklyPlanResponseDto?> GetWeeklyPlanByIdAsync(int id, CancellationToken cancellationToken = default);
-        Task<PaginatedWeeklyPlansResponseDto> GetWeeklyPlansAsync(FilterWeeklyPlansDto filterDto, CancellationToken cancellationToken = default);
-        Task<PaginatedWeeklyPlansResponseDto> GetWeeklyPlansForEmployeeAsync(string employeeId, FilterWeeklyPlansDto filterDto, CancellationToken cancellationToken = default);
-        Task<bool> CanAccessWeeklyPlanAsync(int planId, string userId, bool isManager, CancellationToken cancellationToken = default);
-        
-        // Task operations
-        Task<WeeklyPlanTaskResponseDto?> AddTaskToWeeklyPlanAsync(int weeklyPlanId, AddTaskToWeeklyPlanDto taskDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<WeeklyPlanTaskResponseDto?> UpdateTaskAsync(int weeklyPlanId, int taskId, UpdateWeeklyPlanTaskDto updateDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<bool> DeleteTaskAsync(int weeklyPlanId, int taskId, string employeeId, CancellationToken cancellationToken = default);
-        
-        // Daily Progress operations
-        Task<DailyProgressResponseDto?> AddDailyProgressAsync(int weeklyPlanId, CreateDailyProgressDto progressDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<DailyProgressResponseDto?> UpdateDailyProgressAsync(int weeklyPlanId, int progressId, UpdateDailyProgressDto updateDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<bool> DeleteDailyProgressAsync(int weeklyPlanId, int progressId, string employeeId, CancellationToken cancellationToken = default);
-        
-        // Manager Review operations
-        Task<WeeklyPlanResponseDto?> ReviewWeeklyPlanAsync(int id, ReviewWeeklyPlanDto reviewDto, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Creates a new weekly plan
+        /// </summary>
+        Task<WeeklyPlanResponseDTO> CreateWeeklyPlanAsync(CreateWeeklyPlanDTO createDto, string userId);
+
+        /// <summary>
+        /// Gets weekly plans for a user with pagination
+        /// </summary>
+        Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansAsync(string userId, string userRole, int page, int pageSize);
+
+        /// <summary>
+        /// Gets weekly plans with filters for managers/admins
+        /// </summary>
+        Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansWithFiltersAsync(WeeklyPlanFiltersDTO filters, string userRole, int page, int pageSize);
+
+        /// <summary>
+        /// Gets a specific weekly plan by ID
+        /// </summary>
+        Task<WeeklyPlanResponseDTO?> GetWeeklyPlanAsync(long id, string userId, string userRole);
+
+        /// <summary>
+        /// Updates a weekly plan
+        /// </summary>
+        Task<WeeklyPlanResponseDTO?> UpdateWeeklyPlanAsync(long id, UpdateWeeklyPlanDTO updateDto, string userId);
+
+        /// <summary>
+        /// Submits a weekly plan for approval
+        /// </summary>
+        Task<bool> SubmitWeeklyPlanAsync(long id, string userId);
+
+        /// <summary>
+        /// Reviews a weekly plan (manager rating and comment)
+        /// </summary>
+        Task<bool> ReviewWeeklyPlanAsync(long id, ReviewWeeklyPlanDTO reviewDto, string userId);
+
+        /// <summary>
+        /// Gets the current week's plan for a user
+        /// </summary>
+        Task<WeeklyPlanResponseDTO?> GetCurrentWeeklyPlanAsync(string userId);
+
+        /// <summary>
+        /// Checks if a user has a plan for a specific week
+        /// </summary>
+        Task<bool> HasPlanForWeekAsync(string userId, DateTime weekStartDate);
     }
 }
-
-
-
-
-
-
-
-
-
-
