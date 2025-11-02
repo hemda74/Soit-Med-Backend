@@ -38,21 +38,38 @@ namespace SoitMed.Services
             await _unitOfWork.Notifications.CreateAsync(notification, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            // Send real-time notification via SignalR
-            await _hubContext.Clients.Group($"User_{userId}").SendAsync("ReceiveNotification", new
-            {
-                Id = notification.Id,
-                Title = notification.Title,
-                Message = notification.Message,
-                Type = notification.Type,
-                Priority = notification.Priority,
-                IsRead = notification.IsRead,
-                CreatedAt = notification.CreatedAt,
-                RequestWorkflowId = notification.RequestWorkflowId,
-                ActivityLogId = notification.ActivityLogId
-            });
+            _logger.LogInformation("📝 Notification saved to database. NotificationId: {NotificationId}, UserId: {UserId}, Type: {Type}, Title: {Title}", 
+                notification.Id, userId, type, title);
 
-            _logger.LogInformation($"Notification sent to user {userId}: {title}");
+            // Send real-time notification via SignalR
+            try
+            {
+                var signalRGroup = $"User_{userId}";
+                _logger.LogInformation("📡 Attempting to send SignalR notification to group: {Group}", signalRGroup);
+                
+                await _hubContext.Clients.Group(signalRGroup).SendAsync("ReceiveNotification", new
+                {
+                    Id = notification.Id,
+                    Title = notification.Title,
+                    Message = notification.Message,
+                    Type = notification.Type,
+                    Priority = notification.Priority,
+                    IsRead = notification.IsRead,
+                    CreatedAt = notification.CreatedAt,
+                    RequestWorkflowId = notification.RequestWorkflowId,
+                    ActivityLogId = notification.ActivityLogId
+                });
+
+                _logger.LogInformation("✅ SignalR notification sent successfully to group {Group} for user {UserId}: {Title}", 
+                    signalRGroup, userId, title);
+            }
+            catch (Exception signalREx)
+            {
+                _logger.LogWarning(signalREx, "⚠️ Failed to send SignalR notification to user {UserId} (notification is still saved in DB)", userId);
+                // Don't throw - notification is saved, just real-time delivery failed
+            }
+
+            _logger.LogInformation("📬 Notification process completed for user {UserId}: {Title}", userId, title);
 
             return notification;
         }

@@ -8,9 +8,8 @@ namespace SoitMed.DTO
         [MaxLength(200)]
         public string Name { get; set; } = string.Empty;
 
-        [Required]
         [MaxLength(50)]
-        public string Type { get; set; } = string.Empty;
+        public string? Type { get; set; }
 
         [MaxLength(100)]
         public string? Specialization { get; set; }
@@ -158,7 +157,7 @@ namespace SoitMed.DTO
     {
         public long Id { get; set; }
         public string Name { get; set; } = string.Empty;
-        public string Type { get; set; } = string.Empty;
+        public string? Type { get; set; } // Can be null if not provided
         public string? Specialization { get; set; }
         public string? Location { get; set; }
         public string? Phone { get; set; }

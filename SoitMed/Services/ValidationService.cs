@@ -22,14 +22,11 @@ namespace SoitMed.Services
             if (string.IsNullOrWhiteSpace(createDto.Name))
                 errors.Add("اسم العميل مطلوب");
 
-            if (string.IsNullOrWhiteSpace(createDto.Type))
-                errors.Add("نوع العميل مطلوب");
-
             // Validate field lengths
             if (createDto.Name.Length > 200)
                 errors.Add("اسم العميل لا يجب أن يتجاوز 200 حرف");
 
-            if (createDto.Type.Length > 50)
+            if (!string.IsNullOrEmpty(createDto.Type) && createDto.Type.Length > 50)
                 errors.Add("نوع العميل لا يجب أن يتجاوز 50 حرف");
 
             if (!string.IsNullOrEmpty(createDto.Specialization) && createDto.Specialization.Length > 100)
