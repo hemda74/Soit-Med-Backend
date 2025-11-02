@@ -28,7 +28,7 @@ namespace SoitMed.Services
                 var client = new Client
                 {
                     Name = createClientDto.Name,
-                    Type = createClientDto.Type,
+                    Type = createClientDto.Type, // Can be null - optional field
                     Specialization = createClientDto.Specialization,
                     Location = createClientDto.Location,
                     Phone = createClientDto.Phone,

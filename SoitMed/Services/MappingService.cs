@@ -49,7 +49,7 @@ namespace SoitMed.Services
             return new Client
             {
                 Name = createDto.Name,
-                Type = createDto.Type,
+                Type = createDto.Type, // Can be null - optional field
                 Specialization = createDto.Specialization,
                 Location = createDto.Location,
                 Phone = createDto.Phone,
