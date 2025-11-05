@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
 using SoitMed.Models;
+using SoitMed.Repositories;
 using System.Text;
 using System.Text.Json;
 
@@ -10,35 +12,88 @@ namespace SoitMed.Services
         private readonly IConfiguration _configuration;
         private readonly HttpClient _httpClient;
         private readonly ILogger<MobileNotificationService> _logger;
+        private readonly IUnitOfWork _unitOfWork;
+        private const string ExpoPushApiUrl = "https://exp.host/--/api/v2/push/send";
 
-        public MobileNotificationService(IConfiguration configuration, HttpClient httpClient, ILogger<MobileNotificationService> logger)
+        public MobileNotificationService(
+            IConfiguration configuration, 
+            HttpClient httpClient, 
+            ILogger<MobileNotificationService> logger,
+            IUnitOfWork unitOfWork)
         {
             _configuration = configuration;
             _httpClient = httpClient;
             _logger = logger;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task SendPushNotificationAsync(string userId, string title, string message, Dictionary<string, object>? data = null, CancellationToken cancellationToken = default)
         {
             try
             {
-                // This is a placeholder implementation
-                // In a real implementation, you would integrate with Firebase Cloud Messaging (FCM) or similar service
-                
-                _logger.LogInformation($"Sending push notification to user {userId}: {title} - {message}");
-                
-                // For now, we'll just log the notification
-                // In production, you would:
-                // 1. Get the user's device tokens from database
-                // 2. Send to FCM/APNS
-                // 3. Handle delivery status
-                
-                await Task.Delay(100, cancellationToken); // Simulate API call
+                // Get all active device tokens for this user
+                var deviceTokens = await _unitOfWork.GetContext().DeviceTokens
+                    .Where(dt => dt.UserId == userId && dt.IsActive)
+                    .ToListAsync(cancellationToken);
+
+                if (!deviceTokens.Any())
+                {
+                    _logger.LogWarning("⚠️ No device tokens found for user {UserId}. Push notification not sent.", userId);
+                    return;
+                }
+
+                _logger.LogInformation("📱 Sending push notification to {Count} device(s) for user {UserId}: {Title}", 
+                    deviceTokens.Count, userId, title);
+
+                // Prepare notification payload for Expo Push API
+                var notifications = deviceTokens.Select(dt => new
+                {
+                    to = dt.Token,
+                    sound = "default",
+                    title = title,
+                    body = message,
+                    data = data ?? new Dictionary<string, object>(),
+                    priority = "high",
+                    channelId = "default"
+                }).ToList();
+
+                // Send to Expo Push API
+                var jsonContent = JsonSerializer.Serialize(notifications, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+
+                var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                // Add required headers for Expo API
+                httpContent.Headers.Add("Accept", "application/json");
+                httpContent.Headers.Add("Accept-Encoding", "gzip, deflate");
+
+                var response = await _httpClient.PostAsync(ExpoPushApiUrl, httpContent, cancellationToken);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                    _logger.LogInformation("✅ Push notification sent successfully. Response: {Response}", responseContent);
+                    
+                    // Update LastUsedAt for all tokens
+                    foreach (var token in deviceTokens)
+                    {
+                        token.LastUsedAt = DateTime.UtcNow;
+                    }
+                    await _unitOfWork.SaveChangesAsync(cancellationToken);
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                    _logger.LogError("❌ Failed to send push notification. Status: {Status}, Error: {Error}", 
+                        response.StatusCode, errorContent);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending push notification to user {UserId}", userId);
-                throw;
+                _logger.LogError(ex, "❌ Error sending push notification to user {UserId}", userId);
+                // Don't throw - allow SignalR to still work
             }
         }
 
@@ -46,7 +101,7 @@ namespace SoitMed.Services
         {
             try
             {
-                _logger.LogInformation($"Sending bulk push notification to {userIds.Count} users: {title} - {message}");
+                _logger.LogInformation("📱 Sending bulk push notification to {Count} users: {Title}", userIds.Count, title);
                 
                 // Send to each user
                 var tasks = userIds.Select(userId => SendPushNotificationAsync(userId, title, message, data, cancellationToken));
@@ -54,8 +109,8 @@ namespace SoitMed.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending bulk push notification");
-                throw;
+                _logger.LogError(ex, "❌ Error sending bulk push notification");
+                // Don't throw - allow SignalR to still work
             }
         }
 
@@ -63,15 +118,41 @@ namespace SoitMed.Services
         {
             try
             {
-                _logger.LogInformation($"Registering device token for user {userId} on platform {platform}");
+                _logger.LogInformation("📱 Registering device token for user {UserId} on platform {Platform}", userId, platform);
                 
-                // In a real implementation, you would store this in a database
-                // For now, we'll just log it
-                await Task.Delay(100, cancellationToken);
+                // Check if token already exists for this user
+                var existingToken = await _unitOfWork.GetContext().DeviceTokens
+                    .FirstOrDefaultAsync(dt => dt.UserId == userId && dt.Token == deviceToken, cancellationToken);
+
+                if (existingToken != null)
+                {
+                    // Update existing token
+                    existingToken.Platform = platform;
+                    existingToken.LastUsedAt = DateTime.UtcNow;
+                    existingToken.IsActive = true;
+                    _unitOfWork.GetContext().DeviceTokens.Update(existingToken);
+                    _logger.LogInformation("✅ Updated existing device token for user {UserId}", userId);
+                }
+                else
+                {
+                    // Create new token
+                    var newToken = new DeviceToken
+                    {
+                        UserId = userId,
+                        Token = deviceToken,
+                        Platform = platform,
+                        LastUsedAt = DateTime.UtcNow,
+                        IsActive = true
+                    };
+                    await _unitOfWork.GetContext().DeviceTokens.AddAsync(newToken, cancellationToken);
+                    _logger.LogInformation("✅ Created new device token for user {UserId}", userId);
+                }
+
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error registering device token for user {UserId}", userId);
+                _logger.LogError(ex, "❌ Error registering device token for user {UserId}", userId);
                 throw;
             }
         }
@@ -80,14 +161,26 @@ namespace SoitMed.Services
         {
             try
             {
-                _logger.LogInformation($"Unregistering device token for user {userId}");
+                _logger.LogInformation("📱 Unregistering device token for user {UserId}", userId);
                 
-                // In a real implementation, you would remove this from the database
-                await Task.Delay(100, cancellationToken);
+                var token = await _unitOfWork.GetContext().DeviceTokens
+                    .FirstOrDefaultAsync(dt => dt.UserId == userId && dt.Token == deviceToken, cancellationToken);
+
+                if (token != null)
+                {
+                    token.IsActive = false;
+                    _unitOfWork.GetContext().DeviceTokens.Update(token);
+                    await _unitOfWork.SaveChangesAsync(cancellationToken);
+                    _logger.LogInformation("✅ Device token unregistered for user {UserId}", userId);
+                }
+                else
+                {
+                    _logger.LogWarning("⚠️ Device token not found for user {UserId}", userId);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error unregistering device token for user {UserId}", userId);
+                _logger.LogError(ex, "❌ Error unregistering device token for user {UserId}", userId);
                 throw;
             }
         }

@@ -45,6 +45,7 @@ namespace SoitMed.Models
         public DbSet<DeliveryTerms> DeliveryTerms { get; set; }
         public DbSet<PaymentTerms> PaymentTerms { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<DeviceToken> DeviceTokens { get; set; }
 
         // Client tracking entities
         public DbSet<Client> Clients { get; set; }
@@ -69,6 +70,10 @@ namespace SoitMed.Models
         
         // Salesman targets and statistics
         public DbSet<SalesmanTarget> SalesmanTargets { get; set; }
+        
+        // Products catalog
+        public DbSet<Product> Products { get; set; }
+        
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -272,6 +277,17 @@ namespace SoitMed.Models
                 .HasForeignKey(n => n.ActivityLogId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // Configure DeviceToken relationships
+            modelBuilder.Entity<DeviceToken>()
+                .HasOne(dt => dt.User)
+                .WithMany()
+                .HasForeignKey(dt => dt.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Index for efficient queries
+            modelBuilder.Entity<DeviceToken>()
+                .HasIndex(dt => new { dt.UserId, dt.IsActive });
+
             // Configure indexes for better performance
             modelBuilder.Entity<RequestWorkflow>()
                 .HasIndex(rw => new { rw.FromUserId, rw.Status });
@@ -365,7 +381,7 @@ namespace SoitMed.Models
                 .HasIndex(tp => new { tp.ClientId, tp.ProgressDate });
 
             modelBuilder.Entity<WeeklyPlanTask>()
-                .HasIndex(wpt => new { wpt.WeeklyPlanId, wpt.Status });
+                .HasIndex(wpt => new { wpt.WeeklyPlanId, wpt.PlannedDate });
 
             // ==================== Sales Module Relationships ====================
             
@@ -478,6 +494,16 @@ namespace SoitMed.Models
             modelBuilder.Entity<SalesmanTarget>()
                 .HasIndex(st => new { st.SalesmanId, st.Year, st.Quarter })
                 .IsUnique();
+
+            // Product catalog indexes for efficient searching
+            modelBuilder.Entity<Product>()
+                .HasIndex(p => new { p.Category, p.IsActive, p.InStock });
+            
+            modelBuilder.Entity<Product>()
+                .HasIndex(p => p.IsActive);
+            
+            modelBuilder.Entity<Product>()
+                .HasIndex(p => new { p.Name, p.Model, p.Provider });
         }
     }
 }

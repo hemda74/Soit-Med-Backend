@@ -4,7 +4,7 @@ namespace SoitMed.Services
 {
     public interface INotificationService
     {
-        Task<Notification> CreateNotificationAsync(string userId, string title, string message, string type, string? priority = null, long? requestWorkflowId = null, long? activityLogId = null, bool isMobilePush = false, CancellationToken cancellationToken = default);
+        Task<Notification> CreateNotificationAsync(string userId, string title, string message, string type, string? priority = null, long? requestWorkflowId = null, long? activityLogId = null, bool isMobilePush = false, Dictionary<string, object>? metadata = null, CancellationToken cancellationToken = default);
         
         Task<IEnumerable<Notification>> GetUserNotificationsAsync(string userId, int page = 1, int pageSize = 20, bool unreadOnly = false, CancellationToken cancellationToken = default);
         
