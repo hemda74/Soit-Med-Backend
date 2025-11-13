@@ -51,12 +51,6 @@ namespace SoitMed.Models
         [MaxLength(1000)]
         public string? FollowUpNotes { get; set; }
 
-        // ========== Satisfaction ==========
-        public int? SatisfactionRating { get; set; } // 1-5
-
-        [MaxLength(2000)]
-        public string? Feedback { get; set; }
-
         // ========== Attachments ==========
         [MaxLength(2000)]
         public string? Attachments { get; set; } // JSON array of file paths
@@ -93,14 +87,6 @@ namespace SoitMed.Models
         }
 
         /// <summary>
-        /// Determines if this progress was successful based on satisfaction rating
-        /// </summary>
-        public bool WasSuccessful()
-        {
-            return SatisfactionRating.HasValue && SatisfactionRating.Value >= 4;
-        }
-
-        /// <summary>
         /// Updates the visit result and handles next steps
         /// </summary>
         public void UpdateVisitResult(string result, string? comment = null, string? nextStep = null)
@@ -115,19 +101,6 @@ namespace SoitMed.Models
             if (result == VisitResultConstants.Interested && !string.IsNullOrEmpty(nextStep))
             {
                 NextStep = nextStep;
-            }
-        }
-
-        /// <summary>
-        /// Records satisfaction rating and feedback
-        /// </summary>
-        public void RecordSatisfaction(int rating, string? feedback = null)
-        {
-            if (rating >= 1 && rating <= 5)
-            {
-                SatisfactionRating = rating;
-                if (!string.IsNullOrEmpty(feedback))
-                    Feedback = feedback;
             }
         }
 

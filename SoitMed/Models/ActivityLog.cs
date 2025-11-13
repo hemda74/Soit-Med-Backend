@@ -29,7 +29,7 @@ namespace SoitMed.Models
         [MaxLength(1000)]
         public string? Comment { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation properties
         public Deal? Deal { get; set; }

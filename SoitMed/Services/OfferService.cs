@@ -1,7 +1,11 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SoitMed.DTO;
 using SoitMed.Models;
+using SoitMed.Models.Identity;
 using SoitMed.Repositories;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace SoitMed.Services
 {
@@ -11,11 +15,22 @@ namespace SoitMed.Services
     public class OfferService : IOfferService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly INotificationService _notificationService;
+        private readonly IDealService _dealService;
         private readonly ILogger<OfferService> _logger;
 
-        public OfferService(IUnitOfWork unitOfWork, ILogger<OfferService> logger)
+        public OfferService(
+            IUnitOfWork unitOfWork, 
+            UserManager<ApplicationUser> userManager, 
+            INotificationService notificationService,
+            IDealService dealService,
+            ILogger<OfferService> logger)
         {
             _unitOfWork = unitOfWork;
+            _userManager = userManager;
+            _notificationService = notificationService;
+            _dealService = dealService;
             _logger = logger;
         }
 
@@ -37,9 +52,18 @@ namespace SoitMed.Services
                     AssignedTo = createOfferDto.AssignedTo,
                     Products = createOfferDto.Products,
                     TotalAmount = createOfferDto.TotalAmount,
-                    PaymentTerms = createOfferDto.PaymentTerms,
-                    DeliveryTerms = createOfferDto.DeliveryTerms,
-                    ValidUntil = createOfferDto.ValidUntil,
+                    PaymentTerms = createOfferDto.PaymentTerms != null && createOfferDto.PaymentTerms.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.PaymentTerms) 
+                        : null,
+                    DeliveryTerms = createOfferDto.DeliveryTerms != null && createOfferDto.DeliveryTerms.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.DeliveryTerms) 
+                        : null,
+                    WarrantyTerms = createOfferDto.WarrantyTerms != null && createOfferDto.WarrantyTerms.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.WarrantyTerms) 
+                        : null,
+                    ValidUntil = createOfferDto.ValidUntil != null && createOfferDto.ValidUntil.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.ValidUntil) 
+                        : null,
                     Notes = createOfferDto.Notes,
                     PaymentType = createOfferDto.PaymentType,
                     FinalPrice = createOfferDto.FinalPrice,
@@ -50,8 +74,23 @@ namespace SoitMed.Services
                 await _unitOfWork.SalesOffers.CreateAsync(offer);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Update offer request status
-                offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}");
+                // Save recent activity for new offer creation (from request)
+                await SaveRecentActivityAsync(offer, null);
+
+                // Auto-add equipment based on products (parse from Products field or add default)
+                try
+                {
+                    await AutoAddEquipmentFromProductsAsync(offer.Id, createOfferDto.Products);
+                    _logger.LogInformation("Equipment auto-added to offer. OfferId: {OfferId}", offer.Id);
+                }
+                catch (Exception equipEx)
+                {
+                    // Log but don't fail offer creation
+                    _logger.LogWarning(equipEx, "Failed to auto-add equipment to offer {OfferId}", offer.Id);
+                }
+
+                // Update offer request status and link the created offer
+                offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
                 await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
                 await _unitOfWork.SaveChangesAsync();
 
@@ -79,9 +118,18 @@ namespace SoitMed.Services
                     AssignedTo = createOfferDto.AssignedTo,
                     Products = createOfferDto.Products,
                     TotalAmount = createOfferDto.TotalAmount,
-                    PaymentTerms = createOfferDto.PaymentTerms,
-                    DeliveryTerms = createOfferDto.DeliveryTerms,
-                    ValidUntil = createOfferDto.ValidUntil,
+                    PaymentTerms = createOfferDto.PaymentTerms != null && createOfferDto.PaymentTerms.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.PaymentTerms) 
+                        : null,
+                    DeliveryTerms = createOfferDto.DeliveryTerms != null && createOfferDto.DeliveryTerms.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.DeliveryTerms) 
+                        : null,
+                    WarrantyTerms = createOfferDto.WarrantyTerms != null && createOfferDto.WarrantyTerms.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.WarrantyTerms) 
+                        : null,
+                    ValidUntil = createOfferDto.ValidUntil != null && createOfferDto.ValidUntil.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.ValidUntil) 
+                        : null,
                     Notes = createOfferDto.Notes,
                     PaymentType = createOfferDto.PaymentType,
                     FinalPrice = createOfferDto.FinalPrice,
@@ -92,6 +140,44 @@ namespace SoitMed.Services
                 await _unitOfWork.SalesOffers.CreateAsync(offer);
                 await _unitOfWork.SaveChangesAsync();
 
+                // Save recent activity for new offer creation
+                await SaveRecentActivityAsync(offer, null);
+
+                // Auto-add equipment based on products
+                try
+                {
+                    await AutoAddEquipmentFromProductsAsync(offer.Id, createOfferDto.Products);
+                    _logger.LogInformation("Equipment auto-added to offer. OfferId: {OfferId}", offer.Id);
+                }
+                catch (Exception equipEx)
+                {
+                    // Log but don't fail offer creation
+                    _logger.LogWarning(equipEx, "Failed to auto-add equipment to offer {OfferId}", offer.Id);
+                }
+
+                // Update offer request if linked
+                if (createOfferDto.OfferRequestId.HasValue)
+                {
+                    try
+                    {
+                        var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId.Value);
+                        if (offerRequest != null)
+                        {
+                            offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
+                            await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
+                            await _unitOfWork.SaveChangesAsync();
+                            _logger.LogInformation("Offer request updated with created offer ID. RequestId: {RequestId}, OfferId: {OfferId}", 
+                                createOfferDto.OfferRequestId.Value, offer.Id);
+                        }
+                    }
+                    catch (Exception requestEx)
+                    {
+                        // Log but don't fail offer creation
+                        _logger.LogWarning(requestEx, "Failed to update offer request {RequestId} with created offer ID", 
+                            createOfferDto.OfferRequestId.Value);
+                    }
+                }
+
                 _logger.LogInformation("Offer created successfully. OfferId: {OfferId}", offer.Id);
 
                 return await MapToOfferResponseDTO(offer);
@@ -99,6 +185,88 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating offer");
+                throw;
+            }
+        }
+
+        public async Task<OfferResponseDTO> CreateOfferWithItemsAsync(CreateOfferWithItemsDTO createOfferDto, string userId)
+        {
+            try
+            {
+                var offer = new SalesOffer
+                {
+                    OfferRequestId = createOfferDto.OfferRequestId,
+                    ClientId = createOfferDto.ClientId,
+                    CreatedBy = userId,
+                    AssignedTo = createOfferDto.AssignedTo,
+                    Products = string.Join(", ", createOfferDto.Products.Select(p => p.Name)),
+                    TotalAmount = createOfferDto.TotalAmount,
+                    PaymentTerms = createOfferDto.PaymentTerms != null && createOfferDto.PaymentTerms.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.PaymentTerms) 
+                        : null,
+                    DeliveryTerms = createOfferDto.DeliveryTerms != null && createOfferDto.DeliveryTerms.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.DeliveryTerms) 
+                        : null,
+                    WarrantyTerms = createOfferDto.WarrantyTerms != null && createOfferDto.WarrantyTerms.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.WarrantyTerms) 
+                        : null,
+                    ValidUntil = createOfferDto.ValidUntil != null && createOfferDto.ValidUntil.Count > 0 
+                        ? JsonSerializer.Serialize(createOfferDto.ValidUntil) 
+                        : null,
+                    Notes = createOfferDto.Notes,
+                    PaymentType = createOfferDto.PaymentType,
+                    FinalPrice = createOfferDto.FinalPrice,
+                    OfferDuration = createOfferDto.OfferDuration,
+                    Status = "Draft"
+                };
+
+                await _unitOfWork.SalesOffers.CreateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Save recent activity for new offer creation
+                await SaveRecentActivityAsync(offer, null);
+
+                // Map products to equipment
+                foreach (var item in createOfferDto.Products)
+                {
+                    var equipment = new OfferEquipment
+                    {
+                        OfferId = offer.Id,
+                        Name = item.Name,
+                        Model = item.Model,
+                        Provider = item.Factory,
+                        Country = item.Country,
+                        Year = item.Year,
+                        Price = item.Price,
+                        Description = item.Description,
+                        InStock = item.InStock,
+                        ImagePath = !string.IsNullOrWhiteSpace(item.ImageUrl) ? item.ImageUrl : $"offers/{offer.Id}/equipment-placeholder.png"
+                    };
+
+                    await _unitOfWork.OfferEquipment.CreateAsync(equipment);
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+
+                // Update offer request if linked
+                if (createOfferDto.OfferRequestId.HasValue)
+                {
+                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId.Value);
+                    if (offerRequest != null)
+                    {
+                        offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
+                        await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
+                        await _unitOfWork.SaveChangesAsync();
+                    }
+                }
+
+                _logger.LogInformation("Offer with items created successfully. OfferId: {OfferId}", offer.Id);
+
+                return await MapToOfferResponseDTO(offer);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating offer with items");
                 throw;
             }
         }
@@ -124,15 +292,12 @@ namespace SoitMed.Services
         {
             try
             {
-                var offers = await _unitOfWork.SalesOffers.GetOffersByClientIdAsync(clientId);
-                var result = new List<OfferResponseDTO>();
+                // OPTIMIZED: Single method call loads offers + related data in O(1) queries (3 queries total)
+                var (offers, clientsDict, usersDict) = await _unitOfWork.SalesOffers
+                    .GetOffersByClientIdWithRelatedDataAsync(clientId);
 
-                foreach (var offer in offers)
-                {
-                    result.Add(await MapToOfferResponseDTO(offer));
-                }
-
-                return result;
+                // Map synchronously using pre-loaded data - O(n) in-memory operation
+                return offers.Select(o => MapToOfferResponseDTO(o, clientsDict, usersDict)).ToList();
             }
             catch (Exception ex)
             {
@@ -145,15 +310,12 @@ namespace SoitMed.Services
         {
             try
             {
-                var offers = await _unitOfWork.SalesOffers.GetOffersBySalesmanAsync(salesmanId);
-                var result = new List<OfferResponseDTO>();
+                // OPTIMIZED: Single method call loads offers + related data in O(1) queries (3 queries total)
+                var (offers, clientsDict, usersDict) = await _unitOfWork.SalesOffers
+                    .GetOffersBySalesmanWithRelatedDataAsync(salesmanId);
 
-                foreach (var offer in offers)
-                {
-                    result.Add(await MapToOfferResponseDTO(offer));
-                }
-
-                return result;
+                // Map synchronously using pre-loaded data - O(n) in-memory operation
+                return offers.Select(o => MapToOfferResponseDTO(o, clientsDict, usersDict)).ToList();
             }
             catch (Exception ex)
             {
@@ -166,24 +328,12 @@ namespace SoitMed.Services
         {
             try
             {
-                IEnumerable<SalesOffer> offers;
-                if (string.IsNullOrEmpty(status))
-                {
-                    offers = await _unitOfWork.SalesOffers.GetAllAsync();
-                }
-                else
-                {
-                    offers = await _unitOfWork.SalesOffers.GetOffersByStatusAsync(status);
-                }
-                
-                var result = new List<OfferResponseDTO>();
+                // OPTIMIZED: Single method call loads offers + related data in O(1) queries (3 queries total)
+                var (offers, clientsDict, usersDict) = await _unitOfWork.SalesOffers
+                    .GetOffersByStatusWithRelatedDataAsync(status);
 
-                foreach (var offer in offers)
-                {
-                    result.Add(await MapToOfferResponseDTO(offer));
-                }
-
-                return result;
+                // Map synchronously using pre-loaded data - O(n) in-memory operation
+                return offers.Select(o => MapToOfferResponseDTO(o, clientsDict, usersDict)).ToList();
             }
             catch (Exception ex)
             {
@@ -197,18 +347,74 @@ namespace SoitMed.Services
             try
             {
                 var offers = await _unitOfWork.SalesOffers.GetOffersByCreatorAsync(creatorId);
-                var result = new List<OfferResponseDTO>();
-
-                foreach (var offer in offers)
-                {
-                    result.Add(await MapToOfferResponseDTO(offer));
-                }
-
-                return result;
+                // OPTIMIZATION: Pre-load all related data in batches, then map synchronously
+                return await MapOffersToDTOsAsync(offers);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting offers by creator. CreatorId: {CreatorId}", creatorId);
+                throw;
+            }
+        }
+
+        public async Task<PaginatedOffersResponseDTO> GetAllOffersWithFiltersAsync(
+            string? status,
+            string? salesmanId,
+            int page,
+            int pageSize,
+            DateTime? startDate,
+            DateTime? endDate)
+        {
+            try
+            {
+                var query = _unitOfWork.SalesOffers.GetQueryable();
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(status))
+                {
+                    query = query.Where(o => o.Status == status);
+                }
+
+                if (!string.IsNullOrEmpty(salesmanId))
+                {
+                    query = query.Where(o => o.AssignedTo == salesmanId);
+                }
+
+                // Apply date filters
+                if (startDate.HasValue)
+                {
+                    query = query.Where(o => o.CreatedAt >= startDate.Value);
+                }
+
+                if (endDate.HasValue)
+                {
+                    query = query.Where(o => o.CreatedAt <= endDate.Value);
+                }
+
+                // Get total count before pagination
+                var totalCount = await query.CountAsync();
+
+                // Apply pagination and ordering (default: last 10 offers)
+                var offers = await query
+                    .OrderByDescending(o => o.CreatedAt)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                // OPTIMIZATION: Pre-load all related data in batches, then map synchronously
+                var offerDTOs = await MapOffersToDTOsAsync(offers);
+
+                return new PaginatedOffersResponseDTO
+                {
+                    Offers = offerDTOs,
+                    TotalCount = totalCount,
+                    Page = page,
+                    PageSize = pageSize
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all offers with filters");
                 throw;
             }
         }
@@ -221,20 +427,38 @@ namespace SoitMed.Services
                 if (offer == null)
                     throw new ArgumentException("Offer not found", nameof(offerId));
 
-                // Only allow updates if offer is in draft status
-                if (offer.Status != "Draft")
-                    throw new InvalidOperationException("Only draft offers can be updated");
+                // Store old status to track changes
+                var oldStatus = offer.Status;
+
+                // Only allow updates if offer can be modified (Draft or NeedsModification)
+                if (!offer.CanBeModified())
+                    throw new InvalidOperationException("Only draft or needs-modification offers can be updated");
 
                 offer.Products = updateOfferDto.Products;
                 offer.TotalAmount = updateOfferDto.TotalAmount;
-                offer.PaymentTerms = updateOfferDto.PaymentTerms;
-                offer.DeliveryTerms = updateOfferDto.DeliveryTerms;
-                offer.ValidUntil = updateOfferDto.ValidUntil;
+                offer.PaymentTerms = updateOfferDto.PaymentTerms != null && updateOfferDto.PaymentTerms.Count > 0 
+                    ? JsonSerializer.Serialize(updateOfferDto.PaymentTerms) 
+                    : null;
+                offer.DeliveryTerms = updateOfferDto.DeliveryTerms != null && updateOfferDto.DeliveryTerms.Count > 0 
+                    ? JsonSerializer.Serialize(updateOfferDto.DeliveryTerms) 
+                    : null;
+                offer.WarrantyTerms = updateOfferDto.WarrantyTerms != null && updateOfferDto.WarrantyTerms.Count > 0 
+                    ? JsonSerializer.Serialize(updateOfferDto.WarrantyTerms) 
+                    : null;
+                offer.ValidUntil = updateOfferDto.ValidUntil != null && updateOfferDto.ValidUntil.Count > 0 
+                    ? JsonSerializer.Serialize(updateOfferDto.ValidUntil) 
+                    : null;
                 offer.Notes = updateOfferDto.Notes;
                 offer.UpdatedAt = DateTime.UtcNow;
 
                 await _unitOfWork.SalesOffers.UpdateAsync(offer);
                 await _unitOfWork.SaveChangesAsync();
+
+                // Save recent activity if status changed
+                if (oldStatus != offer.Status)
+                {
+                    await SaveRecentActivityAsync(offer, oldStatus);
+                }
 
                 _logger.LogInformation("Offer updated successfully. OfferId: {OfferId}", offerId);
 
@@ -255,11 +479,83 @@ namespace SoitMed.Services
                 if (offer == null)
                     throw new ArgumentException("Offer not found", nameof(offerId));
 
+                // Get client info for notification
+                var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                var clientName = client?.Name ?? "Unknown Client";
+
                 offer.MarkAsSent();
                 await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                
+                // Update OfferRequest status to Sent
+                if (offer.OfferRequestId.HasValue)
+                {
+                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId.Value);
+                    if (offerRequest != null)
+                    {
+                        offerRequest.MarkAsSent();
+                        await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
+                    }
+                }
+                
                 await _unitOfWork.SaveChangesAsync();
 
+                // Save recent activity (status changed to Sent)
+                await SaveRecentActivityAsync(offer, "Draft");
+
                 _logger.LogInformation("Offer sent to salesman successfully. OfferId: {OfferId}", offerId);
+
+                // Send notification to salesman
+                if (!string.IsNullOrEmpty(offer.AssignedTo))
+                {
+                    try
+                    {
+                        var salesman = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
+                        if (salesman != null && salesman.IsActive)
+                        {
+                            var creatorInfo = await _unitOfWork.Users.GetByIdAsync(userId);
+                            var creatorName = creatorInfo != null ? $"{creatorInfo.FirstName} {creatorInfo.LastName}" : "Sales Support";
+
+                            var notificationTitle = "New Offer Available";
+                            var notificationMessage = $"{creatorName} has sent you an offer for {clientName}. Total: {offer.TotalAmount:C}";
+
+                            // Add offerId to metadata for easy navigation
+                            var metadata = new Dictionary<string, object>
+                            {
+                                ["offerId"] = offerId,
+                                ["clientName"] = clientName,
+                                ["totalAmount"] = offer.TotalAmount
+                            };
+
+                            await _notificationService.CreateNotificationAsync(
+                                offer.AssignedTo,
+                                notificationTitle,
+                                notificationMessage,
+                                "Offer",
+                                "High",
+                                null,
+                                null,
+                                true, // Mobile push notification
+                                metadata, // Pass metadata with offerId
+                                CancellationToken.None
+                            );
+
+                            _logger.LogInformation("✅ Notification sent to Salesman: {SalesmanId} for Offer: {OfferId}", offer.AssignedTo, offerId);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("⚠️ Salesman {SalesmanId} not found or inactive. Notification not sent for Offer: {OfferId}", offer.AssignedTo, offerId);
+                        }
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "❌ Failed to send notification to Salesman {SalesmanId} for Offer: {OfferId}", offer.AssignedTo, offerId);
+                        // Don't fail the whole operation if notification fails
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("⚠️ Offer {OfferId} has no assigned salesman. Notification not sent.", offerId);
+                }
 
                 return await MapToOfferResponseDTO(offer);
             }
@@ -278,9 +574,51 @@ namespace SoitMed.Services
                 if (offer == null)
                     throw new ArgumentException("Offer not found", nameof(offerId));
 
+                var oldStatus = offer.Status;
                 offer.RecordClientResponse(response, accepted);
                 await _unitOfWork.SalesOffers.UpdateAsync(offer);
                 await _unitOfWork.SaveChangesAsync();
+
+                // Save recent activity (status changed to Accepted or Rejected)
+                await SaveRecentActivityAsync(offer, oldStatus);
+
+                // If client accepted the offer, automatically create a deal and send for approval
+                if (accepted && offer.Status == "Accepted")
+                {
+                    try
+                    {
+                        // Check if deal already exists for this offer
+                        var existingDeal = await _unitOfWork.SalesDeals.GetQueryable()
+                            .FirstOrDefaultAsync(d => d.OfferId == offerId);
+
+                        if (existingDeal == null)
+                        {
+                            // Create deal automatically from accepted offer
+                            var createDealDto = new CreateDealDTO
+                            {
+                                OfferId = offer.Id,
+                                ClientId = offer.ClientId,
+                                DealValue = offer.TotalAmount,
+                                PaymentTerms = offer.PaymentTerms,
+                                DeliveryTerms = offer.DeliveryTerms,
+                                ExpectedDeliveryDate = ParseDeliveryTermsToDate(offer.DeliveryTerms),
+                                Notes = $"Auto-created from accepted Offer #{offer.Id}. Client response: {response}"
+                            };
+
+                            await _dealService.CreateDealAsync(createDealDto, userId);
+                            _logger.LogInformation("Deal automatically created from accepted offer. OfferId: {OfferId}", offerId);
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Deal already exists for offer. OfferId: {OfferId}, DealId: {DealId}", offerId, existingDeal.Id);
+                        }
+                    }
+                    catch (Exception dealEx)
+                    {
+                        // Log error but don't fail the offer update
+                        _logger.LogError(dealEx, "Failed to auto-create deal for accepted offer. OfferId: {OfferId}", offerId);
+                    }
+                }
 
                 _logger.LogInformation("Client response recorded for offer. OfferId: {OfferId}, Accepted: {Accepted}", offerId, accepted);
 
@@ -289,6 +627,378 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error recording client response. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        public async Task<OfferResponseDTO> CompleteOfferAsync(long offerId, string? completionNotes, string userId)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    throw new ArgumentException("Offer not found", nameof(offerId));
+
+                // Only allow completion if offer is Accepted
+                if (offer.Status != OfferStatus.Accepted)
+                    throw new InvalidOperationException("Only accepted offers can be completed");
+
+                var oldStatus = offer.Status;
+                offer.Status = OfferStatus.Completed;
+                offer.UpdatedAt = DateTime.UtcNow;
+                if (!string.IsNullOrEmpty(completionNotes))
+                {
+                    offer.Notes = string.IsNullOrEmpty(offer.Notes) 
+                        ? completionNotes 
+                        : $"{offer.Notes}\n\nCompletion Notes: {completionNotes}";
+                }
+
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Save recent activity (status changed to Completed)
+                await SaveRecentActivityAsync(offer, oldStatus);
+
+                _logger.LogInformation("Offer marked as completed. OfferId: {OfferId}", offerId);
+
+                return await MapToOfferResponseDTO(offer);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error completing offer. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        public async Task<OfferResponseDTO> MarkAsNeedsModificationAsync(long offerId, string? reason, string userId)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    throw new ArgumentException("Offer not found", nameof(offerId));
+
+                // Only allow if offer is in Draft or Sent status
+                if (offer.Status != OfferStatus.Draft && offer.Status != OfferStatus.Sent)
+                    throw new InvalidOperationException("Only draft or sent offers can be marked as needing modification");
+
+                // Check if user is a Salesman - if so, verify they are assigned to this offer
+                var user = await _unitOfWork.Users.GetByIdAsync(userId);
+                if (user != null)
+                {
+                    var userRoles = await _userManager.GetRolesAsync(user);
+                    bool isSalesman = userRoles.Contains("Salesman");
+                    bool isManagerOrAdmin = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin") || userRoles.Contains("SalesSupport");
+
+                    // If user is a Salesman (and not a Manager/Admin), verify they are assigned to this offer
+                    if (isSalesman && !isManagerOrAdmin)
+                    {
+                        if (string.IsNullOrEmpty(offer.AssignedTo) || offer.AssignedTo != userId)
+                        {
+                            throw new UnauthorizedAccessException("You can only request modifications for offers assigned to you");
+                        }
+                    }
+                }
+
+                var oldStatus = offer.Status;
+                offer.MarkAsNeedsModification(reason);
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Save recent activity
+                await SaveRecentActivityAsync(offer, oldStatus);
+
+                // If requested by Salesman, send notification to SalesSupport/SalesManager
+                if (user != null)
+                {
+                    var userRoles = await _userManager.GetRolesAsync(user);
+                    if (userRoles.Contains("Salesman") && !userRoles.Contains("SalesManager") && !userRoles.Contains("SuperAdmin"))
+                    {
+                        // Get client info for notification
+                        var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                        var clientName = client?.Name ?? "Unknown Client";
+                        var salesmanName = $"{user.FirstName} {user.LastName}".Trim();
+
+                        var notificationTitle = "Offer Modification Requested";
+                        var notificationMessage = $"Salesman {salesmanName} has requested modifications for Offer #{offerId} (Client: {clientName}). Reason: {reason ?? "No reason provided"}";
+
+                        var metadata = new Dictionary<string, object>
+                        {
+                            ["offerId"] = offerId,
+                            ["clientName"] = clientName,
+                            ["salesmanName"] = salesmanName,
+                            ["reason"] = reason ?? ""
+                        };
+
+                        // Send notification to all SalesSupport and SalesManager users
+                        var supportUsers = await _userManager.GetUsersInRoleAsync("SalesSupport");
+                        var managerUsers = await _userManager.GetUsersInRoleAsync("SalesManager");
+                        var allRecipients = supportUsers.Concat(managerUsers).Where(u => u.IsActive).Distinct().ToList();
+
+                        foreach (var recipient in allRecipients)
+                        {
+                            try
+                            {
+                                await _notificationService.CreateNotificationAsync(
+                                    recipient.Id,
+                                    notificationTitle,
+                                    notificationMessage,
+                                    "Offer",
+                                    "High",
+                                    null,
+                                    null,
+                                    true,
+                                    metadata,
+                                    CancellationToken.None
+                                );
+                            }
+                            catch (Exception notifEx)
+                            {
+                                _logger.LogWarning(notifEx, "Failed to send notification to {UserId} for modification request", recipient.Id);
+                            }
+                        }
+
+                        _logger.LogInformation("Modification request notification sent to SalesSupport/Managers for Offer: {OfferId}", offerId);
+                    }
+                }
+
+                _logger.LogInformation("Offer marked as needing modification. OfferId: {OfferId}, RequestedBy: {UserId}", offerId, userId);
+
+                return await MapToOfferResponseDTO(offer);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking offer as needing modification. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        public async Task<OfferResponseDTO> MarkAsUnderReviewAsync(long offerId, string userId)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    throw new ArgumentException("Offer not found", nameof(offerId));
+
+                // Only allow if offer is in Sent status
+                if (offer.Status != OfferStatus.Sent)
+                    throw new InvalidOperationException("Only sent offers can be marked as under review");
+
+                var oldStatus = offer.Status;
+                offer.MarkAsUnderReview();
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Save recent activity
+                await SaveRecentActivityAsync(offer, oldStatus);
+
+                _logger.LogInformation("Offer marked as under review. OfferId: {OfferId}", offerId);
+
+                return await MapToOfferResponseDTO(offer);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking offer as under review. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        public async Task<int> UpdateExpiredOffersAsync()
+        {
+            try
+            {
+                var offers = await _unitOfWork.SalesOffers.GetQueryable()
+                    .Where(o => o.Status != OfferStatus.Expired
+                             && o.Status != OfferStatus.Accepted
+                             && o.Status != OfferStatus.Completed
+                             && o.Status != OfferStatus.Rejected)
+                    .ToListAsync();
+
+                int expiredCount = 0;
+                foreach (var offer in offers)
+                {
+                    if (offer.IsExpired())
+                    {
+                        var oldStatus = offer.Status;
+                        offer.MarkAsExpired();
+                        await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                        await SaveRecentActivityAsync(offer, oldStatus);
+                        expiredCount++;
+                    }
+                }
+
+                if (expiredCount > 0)
+                {
+                    await _unitOfWork.SaveChangesAsync();
+                    _logger.LogInformation("Updated {Count} offers to expired status", expiredCount);
+                }
+
+                return expiredCount;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating expired offers");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Saves a recent activity and maintains only the last 20 activities in the database
+        /// Tracks ALL offer status changes, not just specific operations
+        /// </summary>
+        private async Task SaveRecentActivityAsync(SalesOffer offer, string? oldStatus = null, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var currentStatus = offer.Status;
+                
+                // Skip if status hasn't changed (unless it's a new offer)
+                if (oldStatus != null && oldStatus == currentStatus)
+                    return;
+
+                var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                var salesman = !string.IsNullOrEmpty(offer.AssignedTo) 
+                    ? await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo) 
+                    : null;
+                var creator = !string.IsNullOrEmpty(offer.CreatedBy)
+                    ? await _unitOfWork.Users.GetByIdAsync(offer.CreatedBy)
+                    : null;
+
+                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : null;
+                var clientName = client?.Name ?? "Unknown Client";
+                var creatorName = creator != null ? $"{creator.FirstName} {creator.LastName}".Trim() : null;
+
+                // Generate description based on status
+                string description = GenerateActivityDescription(currentStatus, offer.Id, clientName, salesmanName, creatorName, oldStatus);
+
+                var activity = new RecentOfferActivity
+                {
+                    OfferId = offer.Id,
+                    Type = currentStatus,
+                    Description = description,
+                    ClientName = clientName,
+                    SalesmanName = salesmanName,
+                    TotalAmount = offer.TotalAmount,
+                    ActivityTimestamp = DateTime.UtcNow
+                };
+
+                await _unitOfWork.RecentOfferActivities.CreateAsync(activity, cancellationToken);
+                
+                // Maintain only the last 20 activities
+                await _unitOfWork.RecentOfferActivities.MaintainMaxActivitiesAsync(20, cancellationToken);
+                
+                _logger.LogInformation("Recent activity saved. OfferId: {OfferId}, Status: {Status}", offer.Id, currentStatus);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving recent activity for OfferId: {OfferId}", offer.Id);
+                // Don't throw - activity saving failure shouldn't break the main operation
+            }
+        }
+
+        /// <summary>
+        /// Generates activity description based on offer status
+        /// </summary>
+        private string GenerateActivityDescription(string status, long offerId, string clientName, string? salesmanName, string? creatorName, string? oldStatus)
+        {
+            return status switch
+            {
+                "Draft" => creatorName != null
+                    ? $"{creatorName} created Offer #{offerId} for client {clientName}"
+                    : $"Offer #{offerId} was created for client {clientName}",
+                
+                "Sent" => creatorName != null
+                    ? $"{creatorName} sent Offer #{offerId} to client {clientName}"
+                    : $"Offer #{offerId} was sent to client {clientName}",
+                
+                "Accepted" => salesmanName != null
+                    ? $"{salesmanName} reported that client {clientName} accepted Offer #{offerId}"
+                    : $"Client {clientName} accepted Offer #{offerId}",
+                
+                "Rejected" => salesmanName != null
+                    ? $"{salesmanName} reported that client {clientName} rejected Offer #{offerId}"
+                    : $"Client {clientName} rejected Offer #{offerId}",
+                
+                "Completed" => salesmanName != null
+                    ? $"{salesmanName} completed Offer #{offerId} for client {clientName}"
+                    : $"Offer #{offerId} for client {clientName} was completed",
+                
+                "UnderReview" => $"Offer #{offerId} for client {clientName} is under review",
+                
+                "NeedsModification" => $"Offer #{offerId} for client {clientName} needs modification",
+                
+                "Expired" => $"Offer #{offerId} for client {clientName} has expired",
+                
+                "Cancelled" => creatorName != null
+                    ? $"{creatorName} cancelled Offer #{offerId} for client {clientName}"
+                    : $"Offer #{offerId} for client {clientName} was cancelled",
+                
+                "Ready" => creatorName != null
+                    ? $"{creatorName} marked Offer #{offerId} as ready for client {clientName}"
+                    : $"Offer #{offerId} for client {clientName} is ready",
+                
+                _ => oldStatus != null
+                    ? $"Offer #{offerId} for client {clientName} status changed from {oldStatus} to {status}"
+                    : $"Offer #{offerId} for client {clientName} status changed to {status}"
+            };
+        }
+
+        public async Task<List<OfferActivityDTO>> GetRecentActivityAsync(int limit = 20)
+        {
+            try
+            {
+                // Get activities from database
+                var activities = await _unitOfWork.RecentOfferActivities.GetRecentActivitiesAsync(limit);
+                
+                return activities.Select(a => new OfferActivityDTO
+                {
+                    OfferId = a.OfferId,
+                    Type = a.Type,
+                    Description = a.Description,
+                    ClientName = a.ClientName,
+                    SalesmanName = a.SalesmanName,
+                    TotalAmount = a.TotalAmount,
+                    Timestamp = a.ActivityTimestamp
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting recent activity");
+                throw;
+            }
+        }
+
+        public async Task<OfferResponseDTO> AssignOfferToSalesmanAsync(long offerId, string salesmanId, string userId)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    throw new ArgumentException("Offer not found", nameof(offerId));
+
+                // Validate salesman user exists and has Salesman role
+                var salesman = await _unitOfWork.Users.GetByIdAsync(salesmanId);
+                if (salesman == null)
+                    throw new ArgumentException("Salesman user not found", nameof(salesmanId));
+
+                // Verify user has Salesman role
+                var userRoles = await _userManager.GetRolesAsync(salesman);
+                if (!userRoles.Contains("Salesman"))
+                    throw new ArgumentException("User must have Salesman role", nameof(salesmanId));
+
+                // Update assignment
+                offer.AssignedTo = salesmanId;
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Offer assigned to salesman successfully. OfferId: {OfferId}, SalesmanId: {SalesmanId}", offerId, salesmanId);
+
+                return await MapToOfferResponseDTO(offer);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error assigning offer to salesman. OfferId: {OfferId}", offerId);
                 throw;
             }
         }
@@ -332,8 +1042,15 @@ namespace SoitMed.Services
             if (offerDto.TotalAmount <= 0)
                 return false;
 
-            if (offerDto.ValidUntil <= DateTime.UtcNow)
-                return false;
+            // Validate ValidUntil dates (check if all dates are in the past)
+            if (offerDto.ValidUntil != null && offerDto.ValidUntil.Count > 0)
+            {
+                var now = DateTime.UtcNow;
+                var allExpired = offerDto.ValidUntil.All(dateStr => 
+                    DateTime.TryParse(dateStr, out var date) && now > date);
+                if (allExpired)
+                    return false;
+            }
 
             // Validate client exists
             var client = await _unitOfWork.Clients.GetByIdAsync(offerDto.ClientId);
@@ -347,15 +1064,12 @@ namespace SoitMed.Services
         {
             try
             {
-                var offers = await _unitOfWork.SalesOffers.GetExpiredOffersAsync();
-                var result = new List<OfferResponseDTO>();
+                // OPTIMIZED: Single method call loads offers + related data in O(1) queries (3 queries total)
+                var (offers, clientsDict, usersDict) = await _unitOfWork.SalesOffers
+                    .GetExpiredOffersWithRelatedDataAsync();
 
-                foreach (var offer in offers)
-                {
-                    result.Add(await MapToOfferResponseDTO(offer));
-                }
-
-                return result;
+                // Map synchronously using pre-loaded data - O(n) in-memory operation
+                return offers.Select(o => MapToOfferResponseDTO(o, clientsDict, usersDict)).ToList();
             }
             catch (Exception ex)
             {
@@ -455,18 +1169,95 @@ namespace SoitMed.Services
             try
             {
                 var equipment = await _unitOfWork.OfferEquipment.GetByOfferIdAsync(offerId);
-                return equipment.Select(e => new OfferEquipmentDTO
+                
+                // Only fetch products if equipment needs enrichment (has missing data)
+                var needsEnrichment = equipment.Any(e => 
+                    string.IsNullOrWhiteSpace(e.Model) || 
+                    string.IsNullOrWhiteSpace(e.Provider) || 
+                    string.IsNullOrWhiteSpace(e.ImagePath) ||
+                    e.Price <= 0);
+                
+                Dictionary<string, Product>? productLookup = null;
+                if (needsEnrichment)
                 {
-                    Id = e.Id,
-                    OfferId = e.OfferId,
-                    Name = e.Name,
-                    Model = e.Model,
-                    Provider = e.Provider,
-                    Country = e.Country,
-                    ImagePath = e.ImagePath,
-                    Price = e.Price,
-                    Description = e.Description,
-                    InStock = e.InStock
+                    // OPTIMIZATION: Only query products that match equipment names instead of loading all products
+                    // This is much faster when there are many products in the database
+                    var equipmentNames = equipment
+                        .Where(e => !string.IsNullOrWhiteSpace(e.Name))
+                        .Select(e => e.Name.Trim())
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    if (equipmentNames.Any())
+                    {
+                        // Get only products that might match equipment names (optimized query)
+                        var matchingProducts = (await _unitOfWork.Products.GetByNamesAsync(equipmentNames)).ToList();
+                        
+                        // Create lookup dictionary for faster matching (O(1) instead of O(n))
+                        productLookup = matchingProducts
+                            .GroupBy(p => p.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+                            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                        
+                        _logger.LogInformation(
+                            "Optimized product query: Found {ProductCount} matching products for {EquipmentCount} equipment items. OfferId: {OfferId}",
+                            matchingProducts.Count, equipment.Count(), offerId);
+                    }
+                }
+                
+                return equipment.Select(e =>
+                {
+                    Product? matchedProduct = null;
+                    
+                    // Only try to match if we have products and equipment needs enrichment
+                    if (productLookup != null)
+                    {
+                        var normalizedEquipmentName = e.Name.Trim();
+                        
+                        // Try exact match first (O(1) lookup)
+                        if (productLookup.TryGetValue(normalizedEquipmentName, out var exactMatch))
+                        {
+                            matchedProduct = exactMatch;
+                        }
+                        else
+                        {
+                            // Fallback to partial matching only if equipment needs data
+                            if (string.IsNullOrWhiteSpace(e.Model) || 
+                                string.IsNullOrWhiteSpace(e.Provider) || 
+                                string.IsNullOrWhiteSpace(e.ImagePath) ||
+                                e.Price <= 0)
+                            {
+                                matchedProduct = productLookup.Values.FirstOrDefault(p =>
+                                    normalizedEquipmentName.Contains(p.Name, StringComparison.OrdinalIgnoreCase) ||
+                                    p.Name.Contains(normalizedEquipmentName, StringComparison.OrdinalIgnoreCase))
+                                    ?? productLookup.Values.FirstOrDefault(p =>
+                                        // Try to match by extracting key words (first 3 words)
+                                        normalizedEquipmentName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= 3 &&
+                                        p.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= 3 &&
+                                        normalizedEquipmentName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                                            .Take(3)
+                                            .Any(word => p.Name.Contains(word, StringComparison.OrdinalIgnoreCase)));
+                            }
+                        }
+                    }
+
+                    return new OfferEquipmentDTO
+                    {
+                        Id = e.Id,
+                        OfferId = e.OfferId,
+                        Name = e.Name,
+                        // Use equipment data if available, otherwise fall back to matched product data
+                        Model = e.Model ?? matchedProduct?.Model,
+                        Provider = e.Provider ?? matchedProduct?.Provider,
+                        Country = e.Country ?? matchedProduct?.Country,
+                        Year = e.Year ?? matchedProduct?.Year,
+                        ImagePath = e.ImagePath ?? matchedProduct?.ImagePath,
+                        // Use equipment price if set (> 0), otherwise use product base price
+                        Price = e.Price > 0 ? e.Price : (matchedProduct?.BasePrice ?? 0),
+                        Description = !string.IsNullOrWhiteSpace(e.Description) && !e.Description.StartsWith("Equipment item:") 
+                            ? e.Description 
+                            : (matchedProduct?.Description ?? e.Description),
+                        InStock = e.InStock
+                    };
                 }).ToList();
             }
             catch (Exception ex)
@@ -493,6 +1284,221 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting equipment. OfferId: {OfferId}, EquipmentId: {EquipmentId}", offerId, equipmentId);
+                throw;
+            }
+        }
+
+        public async Task<OfferEquipmentDTO> UpdateEquipmentImagePathAsync(long offerId, long equipmentId, string imagePath)
+        {
+            try
+            {
+                var equipment = await _unitOfWork.OfferEquipment.GetByIdAsync(equipmentId);
+                if (equipment == null || equipment.OfferId != offerId)
+                    throw new ArgumentException("Equipment not found or doesn't belong to this offer");
+
+                equipment.ImagePath = imagePath;
+                await _unitOfWork.OfferEquipment.UpdateAsync(equipment);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Equipment image path updated. OfferId: {OfferId}, EquipmentId: {EquipmentId}, ImagePath: {ImagePath}", offerId, equipmentId, imagePath);
+
+                return new OfferEquipmentDTO
+                {
+                    Id = equipment.Id,
+                    OfferId = equipment.OfferId,
+                    Name = equipment.Name,
+                    Model = equipment.Model,
+                    Provider = equipment.Provider,
+                    Country = equipment.Country,
+                    ImagePath = equipment.ImagePath,
+                    Price = equipment.Price,
+                    Description = equipment.Description,
+                    InStock = equipment.InStock
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating equipment image path. OfferId: {OfferId}, EquipmentId: {EquipmentId}", offerId, equipmentId);
+                throw;
+            }
+        }
+
+        public async Task<string?> GetEquipmentImagePathAsync(long offerId, long equipmentId)
+        {
+            try
+            {
+                var equipment = await _unitOfWork.OfferEquipment.GetByIdAsync(equipmentId);
+                if (equipment == null || equipment.OfferId != offerId)
+                {
+                    _logger.LogWarning("Equipment not found. OfferId: {OfferId}, EquipmentId: {EquipmentId}", offerId, equipmentId);
+                    return null;
+                }
+
+                // If equipment has image path, return it immediately (fast path)
+                if (!string.IsNullOrWhiteSpace(equipment.ImagePath) && !equipment.ImagePath.Contains("equipment-placeholder.png"))
+                {
+                    _logger.LogInformation("Equipment has valid image path. OfferId: {OfferId}, EquipmentId: {EquipmentId}, ImagePath: {ImagePath}", offerId, equipmentId, equipment.ImagePath);
+                    return equipment.ImagePath;
+                }
+
+                // If no image path or placeholder, try to find matching product
+                var normalizedEquipmentName = equipment.Name.Trim();
+                _logger.LogInformation("Searching for product match. EquipmentName: {EquipmentName}, EquipmentId: {EquipmentId}, Model: {Model}", 
+                    normalizedEquipmentName, equipmentId, equipment.Model);
+
+                Product? matchedProduct = null;
+
+                // Strategy 1: Try exact name match first (fast)
+                // Limit search to first 20 results for performance
+                var exactMatchProducts = (await _unitOfWork.Products.SearchAsync(normalizedEquipmentName)).Take(20).ToList();
+                matchedProduct = exactMatchProducts.FirstOrDefault(p => 
+                    p.Name.Equals(normalizedEquipmentName, StringComparison.OrdinalIgnoreCase));
+                
+                if (matchedProduct != null)
+                {
+                    _logger.LogInformation("Found exact name match. ProductId: {ProductId}, ProductName: {ProductName}", 
+                        matchedProduct.Id, matchedProduct.Name);
+                }
+
+                // Strategy 2: If no exact match, try partial matching with first few words
+                if (matchedProduct == null)
+                {
+                    // Extract first 3-4 meaningful words from equipment name for better matching
+                    var words = normalizedEquipmentName
+                        .Split(new[] { ' ', '(', '-', ')', '/', '\\' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Where(w => w.Length > 2 && !w.All(char.IsDigit)) // Filter out very short words and pure numbers
+                        .Take(4)
+                        .ToArray();
+                    
+                    if (words.Length > 0)
+                    {
+                        var searchTerm = string.Join(" ", words);
+                        _logger.LogInformation("Trying partial match with search term: {SearchTerm}, Words: [{Words}]", 
+                            searchTerm, string.Join(", ", words));
+                        
+                        // Try searching with the full search term first (limit to 20 results for performance)
+                        var partialMatchProducts = (await _unitOfWork.Products.SearchAsync(searchTerm)).Take(20).ToList();
+                        
+                        // Try to find best match by comparing name similarity
+                        matchedProduct = partialMatchProducts
+                            .OrderByDescending(p => {
+                                var productNameLower = p.Name.ToLower();
+                                // Calculate similarity: check if product name contains key words from equipment name
+                                var matchCount = words.Count(w => productNameLower.Contains(w.ToLower()));
+                                // Bonus if product name starts with the first word
+                                if (words.Length > 0 && productNameLower.StartsWith(words[0].ToLower()))
+                                    matchCount += 2;
+                                return matchCount;
+                            })
+                            .FirstOrDefault();
+                        
+                        if (matchedProduct != null)
+                        {
+                            _logger.LogInformation("Found partial match. ProductId: {ProductId}, ProductName: {ProductName}, SearchTerm: {SearchTerm}", 
+                                matchedProduct.Id, matchedProduct.Name, searchTerm);
+                        }
+                        else
+                        {
+                            // If still no match, try searching with just the first 2-3 words (limit to 20 results)
+                            if (words.Length >= 2)
+                            {
+                                var shorterSearchTerm = string.Join(" ", words.Take(2));
+                                _logger.LogInformation("Trying shorter search term: {SearchTerm}", shorterSearchTerm);
+                                var shorterMatchProducts = (await _unitOfWork.Products.SearchAsync(shorterSearchTerm)).Take(20).ToList();
+                                matchedProduct = shorterMatchProducts
+                                    .OrderByDescending(p => {
+                                        var productNameLower = p.Name.ToLower();
+                                        var matchCount = words.Take(2).Count(w => productNameLower.Contains(w.ToLower()));
+                                        if (words.Length > 0 && productNameLower.StartsWith(words[0].ToLower()))
+                                            matchCount += 2;
+                                        return matchCount;
+                                    })
+                                    .FirstOrDefault();
+                                
+                                if (matchedProduct != null)
+                                {
+                                    _logger.LogInformation("Found match with shorter term. ProductId: {ProductId}, ProductName: {ProductName}", 
+                                        matchedProduct.Id, matchedProduct.Name);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Strategy 3: If still no match, try matching by model if available (limit to 10 results)
+                if (matchedProduct == null && !string.IsNullOrWhiteSpace(equipment.Model))
+                {
+                    _logger.LogInformation("Trying model match. Model: {Model}", equipment.Model);
+                    var modelMatchProducts = (await _unitOfWork.Products.SearchAsync(equipment.Model)).Take(10).ToList();
+                    matchedProduct = modelMatchProducts.FirstOrDefault();
+                    
+                    if (matchedProduct != null)
+                    {
+                        _logger.LogInformation("Found model match. ProductId: {ProductId}, ProductName: {ProductName}, Model: {Model}", 
+                            matchedProduct.Id, matchedProduct.Name, equipment.Model);
+                    }
+                }
+
+                // Strategy 4: Last resort - try searching with individual key words (optimized - no full product load)
+                if (matchedProduct == null)
+                {
+                    // Extract key words from equipment name
+                    var keyWords = normalizedEquipmentName
+                        .Split(new[] { ' ', '(', '-', ')', '/', '\\' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Where(w => w.Length > 3 && !w.All(char.IsDigit)) // Only words longer than 3 chars
+                        .Take(3)
+                        .Select(w => w.ToLower())
+                        .ToList();
+                    
+                    if (keyWords.Any())
+                    {
+                        _logger.LogInformation("Trying last resort: searching with individual key words: {KeyWords}", string.Join(", ", keyWords));
+                        
+                        // Try searching with the longest key word first (most specific)
+                        var longestWord = keyWords.OrderByDescending(w => w.Length).First();
+                        var lastResortProducts = await _unitOfWork.Products.SearchAsync(longestWord);
+                        
+                        if (lastResortProducts.Any())
+                        {
+                            matchedProduct = lastResortProducts
+                                .OrderByDescending(p => {
+                                    var productNameLower = p.Name.ToLower();
+                                    var matchCount = keyWords.Count(w => productNameLower.Contains(w));
+                                    // Bonus if product name starts with first key word
+                                    if (keyWords.Any() && productNameLower.StartsWith(keyWords[0]))
+                                        matchCount += 3;
+                                    // Bonus if product name contains all key words
+                                    if (keyWords.All(w => productNameLower.Contains(w)))
+                                        matchCount += 5;
+                                    return matchCount;
+                                })
+                                .FirstOrDefault(p => {
+                                    var productNameLower = p.Name.ToLower();
+                                    return keyWords.Any(w => productNameLower.Contains(w));
+                                });
+                            
+                            if (matchedProduct != null)
+                            {
+                                _logger.LogInformation("Found match in last resort search. ProductId: {ProductId}, ProductName: {ProductName}", 
+                                    matchedProduct.Id, matchedProduct.Name);
+                            }
+                        }
+                    }
+                }
+
+                if (matchedProduct != null && !string.IsNullOrWhiteSpace(matchedProduct.ImagePath))
+                {
+                    _logger.LogInformation("Found matching product. ProductId: {ProductId}, ProductName: {ProductName}, ImagePath: {ImagePath}", 
+                        matchedProduct.Id, matchedProduct.Name, matchedProduct.ImagePath);
+                    return matchedProduct.ImagePath;
+                }
+
+                _logger.LogWarning("No matching product found for equipment. EquipmentName: {EquipmentName}, EquipmentId: {EquipmentId}", normalizedEquipmentName, equipmentId);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting equipment image path. OfferId: {OfferId}, EquipmentId: {EquipmentId}", offerId, equipmentId);
                 throw;
             }
         }
@@ -578,12 +1584,15 @@ namespace SoitMed.Services
                 if (!offer.FinalPrice.HasValue || offer.FinalPrice.Value <= 0)
                     throw new InvalidOperationException("Offer must have a valid FinalPrice to create installment plan");
 
+                // OPTIMIZATION: Use bulk delete instead of sequential deletes
                 var existingInstallments = await _unitOfWork.InstallmentPlans.GetByOfferIdAsync(offerId);
-                foreach (var existing in existingInstallments)
+                var existingList = existingInstallments.ToList();
+                if (existingList.Any())
                 {
-                    await _unitOfWork.InstallmentPlans.DeleteAsync(existing);
+                    await _unitOfWork.InstallmentPlans.DeleteRangeAsync(existingList);
                 }
 
+                // OPTIMIZATION: Build all installments first, then bulk create
                 var installments = new List<InstallmentPlan>();
                 decimal installmentAmount = offer.FinalPrice.Value / dto.NumberOfInstallments;
                 DateTime dueDate = dto.StartDate;
@@ -609,9 +1618,10 @@ namespace SoitMed.Services
                         dueDate = dueDate.AddDays(7);
 
                     installments.Add(installment);
-                    await _unitOfWork.InstallmentPlans.CreateAsync(installment);
                 }
 
+                // OPTIMIZATION: Bulk create all installments at once
+                await _unitOfWork.InstallmentPlans.CreateRangeAsync(installments);
                 await _unitOfWork.SaveChangesAsync();
 
                 return installments.Select(i => new InstallmentPlanDTO
@@ -664,9 +1674,10 @@ namespace SoitMed.Services
                     AssignedToName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Unknown Salesman",
                     Products = offer.Products,
                     TotalAmount = offer.TotalAmount,
-                    PaymentTerms = offer.PaymentTerms,
-                    DeliveryTerms = offer.DeliveryTerms,
-                    ValidUntil = offer.ValidUntil,
+                    PaymentTerms = DeserializeStringList(offer.PaymentTerms),
+                    DeliveryTerms = DeserializeStringList(offer.DeliveryTerms),
+                    WarrantyTerms = DeserializeStringList(offer.WarrantyTerms),
+                    ValidUntil = DeserializeStringList(offer.ValidUntil),
                     Status = offer.Status,
                     SentToClientAt = offer.SentToClientAt,
                     ClientResponse = offer.ClientResponse,
@@ -707,6 +1718,41 @@ namespace SoitMed.Services
 
         #region Mapping Methods
 
+        // Helper method to pre-load related data and map offers synchronously
+        private async Task<List<OfferResponseDTO>> MapOffersToDTOsAsync(IEnumerable<SalesOffer> offers)
+        {
+            var offersList = offers.ToList();
+            if (!offersList.Any())
+                return new List<OfferResponseDTO>();
+
+            // Safety limit to prevent memory issues and connection pool exhaustion
+            const int maxOffersToProcess = 1000;
+            if (offersList.Count > maxOffersToProcess)
+            {
+                _logger.LogWarning("Attempting to map {Count} offers, limiting to {Max} to prevent memory issues", 
+                    offersList.Count, maxOffersToProcess);
+                offersList = offersList.Take(maxOffersToProcess).ToList();
+            }
+
+            // Pre-load all related data in batches to avoid DbContext concurrency issues
+            var clientIds = offersList.Where(o => o.ClientId > 0).Select(o => o.ClientId).Distinct().ToList();
+            var userIds = offersList
+                .SelectMany(o => new[] { o.CreatedBy, o.AssignedTo })
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList();
+
+            // Load sequentially to avoid DbContext concurrency issues (same DbContext instance)
+            var clientsList = clientIds.Any() ? await _unitOfWork.Clients.GetByIdsAsync(clientIds) : new List<Client>();
+            var usersList = userIds.Any() ? await _unitOfWork.Users.GetByIdsAsync(userIds) : new List<ApplicationUser>();
+
+            var clientsDict = clientsList.ToDictionary(c => c.Id);
+            var usersDict = usersList.ToDictionary(u => u.Id);
+
+            // Map synchronously using pre-loaded data
+            return offersList.Select(o => MapToOfferResponseDTO(o, clientsDict, usersDict)).ToList();
+        }
+
         private async Task<OfferResponseDTO> MapToOfferResponseDTO(SalesOffer offer)
         {
             var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
@@ -725,14 +1771,228 @@ namespace SoitMed.Services
                 AssignedToName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Unknown Salesman",
                 Products = offer.Products,
                 TotalAmount = offer.TotalAmount,
-                PaymentTerms = offer.PaymentTerms,
-                DeliveryTerms = offer.DeliveryTerms,
-                ValidUntil = offer.ValidUntil,
+                PaymentTerms = DeserializeStringList(offer.PaymentTerms),
+                DeliveryTerms = DeserializeStringList(offer.DeliveryTerms),
+                WarrantyTerms = DeserializeStringList(offer.WarrantyTerms),
+                ValidUntil = DeserializeStringList(offer.ValidUntil),
                 Status = offer.Status,
                 SentToClientAt = offer.SentToClientAt,
                 ClientResponse = offer.ClientResponse,
                 CreatedAt = offer.CreatedAt
             };
+        }
+
+        // Synchronous overload that uses pre-loaded data to avoid DbContext concurrency issues
+        private OfferResponseDTO MapToOfferResponseDTO(SalesOffer offer, Dictionary<long, Client> clientsDict, Dictionary<string, ApplicationUser> usersDict)
+        {
+            clientsDict.TryGetValue(offer.ClientId, out var client);
+            usersDict.TryGetValue(offer.CreatedBy ?? string.Empty, out var creator);
+            usersDict.TryGetValue(offer.AssignedTo ?? string.Empty, out var salesman);
+
+            return new OfferResponseDTO
+            {
+                Id = offer.Id,
+                OfferRequestId = offer.OfferRequestId,
+                ClientId = offer.ClientId,
+                ClientName = client?.Name ?? "Unknown Client",
+                CreatedBy = offer.CreatedBy,
+                CreatedByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown Creator",
+                AssignedTo = offer.AssignedTo,
+                AssignedToName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Unknown Salesman",
+                Products = offer.Products,
+                TotalAmount = offer.TotalAmount,
+                PaymentTerms = DeserializeStringList(offer.PaymentTerms),
+                DeliveryTerms = DeserializeStringList(offer.DeliveryTerms),
+                WarrantyTerms = DeserializeStringList(offer.WarrantyTerms),
+                ValidUntil = DeserializeStringList(offer.ValidUntil),
+                Status = offer.Status,
+                SentToClientAt = offer.SentToClientAt,
+                ClientResponse = offer.ClientResponse,
+                CreatedAt = offer.CreatedAt
+            };
+        }
+
+        #endregion
+
+        #region Private Helper Methods
+
+        /// <summary>
+        /// Automatically adds equipment items to offer based on products description
+        /// Creates equipment with default image paths
+        /// </summary>
+        private async Task AutoAddEquipmentFromProductsAsync(long offerId, string productsDescription)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(productsDescription))
+                    return;
+
+                // Parse products - try to split by comma or newline
+                var productNames = productsDescription
+                    .Split(new[] { ',', '\n', '\r', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(p => p.Trim())
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .ToList();
+
+                if (!productNames.Any())
+                {
+                    // If no products parsed, create one default equipment item
+                    productNames = new List<string> { "Equipment" };
+                }
+
+                // Get all active products to match against
+                var allProducts = (await _unitOfWork.Products.GetAllActiveAsync()).ToList();
+
+                foreach (var productName in productNames)
+                {
+                    // Try to find matching product in Products table
+                    // Match by name (case-insensitive, partial match)
+                    // First try exact match, then try if product name contains the search term or vice versa
+                    var normalizedProductName = productName.Trim();
+                    var matchedProduct = allProducts.FirstOrDefault(p =>
+                        p.Name.Equals(normalizedProductName, StringComparison.OrdinalIgnoreCase)) 
+                        ?? allProducts.FirstOrDefault(p =>
+                            normalizedProductName.Contains(p.Name, StringComparison.OrdinalIgnoreCase) ||
+                            p.Name.Contains(normalizedProductName, StringComparison.OrdinalIgnoreCase))
+                        ?? allProducts.FirstOrDefault(p =>
+                            // Try to match by extracting key words (first 3-5 words)
+                            normalizedProductName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= 3 &&
+                            p.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= 3 &&
+                            normalizedProductName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                                .Take(3)
+                                .Any(word => p.Name.Contains(word, StringComparison.OrdinalIgnoreCase)));
+
+                    var equipment = new OfferEquipment
+                    {
+                        OfferId = offerId,
+                        Name = productName.Length > 200 ? productName.Substring(0, 200) : productName,
+                        // Populate from Products table if match found
+                        Model = matchedProduct?.Model,
+                        Provider = matchedProduct?.Provider,
+                        Country = matchedProduct?.Country,
+                        Year = matchedProduct?.Year,
+                        Price = matchedProduct?.BasePrice ?? 0,
+                        Description = matchedProduct?.Description ?? $"Equipment item: {productName}",
+                        InStock = matchedProduct?.InStock ?? true,
+                        ImagePath = matchedProduct?.ImagePath ?? $"offers/{offerId}/equipment-placeholder.png"
+                    };
+
+                    await _unitOfWork.OfferEquipment.CreateAsync(equipment);
+                    
+                    if (matchedProduct != null)
+                    {
+                        _logger.LogInformation("Matched product '{ProductName}' with catalog product ID {ProductId} for offer {OfferId}", 
+                            productName, matchedProduct.Id, offerId);
+                    }
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+                _logger.LogInformation("Auto-added {Count} equipment items to offer {OfferId}", productNames.Count, offerId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error auto-adding equipment to offer {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Helper method to deserialize JSON array or return single value as array (backward compatibility)
+        /// </summary>
+        private List<string>? DeserializeStringList(string? jsonOrString)
+        {
+            if (string.IsNullOrWhiteSpace(jsonOrString))
+                return null;
+
+            // Try to deserialize as JSON array first
+            try
+            {
+                var list = JsonSerializer.Deserialize<List<string>>(jsonOrString);
+                if (list != null && list.Count > 0)
+                    return list;
+            }
+            catch
+            {
+                // Not JSON, try as single string (backward compatibility)
+            }
+
+            // Fallback: treat as single string value (backward compatibility)
+            return new List<string> { jsonOrString };
+        }
+
+        /// <summary>
+        /// Helper method to parse DeliveryTerms JSON array and extract delivery date from descriptive text
+        /// DeliveryTerms contains descriptive text like "the equipment will be delivered within a week"
+        /// This method tries to extract actual dates or calculate dates from relative terms
+        /// </summary>
+        private DateTime? ParseDeliveryTermsToDate(string? deliveryTerms)
+        {
+            if (string.IsNullOrWhiteSpace(deliveryTerms))
+                return null;
+
+            try
+            {
+                // Parse the JSON array of delivery term strings
+                var terms = DeserializeStringList(deliveryTerms);
+                if (terms == null || terms.Count == 0)
+                    return null;
+
+                // Look through all delivery terms for dates
+                foreach (var term in terms)
+                {
+                    if (string.IsNullOrWhiteSpace(term))
+                        continue;
+
+                    // Try to find explicit dates in the text (e.g., "delivered on 10/11/2020" or "by December 15, 2025")
+                    var dateMatch = Regex.Match(
+                        term,
+                        @"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|(\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{2,4})",
+                        RegexOptions.IgnoreCase
+                    );
+
+                    if (dateMatch.Success && DateTime.TryParse(dateMatch.Value, out var explicitDate))
+                    {
+                        return explicitDate;
+                    }
+
+                    // Try to parse relative terms like "within a week", "in 2 weeks", "within 30 days"
+                    var relativeMatch = Regex.Match(
+                        term,
+                        @"(within|in)\s+(\d+)\s+(day|days|week|weeks|month|months)",
+                        RegexOptions.IgnoreCase
+                    );
+
+                    if (relativeMatch.Success)
+                    {
+                        var number = int.Parse(relativeMatch.Groups[2].Value);
+                        var unit = relativeMatch.Groups[3].Value.ToLower();
+                        
+                        var deliveryDate = DateTime.UtcNow;
+                        if (unit.StartsWith("day"))
+                            deliveryDate = deliveryDate.AddDays(number);
+                        else if (unit.StartsWith("week"))
+                            deliveryDate = deliveryDate.AddDays(number * 7);
+                        else if (unit.StartsWith("month"))
+                            deliveryDate = deliveryDate.AddMonths(number);
+                        
+                        return deliveryDate;
+                    }
+
+                    // Try parsing the whole term as a date (in case it's just a date string)
+                    if (DateTime.TryParse(term, out var directDate))
+                    {
+                        return directDate;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse DeliveryTerms to date: {DeliveryTerms}", deliveryTerms);
+            }
+
+            // If no date can be extracted from delivery terms, return null
+            // The deal can still be created without an expected delivery date
+            return null;
         }
 
         #endregion

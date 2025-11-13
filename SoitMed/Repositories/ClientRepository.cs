@@ -140,5 +140,24 @@ namespace SoitMed.Repositories
                 ClientsByPriority = clientsByPriority
             };
         }
+
+        public async Task<List<Client>> GetByIdsAsync(IEnumerable<long> ids)
+        {
+            var idList = ids.ToList();
+            if (!idList.Any())
+                return new List<Client>();
+
+            // Safety limit to prevent memory issues and connection pool exhaustion
+            const int maxBatchSize = 1000;
+            if (idList.Count > maxBatchSize)
+            {
+                idList = idList.Take(maxBatchSize).ToList();
+            }
+
+            return await _context.Clients
+                .AsNoTracking()
+                .Where(c => idList.Contains(c.Id))
+                .ToListAsync();
+        }
     }
 }

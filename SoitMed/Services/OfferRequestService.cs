@@ -78,10 +78,10 @@ namespace SoitMed.Services
                 _logger.LogInformation("Offer request created successfully. RequestId: {RequestId}, ClientId: {ClientId}, AssignedTo: {AssignedTo}", 
                     offerRequest.Id, createDto.ClientId, assignedToSupportId ?? "None");
 
-                // Send notification to SalesSupport users
+                // Send notification to assigned SalesSupport user ONLY (not all SalesSupport users)
                 try
                 {
-                    _logger.LogInformation("Starting notification process. SalesSupport users count: {Count}", salesSupportUserList.Count);
+                    _logger.LogInformation("Starting notification process for assigned SalesSupport user");
                     
                     var salesman = await _unitOfWork.Users.GetByIdAsync(userId);
                     var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Salesman";
@@ -89,40 +89,58 @@ namespace SoitMed.Services
                     var notificationTitle = "New Offer Request";
                     var notificationMessage = $"{salesmanName} requested an offer for client: {client.Name}";
                     
-                    // Send notification to all SalesSupport users
-                    foreach (var supportUser in salesSupportUserList)
+                    // Prepare metadata with offer request details
+                    var metadata = new Dictionary<string, object>
                     {
-                        _logger.LogInformation("Attempting to send notification to SalesSupport user: {SupportUserId} (Name: {Name}, Email: {Email}) for OfferRequest: {RequestId}", 
-                            supportUser.Id, supportUser.FullName, supportUser.Email, offerRequest.Id);
-                        
-                        try
+                        ["offerRequestId"] = offerRequest.Id,
+                        ["clientId"] = client.Id,
+                        ["clientName"] = client.Name,
+                        ["salesmanId"] = userId,
+                        ["salesmanName"] = salesmanName
+                    };
+                    
+                    // Send notification ONLY to the assigned SalesSupport user (not all)
+                    if (!string.IsNullOrEmpty(assignedToSupportId))
+                    {
+                        var assignedUser = salesSupportUserList.FirstOrDefault(u => u.Id == assignedToSupportId);
+                        if (assignedUser != null)
                         {
-                            var notification = await _notificationService.CreateNotificationAsync(
-                                supportUser.Id,
-                                notificationTitle,
-                                notificationMessage,
-                                "OfferRequest",
-                                "High", // High priority for new offer requests
-                                null,
-                                null,
-                                true, // Mobile push notification
-                                CancellationToken.None
-                            );
+                            _logger.LogInformation("Sending notification to assigned SalesSupport user: {SupportUserId} (Name: {Name}, Email: {Email}) for OfferRequest: {RequestId}", 
+                                assignedUser.Id, assignedUser.FullName, assignedUser.Email, offerRequest.Id);
                             
-                            _logger.LogInformation("✅ Notification successfully created and sent to SalesSupport: {SupportUserId} (NotificationId: {NotificationId}) for OfferRequest: {RequestId}. SignalR group: User_{UserId}", 
-                                supportUser.Id, notification.Id, offerRequest.Id, supportUser.Id);
+                            try
+                            {
+                                var notification = await _notificationService.CreateNotificationAsync(
+                                    assignedUser.Id,
+                                    notificationTitle,
+                                    notificationMessage,
+                                    "OfferRequest",
+                                    "High", // High priority for new offer requests
+                                    null,
+                                    null,
+                                    true, // Mobile push notification
+                                    metadata, // Pass metadata with offerRequestId
+                                    CancellationToken.None
+                                );
+                                
+                                _logger.LogInformation("✅ Notification successfully created and sent to assigned SalesSupport: {SupportUserId} (NotificationId: {NotificationId}) for OfferRequest: {RequestId}", 
+                                    assignedUser.Id, notification.Id, offerRequest.Id);
+                            }
+                            catch (Exception notificationEx)
+                            {
+                                _logger.LogError(notificationEx, "❌ Failed to create notification for assigned SalesSupport user {SupportUserId} for OfferRequest: {RequestId}", 
+                                    assignedUser.Id, offerRequest.Id);
+                            }
                         }
-                        catch (Exception notificationEx)
-                        {
-                            _logger.LogError(notificationEx, "❌ Failed to create notification for SalesSupport user {SupportUserId} for OfferRequest: {RequestId}", 
-                                supportUser.Id, offerRequest.Id);
-                            // Continue to next user
-                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("⚠️ No SalesSupport user was assigned. Offer request {RequestId} was created but no notification sent.", offerRequest.Id);
                     }
 
                     if (!salesSupportUserList.Any())
                     {
-                        _logger.LogWarning("⚠️ No active SalesSupport users found. Offer request {RequestId} was created but not assigned.", offerRequest.Id);
+                        _logger.LogWarning("⚠️ No active SalesSupport users found in the system.");
                     }
                     else
                     {
@@ -309,13 +327,25 @@ namespace SoitMed.Services
                 if (!OfferRequestStatusConstants.IsValidStatus(status))
                     throw new ArgumentException("Invalid status", nameof(status));
 
-                offerRequest.Status = status;
-                if (!string.IsNullOrEmpty(notes))
-                    offerRequest.CompletionNotes = notes;
-
-                if (status == "Ready" || status == "Sent")
+                // Use appropriate methods for status transitions
+                switch (status)
                 {
-                    offerRequest.MarkAsCompleted(notes);
+                    case "Ready":
+                        offerRequest.MarkAsCompleted(notes);
+                        break;
+                    case "Sent":
+                        offerRequest.MarkAsSent();
+                        if (!string.IsNullOrEmpty(notes))
+                            offerRequest.CompletionNotes = notes;
+                        break;
+                    case "Cancelled":
+                        offerRequest.Cancel(notes);
+                        break;
+                    default:
+                        offerRequest.Status = status;
+                        if (!string.IsNullOrEmpty(notes))
+                            offerRequest.CompletionNotes = notes;
+                        break;
                 }
 
                 await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);

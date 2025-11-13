@@ -65,11 +65,19 @@ namespace SoitMed.Services
 
                 var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-                // Add required headers for Expo API
-                httpContent.Headers.Add("Accept", "application/json");
-                httpContent.Headers.Add("Accept-Encoding", "gzip, deflate");
+                // Create request message with proper headers
+                var request = new HttpRequestMessage(HttpMethod.Post, ExpoPushApiUrl)
+                {
+                    Content = httpContent
+                };
+                
+                // Add required headers for Expo API (request headers, not content headers)
+                request.Headers.Accept.Clear();
+                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                request.Headers.AcceptEncoding.Add(new System.Net.Http.Headers.StringWithQualityHeaderValue("gzip"));
+                request.Headers.AcceptEncoding.Add(new System.Net.Http.Headers.StringWithQualityHeaderValue("deflate"));
 
-                var response = await _httpClient.PostAsync(ExpoPushApiUrl, httpContent, cancellationToken);
+                var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (response.IsSuccessStatusCode)
                 {

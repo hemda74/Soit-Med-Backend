@@ -5,6 +5,7 @@ using SoitMed.Models.Core;
 using SoitMed.Models.Hospital;
 using SoitMed.Models.Location;
 using SoitMed.Models.Equipment;
+using SoitMed.Models.Payment;
 
 namespace SoitMed.Models
 {
@@ -28,6 +29,18 @@ namespace SoitMed.Models
         // Equipment entities
         public DbSet<Equipment.Equipment> Equipment { get; set; }
         public DbSet<RepairRequest> RepairRequests { get; set; }
+        
+        // Maintenance entities
+        public DbSet<MaintenanceRequest> MaintenanceRequests { get; set; }
+        public DbSet<MaintenanceVisit> MaintenanceVisits { get; set; }
+        public DbSet<MaintenanceRequestAttachment> MaintenanceRequestAttachments { get; set; }
+        public DbSet<SparePartRequest> SparePartRequests { get; set; }
+        public DbSet<MaintenanceRequestRating> MaintenanceRequestRatings { get; set; }
+        
+        // Payment entities
+        public DbSet<Payment.Payment> Payments { get; set; }
+        public DbSet<Payment.PaymentTransaction> PaymentTransactions { get; set; }
+        public DbSet<Payment.PaymentGatewayConfig> PaymentGatewayConfigs { get; set; }
 
         // User image entities
         public DbSet<UserImage> UserImages { get; set; }
@@ -67,6 +80,7 @@ namespace SoitMed.Models
         public DbSet<OfferEquipment> OfferEquipment { get; set; }
         public DbSet<OfferTerms> OfferTerms { get; set; }
         public DbSet<InstallmentPlan> InstallmentPlans { get; set; }
+        public DbSet<RecentOfferActivity> RecentOfferActivities { get; set; }
         
         // Salesman targets and statistics
         public DbSet<SalesmanTarget> SalesmanTargets { get; set; }
@@ -175,7 +189,18 @@ namespace SoitMed.Models
                 .HasOne(e => e.Hospital)
                 .WithMany(h => h.Equipment)
                 .HasForeignKey(e => e.HospitalId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Equipment.Equipment>()
+                .HasOne(e => e.Customer)
+                .WithMany()
+                .HasForeignKey(e => e.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Ensure Equipment has either HospitalId OR CustomerId, not both
+            modelBuilder.Entity<Equipment.Equipment>()
+                .ToTable(t => t.HasCheckConstraint("CK_Equipment_Owner",
+                    "(HospitalId IS NOT NULL AND CustomerId IS NULL) OR (HospitalId IS NULL AND CustomerId IS NOT NULL)"));
 
             // Ensure unique QR codes
             modelBuilder.Entity<Equipment.Equipment>()
@@ -442,9 +467,19 @@ namespace SoitMed.Models
                 .HasForeignKey(sd => sd.SuperAdminApprovedBy)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // RecentOfferActivity relationships
+            modelBuilder.Entity<RecentOfferActivity>()
+                .HasOne(roa => roa.Offer)
+                .WithMany()
+                .HasForeignKey(roa => roa.OfferId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             // Indexes for performance
             modelBuilder.Entity<SalesOffer>()
                 .HasIndex(so => new { so.Status, so.AssignedTo });
+
+            modelBuilder.Entity<RecentOfferActivity>()
+                .HasIndex(roa => roa.ActivityTimestamp);
 
             modelBuilder.Entity<SalesDeal>()
                 .HasIndex(sd => new { sd.Status, sd.SalesmanId });
@@ -504,6 +539,202 @@ namespace SoitMed.Models
             
             modelBuilder.Entity<Product>()
                 .HasIndex(p => new { p.Name, p.Model, p.Provider });
+
+            // ========== MAINTENANCE MODULE RELATIONSHIPS ==========
+            
+            // MaintenanceRequest relationships
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasOne(mr => mr.Customer)
+                .WithMany()
+                .HasForeignKey(mr => mr.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasOne(mr => mr.Hospital)
+                .WithMany()
+                .HasForeignKey(mr => mr.HospitalId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasOne(mr => mr.Equipment)
+                .WithMany()
+                .HasForeignKey(mr => mr.EquipmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasOne(mr => mr.AssignedToEngineer)
+                .WithMany()
+                .HasForeignKey(mr => mr.AssignedToEngineerId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasOne(mr => mr.AssignedByMaintenanceSupport)
+                .WithMany()
+                .HasForeignKey(mr => mr.AssignedByMaintenanceSupportId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Configure decimal precision for payment amounts
+            modelBuilder.Entity<MaintenanceRequest>()
+                .Property(mr => mr.TotalAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<MaintenanceRequest>()
+                .Property(mr => mr.PaidAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<MaintenanceRequest>()
+                .Property(mr => mr.RemainingAmount)
+                .HasPrecision(18, 2);
+
+            // MaintenanceRequestAttachment relationships
+            modelBuilder.Entity<MaintenanceRequestAttachment>()
+                .HasOne(mra => mra.MaintenanceRequest)
+                .WithMany(mr => mr.Attachments)
+                .HasForeignKey(mra => mra.MaintenanceRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<MaintenanceRequestAttachment>()
+                .HasOne(mra => mra.UploadedBy)
+                .WithMany()
+                .HasForeignKey(mra => mra.UploadedById)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // MaintenanceVisit relationships
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasOne(mv => mv.MaintenanceRequest)
+                .WithMany(mr => mr.Visits)
+                .HasForeignKey(mv => mv.MaintenanceRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasOne(mv => mv.Engineer)
+                .WithMany()
+                .HasForeignKey(mv => mv.EngineerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasOne(mv => mv.SparePartRequest)
+                .WithOne(spr => spr.MaintenanceVisit)
+                .HasForeignKey<MaintenanceVisit>(mv => mv.SparePartRequestId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<MaintenanceVisit>()
+                .Property(mv => mv.ServiceFee)
+                .HasPrecision(18, 2);
+
+            // SparePartRequest relationships
+            modelBuilder.Entity<SparePartRequest>()
+                .HasOne(spr => spr.MaintenanceRequest)
+                .WithMany()
+                .HasForeignKey(spr => spr.MaintenanceRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<SparePartRequest>()
+                .HasOne(spr => spr.AssignedToCoordinator)
+                .WithMany()
+                .HasForeignKey(spr => spr.AssignedToCoordinatorId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<SparePartRequest>()
+                .HasOne(spr => spr.AssignedToInventoryManager)
+                .WithMany()
+                .HasForeignKey(spr => spr.AssignedToInventoryManagerId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<SparePartRequest>()
+                .HasOne(spr => spr.PriceSetByManager)
+                .WithMany()
+                .HasForeignKey(spr => spr.PriceSetByManagerId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Configure decimal precision for spare part prices
+            modelBuilder.Entity<SparePartRequest>()
+                .Property(spr => spr.OriginalPrice)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<SparePartRequest>()
+                .Property(spr => spr.CompanyPrice)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<SparePartRequest>()
+                .Property(spr => spr.CustomerPrice)
+                .HasPrecision(18, 2);
+
+            // MaintenanceRequestRating relationships
+            modelBuilder.Entity<MaintenanceRequestRating>()
+                .HasOne(mrr => mrr.MaintenanceRequest)
+                .WithMany(mr => mr.Ratings)
+                .HasForeignKey(mrr => mrr.MaintenanceRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<MaintenanceRequestRating>()
+                .HasOne(mrr => mrr.Customer)
+                .WithMany()
+                .HasForeignKey(mrr => mrr.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MaintenanceRequestRating>()
+                .HasOne(mrr => mrr.Engineer)
+                .WithMany()
+                .HasForeignKey(mrr => mrr.EngineerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ========== PAYMENT MODULE RELATIONSHIPS ==========
+            
+            // Payment relationships
+            modelBuilder.Entity<Payment.Payment>()
+                .HasOne(p => p.MaintenanceRequest)
+                .WithMany(mr => mr.Payments)
+                .HasForeignKey(p => p.MaintenanceRequestId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Payment.Payment>()
+                .HasOne(p => p.SparePartRequest)
+                .WithMany(spr => spr.Payments)
+                .HasForeignKey(p => p.SparePartRequestId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<Payment.Payment>()
+                .HasOne(p => p.Customer)
+                .WithMany()
+                .HasForeignKey(p => p.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Payment.Payment>()
+                .HasOne(p => p.ProcessedByAccountant)
+                .WithMany()
+                .HasForeignKey(p => p.ProcessedByAccountantId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Configure decimal precision for payment amount
+            modelBuilder.Entity<Payment.Payment>()
+                .Property(p => p.Amount)
+                .HasPrecision(18, 2);
+
+            // PaymentTransaction relationships
+            modelBuilder.Entity<Payment.PaymentTransaction>()
+                .HasOne(pt => pt.Payment)
+                .WithMany(p => p.Transactions)
+                .HasForeignKey(pt => pt.PaymentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure decimal precision for transaction amount
+            modelBuilder.Entity<Payment.PaymentTransaction>()
+                .Property(pt => pt.Amount)
+                .HasPrecision(18, 2);
+
+            // Indexes for performance
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasIndex(mr => new { mr.CustomerId, mr.Status });
+
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasIndex(mr => new { mr.AssignedToEngineerId, mr.Status });
+
+            modelBuilder.Entity<Payment.Payment>()
+                .HasIndex(p => new { p.CustomerId, p.Status });
+
+            modelBuilder.Entity<Payment.Payment>()
+                .HasIndex(p => new { p.Status, p.CreatedAt });
         }
     }
 }

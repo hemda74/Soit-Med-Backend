@@ -42,29 +42,17 @@ namespace SoitMed.Repositories
             var today = DateTime.UtcNow.Date;
             return await _context.WeeklyPlanTasks
                 .Include(t => t.WeeklyPlan)
+                .Include(t => t.Progresses)
                 .Where(t => t.WeeklyPlan.EmployeeId == employeeId &&
                            t.PlannedDate < today &&
-                           t.Status != "Completed" &&
-                           t.Status != "Cancelled")
+                           t.IsActive &&
+                           !t.Progresses.Any()) // No progress yet
                 .OrderBy(t => t.PlannedDate)
                 .ToListAsync();
         }
 
-        public async Task<List<WeeklyPlanTask>> GetTasksByStatusAsync(string status)
-        {
-            return await _context.WeeklyPlanTasks
-                .Where(t => t.Status == status)
-                .OrderBy(t => t.PlannedDate)
-                .ToListAsync();
-        }
-
-        public async Task<List<WeeklyPlanTask>> GetTasksByPriorityAsync(string priority)
-        {
-            return await _context.WeeklyPlanTasks
-                .Where(t => t.Priority == priority)
-                .OrderBy(t => t.PlannedDate)
-                .ToListAsync();
-        }
+        // REMOVED: GetTasksByStatusAsync - Status is now tracked in TaskProgress
+        // REMOVED: GetTasksByPriorityAsync - Priority is now tracked in TaskProgress
 
         public async Task<List<WeeklyPlanTask>> GetTasksByClientIdAsync(long clientId)
         {
@@ -74,13 +62,7 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<WeeklyPlanTask>> GetTasksByTaskTypeAsync(string taskType)
-        {
-            return await _context.WeeklyPlanTasks
-                .Where(t => t.TaskType == taskType)
-                .OrderBy(t => t.PlannedDate)
-                .ToListAsync();
-        }
+        // REMOVED: GetTasksByTaskTypeAsync - TaskType is no longer in WeeklyPlanTask
 
         public async Task<List<WeeklyPlanTask>> GetTasksByClientClassificationAsync(string classification)
         {
@@ -126,7 +108,8 @@ namespace SoitMed.Repositories
         {
             var query = _context.WeeklyPlanTasks
                 .Include(t => t.WeeklyPlan)
-                .Where(t => t.WeeklyPlan.EmployeeId == employeeId && t.Status == "Completed");
+                .Include(t => t.Progresses)
+                .Where(t => t.WeeklyPlan.EmployeeId == employeeId && t.Progresses.Any()); // Has progress = completed
 
             if (startDate.HasValue)
                 query = query.Where(t => t.PlannedDate >= startDate.Value);
@@ -144,9 +127,11 @@ namespace SoitMed.Repositories
 
             return await _context.WeeklyPlanTasks
                 .Include(t => t.WeeklyPlan)
+                .Include(t => t.Progresses)
                 .Where(t => t.WeeklyPlan.EmployeeId == employeeId &&
                            t.PlannedDate <= followUpDate &&
-                           t.Status == "Planned")
+                           t.IsActive &&
+                           !t.Progresses.Any()) // Not yet started
                 .OrderBy(t => t.PlannedDate)
                 .ToListAsync();
         }
@@ -159,13 +144,7 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<WeeklyPlanTask>> GetTasksByPlaceTypeAsync(string placeType)
-        {
-            return await _context.WeeklyPlanTasks
-                .Where(t => t.PlaceType == placeType)
-                .OrderBy(t => t.PlannedDate)
-                .ToListAsync();
-        }
+        // REMOVED: GetTasksByPlaceTypeAsync - PlaceType is no longer in WeeklyPlanTask
     }
 }
 

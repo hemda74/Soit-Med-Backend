@@ -135,9 +135,13 @@ namespace SoitMed.Repositories
             var now = DateTime.UtcNow;
             var weekStart = now.Date.AddDays(-(int)now.DayOfWeek);
             
+            // OPTIMIZATION: Eagerly load Tasks and Progresses to avoid N+1 queries
+            // Use AsNoTracking for read-only operations to improve performance
             return await _context.WeeklyPlans
+                .AsNoTracking()
                 .Where(p => p.EmployeeId == employeeId && p.WeekStartDate == weekStart)
                 .Include(p => p.Tasks)
+                    .ThenInclude(t => t.Progresses)
                 .FirstOrDefaultAsync();
         }
 

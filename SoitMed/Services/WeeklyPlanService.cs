@@ -1,6 +1,7 @@
 using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Repositories;
+using System.Text.Json;
 
 namespace SoitMed.Services
 {
@@ -9,9 +10,15 @@ namespace SoitMed.Services
     /// </summary>
     public class WeeklyPlanService : BaseService, IWeeklyPlanService
     {
-        public WeeklyPlanService(IUnitOfWork unitOfWork, ILogger<WeeklyPlanService> logger) 
+        private readonly IWeeklyPlanTaskService _taskService;
+
+        public WeeklyPlanService(
+            IUnitOfWork unitOfWork, 
+            ILogger<WeeklyPlanService> logger,
+            IWeeklyPlanTaskService taskService) 
             : base(unitOfWork, logger)
         {
+            _taskService = taskService;
         }
 
         public async Task<WeeklyPlanResponseDTO> CreateWeeklyPlanAsync(CreateWeeklyPlanDTO createDto, string userId)
@@ -36,6 +43,31 @@ namespace SoitMed.Services
             await UnitOfWork.WeeklyPlans.CreateAsync(plan);
             await UnitOfWork.SaveChangesAsync();
 
+            // Create tasks if provided
+            if (createDto.Tasks != null && createDto.Tasks.Any())
+            {
+                // Set WeeklyPlanId for all tasks (it might not be set in the DTO)
+                foreach (var taskDto in createDto.Tasks)
+                {
+                    taskDto.WeeklyPlanId = plan.Id;
+                }
+                
+                var createdTasks = await _taskService.CreateTasksAsync(plan.Id, createDto.Tasks, userId);
+                Logger.LogInformation("Created {Count} tasks during weekly plan creation for plan {PlanId}", createdTasks.Count, plan.Id);
+            }
+
+            // Reload plan with tasks
+            var planWithTasks = await UnitOfWork.WeeklyPlans.GetPlanWithFullDetailsAsync(plan.Id);
+            
+            // Map tasks sequentially to avoid DbContext concurrency issues
+            var tasksList = planWithTasks?.Tasks?.ToList() ?? new List<WeeklyPlanTask>();
+            var mappedTasks = new List<WeeklyPlanTaskResponseDTO>();
+            
+            foreach (var task in tasksList)
+            {
+                mappedTasks.Add(await MapTaskToDTO(task));
+            }
+            
             return new WeeklyPlanResponseDTO
             {
                 Id = plan.Id,
@@ -46,7 +78,8 @@ namespace SoitMed.Services
                 Description = plan.Description,
                 IsActive = plan.IsActive,
                 CreatedAt = plan.CreatedAt,
-                UpdatedAt = plan.UpdatedAt
+                UpdatedAt = plan.UpdatedAt,
+                Tasks = mappedTasks
             };
         }
 
@@ -61,15 +94,30 @@ namespace SoitMed.Services
                 ? await UnitOfWork.WeeklyPlans.CountAsync()
                 : await UnitOfWork.WeeklyPlans.CountAsync(p => p.EmployeeId == userId);
 
-            var planDtos = plans.Select(p => new WeeklyPlanResponseDTO
+            // OPTIMIZATION: Map tasks sequentially to avoid DbContext concurrency issues
+            // MapTaskToDTO makes database calls, so we can't parallelize it safely
+            var plansList = plans.ToList();
+            var planDtos = new List<WeeklyPlanResponseDTO>();
+            
+            foreach (var p in plansList)
+            {
+                var tasksList = p.Tasks.ToList();
+                var mappedTasks = new List<WeeklyPlanTaskResponseDTO>();
+                
+                foreach (var task in tasksList)
+                {
+                    mappedTasks.Add(await MapTaskToDTO(task));
+                }
+                
+                planDtos.Add(new WeeklyPlanResponseDTO
             {
                 Id = p.Id,
                 EmployeeId = p.EmployeeId,
                 Employee = p.Employee != null ? new EmployeeInfoDTO
                 {
                     Id = p.Employee.Id,
-                    FirstName = p.Employee.FirstName,
-                    LastName = p.Employee.LastName,
+                    FirstName = p.Employee.FirstName ?? string.Empty,
+                    LastName = p.Employee.LastName ?? string.Empty,
                     Email = p.Employee.Email ?? string.Empty,
                     PhoneNumber = p.Employee.PhoneNumber,
                     UserName = p.Employee.UserName ?? string.Empty
@@ -87,18 +135,20 @@ namespace SoitMed.Services
                 IsViewed = p.ManagerViewedAt.HasValue,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
-                Tasks = p.Tasks.Select(t => MapTaskToDTO(t)).ToList()
+                    Tasks = mappedTasks
             });
+            }
 
             return (planDtos, totalCount);
         }
 
         public async Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansWithFiltersAsync(WeeklyPlanFiltersDTO filters, string userRole, int page, int pageSize)
         {
-            // Only SalesManager and SuperAdmin can use filters
-            if (userRole != "SalesManager" && userRole != "SuperAdmin")
+            // SalesManager, SuperAdmin, and Salesman can use filters
+            // Note: For Salesman, the controller ensures they can only filter their own plans by date
+            if (userRole != "SalesManager" && userRole != "SuperAdmin" && userRole != "Salesman")
             {
-                throw new UnauthorizedAccessException("Only SalesManager and SuperAdmin can use filters");
+                throw new UnauthorizedAccessException("Only SalesManager, SuperAdmin and Salesman can use filters");
             }
 
             var plans = await UnitOfWork.WeeklyPlans.GetAllPlansWithFiltersAsync(
@@ -117,15 +167,30 @@ namespace SoitMed.Services
                 filters.IsViewed
             );
 
-            var planDtos = plans.Select(p => new WeeklyPlanResponseDTO
+            // OPTIMIZATION: Map tasks sequentially to avoid DbContext concurrency issues
+            // MapTaskToDTO makes database calls, so we can't parallelize it safely
+            var plansList = plans.ToList();
+            var planDtos = new List<WeeklyPlanResponseDTO>();
+            
+            foreach (var p in plansList)
+            {
+                var tasksList = p.Tasks.ToList();
+                var mappedTasks = new List<WeeklyPlanTaskResponseDTO>();
+                
+                foreach (var task in tasksList)
+                {
+                    mappedTasks.Add(await MapTaskToDTO(task));
+                }
+                
+                planDtos.Add(new WeeklyPlanResponseDTO
             {
                 Id = p.Id,
                 EmployeeId = p.EmployeeId,
                 Employee = p.Employee != null ? new EmployeeInfoDTO
                 {
                     Id = p.Employee.Id,
-                    FirstName = p.Employee.FirstName,
-                    LastName = p.Employee.LastName,
+                    FirstName = p.Employee.FirstName ?? string.Empty,
+                    LastName = p.Employee.LastName ?? string.Empty,
                     Email = p.Employee.Email ?? string.Empty,
                     PhoneNumber = p.Employee.PhoneNumber,
                     UserName = p.Employee.UserName ?? string.Empty
@@ -143,8 +208,9 @@ namespace SoitMed.Services
                 IsViewed = p.ManagerViewedAt.HasValue,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
-                Tasks = p.Tasks.Select(t => MapTaskToDTO(t)).ToList()
+                    Tasks = mappedTasks
             });
+            }
 
             return (planDtos, totalCount);
         }
@@ -171,6 +237,15 @@ namespace SoitMed.Services
                 await UnitOfWork.SaveChangesAsync();
             }
 
+            // Map tasks sequentially to avoid DbContext concurrency issues
+            var tasksList = plan.Tasks.ToList();
+            var mappedTasks = new List<WeeklyPlanTaskResponseDTO>();
+            
+            foreach (var task in tasksList)
+            {
+                mappedTasks.Add(await MapTaskToDTO(task));
+            }
+
             return new WeeklyPlanResponseDTO
             {
                 Id = plan.Id,
@@ -188,16 +263,16 @@ namespace SoitMed.Services
                 IsViewed = plan.ManagerViewedAt.HasValue,
                 CreatedAt = plan.CreatedAt,
                 UpdatedAt = plan.UpdatedAt,
-                Tasks = plan.Tasks.Select(t => MapTaskToDTO(t)).ToList()
+                Tasks = mappedTasks
             };
         }
 
-        private WeeklyPlanTaskResponseDTO MapTaskToDTO(WeeklyPlanTask task)
+        private async Task<WeeklyPlanTaskResponseDTO> MapTaskToDTO(WeeklyPlanTask task)
         {
             // Get offer requests from task progresses
             var offerRequestIds = task.Progresses
                 .Where(p => p.OfferRequestId.HasValue)
-                .Select(p => p.OfferRequestId.Value)
+                .Select(p => p.OfferRequestId ?? 0)
                 .Distinct()
                 .ToList();
 
@@ -205,12 +280,10 @@ namespace SoitMed.Services
             var offers = new List<SalesOfferSimpleDTO>();
             var deals = new List<SalesDealSimpleDTO>();
 
-            // Load offer requests, offers, and deals if needed
+            // OPTIMIZATION: Use repository methods that query by IDs instead of loading all data
             if (offerRequestIds.Any())
             {
-                var offerRequestsData = UnitOfWork.OfferRequests.GetAllAsync().Result
-                    .Where(or => offerRequestIds.Contains(or.Id))
-                    .ToList();
+                var offerRequestsData = await UnitOfWork.OfferRequests.GetByIdsAsync(offerRequestIds);
 
                 offerRequests = offerRequestsData.Select(or => new OfferRequestSimpleDTO
                 {
@@ -226,22 +299,38 @@ namespace SoitMed.Services
                 {
                     var offerIds = offerRequestsData
                         .Where(or => or.CreatedOfferId.HasValue)
-                        .Select(or => or.CreatedOfferId.Value)
+                        .Select(or => or.CreatedOfferId ?? 0)
                         .Distinct()
                         .ToList();
 
-                    var offersData = UnitOfWork.SalesOffers.GetAllAsync().Result
-                        .Where(o => offerIds.Contains(o.Id))
-                        .ToList();
+                    var offersData = await UnitOfWork.SalesOffers.GetByIdsAsync(offerIds);
 
-                    offers = offersData.Select(o => new SalesOfferSimpleDTO
+                    offers = offersData.Select(o => 
                     {
-                        Id = o.Id,
-                        Products = o.Products,
-                        TotalAmount = o.TotalAmount,
-                        ValidUntil = o.ValidUntil,
-                        Status = o.Status,
-                        SentToClientAt = o.SentToClientAt
+                        // Deserialize ValidUntil from JSON string to List<string>
+                        List<string>? validUntilList = null;
+                        if (!string.IsNullOrWhiteSpace(o.ValidUntil))
+                        {
+                            try
+                            {
+                                validUntilList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(o.ValidUntil);
+                            }
+                            catch
+                            {
+                                // Fallback: treat as single string value (backward compatibility)
+                                validUntilList = new List<string> { o.ValidUntil };
+                            }
+                        }
+                        
+                        return new SalesOfferSimpleDTO
+                        {
+                            Id = o.Id,
+                            Products = o.Products,
+                            TotalAmount = o.TotalAmount,
+                            ValidUntil = validUntilList,
+                            Status = o.Status,
+                            SentToClientAt = o.SentToClientAt
+                        };
                     }).ToList();
 
                     // Get deals created from these offers
@@ -249,13 +338,12 @@ namespace SoitMed.Services
                     {
                         var dealIds = offersData
                             .Where(o => o.Deal != null)
-                            .Select(o => o.Deal.Id)
+                            .Select(o => o.Deal?.Id ?? 0)
                             .Distinct()
                             .ToList();
 
-                        deals = UnitOfWork.SalesDeals.GetAllAsync().Result
-                            .Where(d => dealIds.Contains(d.Id))
-                            .Select(d => new SalesDealSimpleDTO
+                        var dealsData = await UnitOfWork.SalesDeals.GetByIdsAsync(dealIds);
+                        deals = dealsData.Select(d => new SalesDealSimpleDTO
                             {
                                 Id = d.Id,
                                 DealValue = d.DealValue,
@@ -272,16 +360,16 @@ namespace SoitMed.Services
             return new WeeklyPlanTaskResponseDTO
             {
                 Id = task.Id,
-                TaskType = task.TaskType,
+                Title = task.Title,
                 ClientId = task.ClientId,
                 ClientName = task.ClientName,
                 ClientStatus = task.ClientStatus,
+                ClientPhone = task.ClientPhone,
+                ClientAddress = task.ClientAddress,
+                ClientLocation = task.ClientLocation,
                 ClientClassification = task.ClientClassification,
                 PlannedDate = task.PlannedDate,
-                PlannedTime = task.PlannedTime,
-                Purpose = task.Purpose,
-                Priority = task.Priority,
-                Status = task.Status,
+                Notes = task.Notes,
                 ProgressCount = task.Progresses.Count,
                 Progresses = task.Progresses.Select(p => new TaskProgressSimpleDTO
                 {
@@ -381,6 +469,10 @@ namespace SoitMed.Services
                 return null;
             }
 
+            // OPTIMIZATION: Materialize tasks list once to avoid multiple enumerations
+            // Progresses are already loaded via ThenInclude in the repository
+            var tasksList = plan.Tasks?.ToList() ?? new List<WeeklyPlanTask>();
+
             return new WeeklyPlanResponseDTO
             {
                 Id = plan.Id,
@@ -393,20 +485,20 @@ namespace SoitMed.Services
                 Rating = plan.Rating,
                 ManagerComment = plan.ManagerComment,
                 ManagerReviewedAt = plan.ManagerReviewedAt,
-                Tasks = plan.Tasks.Select(t => new WeeklyPlanTaskResponseDTO
+                Tasks = tasksList.Select(t => new WeeklyPlanTaskResponseDTO
                 {
                     Id = t.Id,
-                    TaskType = t.TaskType,
+                    Title = t.Title,
                     ClientId = t.ClientId,
                     ClientName = t.ClientName,
                     ClientStatus = t.ClientStatus,
+                    ClientPhone = t.ClientPhone,
+                    ClientAddress = t.ClientAddress,
+                    ClientLocation = t.ClientLocation,
                     ClientClassification = t.ClientClassification,
                     PlannedDate = t.PlannedDate,
-                    PlannedTime = t.PlannedTime,
-                    Purpose = t.Purpose,
-                    Priority = t.Priority,
-                    Status = t.Status,
-                    ProgressCount = t.Progresses.Count
+                    Notes = t.Notes,
+                    ProgressCount = t.Progresses?.Count ?? 0 // Progresses are already loaded
                 }).ToList()
             };
         }

@@ -43,7 +43,7 @@ namespace SoitMed.Services
                     throw new ArgumentException("Weekly plan not found for this task");
 
                 if (weeklyPlan.EmployeeId != userId)
-                    throw new UnauthorizedAccessException("You don't have permission to create progress for this task");
+                    throw new UnauthorizedAccessException("You can only create progress for tasks in your own weekly plan. This task belongs to another employee's plan.");
 
                 var progress = new TaskProgress
                 {
@@ -58,23 +58,79 @@ namespace SoitMed.Services
                     NotInterestedComment = createDto.NotInterestedComment,
                     NextStep = createDto.NextStep,
                     NextFollowUpDate = createDto.NextFollowUpDate,
-                    FollowUpNotes = createDto.FollowUpNotes,
-                    SatisfactionRating = createDto.SatisfactionRating,
-                    Feedback = createDto.Feedback
+                    FollowUpNotes = createDto.FollowUpNotes
                 };
 
                 await _unitOfWork.TaskProgresses.CreateAsync(progress);
                 await _unitOfWork.SaveChangesAsync();
 
                 // Update task status if needed
-                if (createDto.VisitResult == "Interested" || createDto.VisitResult == "NotInterested")
+                // Task completion is now tracked through TaskProgress existence
+                // No need to update task status as it's been removed
+
+                // Auto-create OfferRequest if client is interested and needs offer
+                _logger.LogInformation(" Checking auto-create conditions: VisitResult={VisitResult}, NextStep={NextStep}, HasClientId={HasClientId}", 
+                    createDto.VisitResult, createDto.NextStep, task.ClientId.HasValue);
+                
+                if (createDto.VisitResult == "Interested" && createDto.NextStep == "NeedsOffer" && task.ClientId.HasValue)
                 {
-                    task.UpdateStatus("Completed");
-                    await _unitOfWork.WeeklyPlanTasks.UpdateAsync(task);
-                    await _unitOfWork.SaveChangesAsync();
+                    try
+                    {
+                        _logger.LogInformation("Conditions met! Auto-creating OfferRequest for ProgressId: {ProgressId}, ClientId: {ClientId}", progress.Id, task.ClientId.Value);
+                        
+                        // Combine description and notes for comprehensive offer request details
+                        var requestDetails = new System.Text.StringBuilder();
+                        
+                        if (!string.IsNullOrWhiteSpace(createDto.Description))
+                        {
+                            requestDetails.Append(createDto.Description);
+                        }
+                        else
+                        {
+                            requestDetails.Append("Products requested from task progress");
+                        }
+                        
+                        var specialNotes = createDto.Notes ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(createDto.FollowUpNotes))
+                        {
+                            if (!string.IsNullOrWhiteSpace(specialNotes))
+                                specialNotes += "\n\n";
+                            specialNotes += $"Follow-up Notes: {createDto.FollowUpNotes}";
+                        }
+                        
+                        var offerRequestDto = new CreateOfferRequestDTO
+                        {
+                            ClientId = task.ClientId.Value,
+                            TaskProgressId = progress.Id,
+                            RequestedProducts = requestDetails.ToString(),
+                            SpecialNotes = string.IsNullOrWhiteSpace(specialNotes) ? null : specialNotes
+                        };
+
+                        var offerRequest = await _offerRequestService.CreateOfferRequestAsync(offerRequestDto, userId);
+
+                        // Update progress with offer request ID
+                        progress.OfferRequestId = offerRequest.Id;
+                        await _unitOfWork.TaskProgresses.UpdateAsync(progress);
+                        await _unitOfWork.SaveChangesAsync();
+
+                        _logger.LogInformation("OfferRequest auto-created successfully. OfferRequestId: {OfferRequestId} for ProgressId: {ProgressId}", 
+                            offerRequest.Id, progress.Id);
+                    }
+                    catch (Exception offerRequestEx)
+                    {
+                        // Log but don't fail the progress creation
+                        _logger.LogError(offerRequestEx, "Failed to auto-create OfferRequest for ProgressId: {ProgressId}. Progress was still created successfully. Error: {Error}", 
+                            progress.Id, offerRequestEx.Message);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Auto-create OfferRequest skipped. VisitResult={VisitResult}, NextStep={NextStep}, HasClientId={HasClientId}", 
+                        createDto.VisitResult, createDto.NextStep, task.ClientId.HasValue);
                 }
 
-                _logger.LogInformation("Task progress created successfully. ProgressId: {ProgressId}, TaskId: {TaskId}", progress.Id, createDto.TaskId);
+                _logger.LogInformation("Task progress created successfully. ProgressId: {ProgressId}, TaskId: {TaskId}, OfferRequestId: {OfferRequestId}", 
+                    progress.Id, createDto.TaskId, progress.OfferRequestId);
 
                 return await MapToResponseDTO(progress);
             }
@@ -101,9 +157,7 @@ namespace SoitMed.Services
                     NotInterestedComment = createDto.NotInterestedComment,
                     NextStep = createDto.NextStep,
                     NextFollowUpDate = createDto.NextFollowUpDate,
-                    FollowUpNotes = createDto.FollowUpNotes,
-                    SatisfactionRating = createDto.SatisfactionRating,
-                    Feedback = createDto.Feedback
+                    FollowUpNotes = createDto.FollowUpNotes
                 };
 
                 var progress = await CreateProgressAsync(progressDto, userId);
@@ -111,12 +165,38 @@ namespace SoitMed.Services
                 // If client is interested and needs offer, create offer request
                 if (createDto.VisitResult == "Interested" && createDto.NextStep == "NeedsOffer")
                 {
+                    // Combine all relevant information for the offer request
+                    var requestDetails = new System.Text.StringBuilder();
+                    
+                    // Use RequestedProducts if provided, otherwise use Description from progress
+                    if (!string.IsNullOrWhiteSpace(createDto.RequestedProducts))
+                    {
+                        requestDetails.Append(createDto.RequestedProducts);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(createDto.Description))
+                    {
+                        requestDetails.Append(createDto.Description);
+                    }
+                    else
+                    {
+                        requestDetails.Append("Products requested from task progress");
+                    }
+                    
+                    // Combine special notes with follow-up notes
+                    var specialNotes = createDto.SpecialNotes ?? createDto.Notes ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(createDto.FollowUpNotes))
+                    {
+                        if (!string.IsNullOrWhiteSpace(specialNotes))
+                            specialNotes += "\n\n";
+                        specialNotes += $"Follow-up Notes: {createDto.FollowUpNotes}";
+                    }
+                    
                     var offerRequestDto = new CreateOfferRequestDTO
                     {
                         ClientId = createDto.ClientId,
                         TaskProgressId = progress.Id,
-                        RequestedProducts = createDto.RequestedProducts,
-                        SpecialNotes = createDto.SpecialNotes
+                        RequestedProducts = requestDetails.ToString(),
+                        SpecialNotes = string.IsNullOrWhiteSpace(specialNotes) ? null : specialNotes
                     };
 
                     var offerRequest = await _offerRequestService.CreateOfferRequestAsync(offerRequestDto, userId);
@@ -167,13 +247,23 @@ namespace SoitMed.Services
         {
             try
             {
-                var task = await _unitOfWork.WeeklyPlanTasks.GetByIdAsync(taskId);
+                var task = await _unitOfWork.WeeklyPlanTasks.GetTaskWithDetailsAsync(taskId);
                 if (task == null)
                     throw new ArgumentException("Task not found", nameof(taskId));
 
                 // Check authorization
-                if (userRole != "SuperAdmin" && task.WeeklyPlan.EmployeeId != userId)
-                    throw new UnauthorizedAccessException("You don't have permission to view this task's progress");
+                if (userRole != "SuperAdmin")
+                {
+                    var taskOwnerId = task.WeeklyPlan?.EmployeeId;
+                    if (string.IsNullOrEmpty(taskOwnerId))
+                    {
+                        var weeklyPlan = await _unitOfWork.WeeklyPlans.GetByIdAsync(task.WeeklyPlanId);
+                        taskOwnerId = weeklyPlan?.EmployeeId;
+                    }
+
+                    if (taskOwnerId != userId)
+                        throw new UnauthorizedAccessException("You don't have permission to view this task's progress");
+                }
 
                 var progresses = await _unitOfWork.TaskProgresses.GetProgressesByTaskIdAsync(taskId);
                 var result = new List<TaskProgressResponseDTO>();
@@ -280,8 +370,6 @@ namespace SoitMed.Services
                 progress.NextStep = updateDto.NextStep;
                 progress.NextFollowUpDate = updateDto.NextFollowUpDate;
                 progress.FollowUpNotes = updateDto.FollowUpNotes;
-                progress.SatisfactionRating = updateDto.SatisfactionRating;
-                progress.Feedback = updateDto.Feedback;
 
                 await _unitOfWork.TaskProgresses.UpdateAsync(progress);
                 await _unitOfWork.SaveChangesAsync();
@@ -346,9 +434,6 @@ namespace SoitMed.Services
                 if (!string.IsNullOrEmpty(progressDto.NextStep) && !Models.NextStepConstants.IsValidStep(progressDto.NextStep))
                     return false;
 
-                // Validate satisfaction rating
-                if (progressDto.SatisfactionRating.HasValue && (progressDto.SatisfactionRating < 1 || progressDto.SatisfactionRating > 5))
-                    return false;
 
                 return true;
             }
@@ -400,8 +485,7 @@ namespace SoitMed.Services
                     ProgressDate = p.ProgressDate,
                     ProgressType = p.ProgressType,
                     VisitResult = p.VisitResult,
-                    NextStep = p.NextStep,
-                    SatisfactionRating = p.SatisfactionRating
+                    NextStep = p.NextStep
                 }).ToList();
             }
             catch (Exception ex)
@@ -438,7 +522,6 @@ namespace SoitMed.Services
                 OfferId = null, // Not available in current model
                 DealId = null, // Not available in current model
                 NextFollowUpDate = progress.NextFollowUpDate,
-                SatisfactionRating = progress.SatisfactionRating,
                 CreatedAt = progress.CreatedAt
             };
         }

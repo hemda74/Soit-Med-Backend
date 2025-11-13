@@ -170,7 +170,7 @@ namespace SoitMed.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("InteractionType")
@@ -303,7 +303,6 @@ namespace SoitMed.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Type")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
@@ -754,6 +753,52 @@ namespace SoitMed.Migrations
                     b.ToTable("DeliveryTerms");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.DeviceToken", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("LastUsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IsActive");
+
+                    b.ToTable("DeviceTokens");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Equipment.Equipment", b =>
                 {
                     b.Property<int>("Id")
@@ -765,12 +810,15 @@ namespace SoitMed.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CustomerId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("HospitalId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<bool>("IsActive")
@@ -818,12 +866,284 @@ namespace SoitMed.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CustomerId");
+
                     b.HasIndex("HospitalId");
 
                     b.HasIndex("QRCode")
                         .IsUnique();
 
-                    b.ToTable("Equipment");
+                    b.ToTable("Equipment", t =>
+                        {
+                            t.HasCheckConstraint("CK_Equipment_Owner", "(HospitalId IS NOT NULL AND CustomerId IS NULL) OR (HospitalId IS NULL AND CustomerId IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.MaintenanceRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AssignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("AssignedByMaintenanceSupportId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("AssignedToEngineerId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomerId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("CustomerType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("EquipmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("HospitalId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<decimal?>("PaidAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("PaymentStatus")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("RemainingAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Symptoms")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal?>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedByMaintenanceSupportId");
+
+                    b.HasIndex("EquipmentId");
+
+                    b.HasIndex("HospitalId");
+
+                    b.HasIndex("AssignedToEngineerId", "Status");
+
+                    b.HasIndex("CustomerId", "Status");
+
+                    b.ToTable("MaintenanceRequests");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.MaintenanceRequestAttachment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AttachmentType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FileType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaintenanceRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UploadedById")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaintenanceRequestId");
+
+                    b.HasIndex("UploadedById");
+
+                    b.ToTable("MaintenanceRequestAttachments");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.MaintenanceRequestRating", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomerId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("EngineerId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaintenanceRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("EngineerId");
+
+                    b.HasIndex("MaintenanceRequestId");
+
+                    b.ToTable("MaintenanceRequestRatings");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.MaintenanceVisit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ActionsTaken")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EngineerId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaintenanceRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PartsUsed")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("QRCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Report")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("SerialCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal?>("ServiceFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("SparePartRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("VisitDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EngineerId");
+
+                    b.HasIndex("MaintenanceRequestId");
+
+                    b.HasIndex("SparePartRequestId")
+                        .IsUnique()
+                        .HasFilter("[SparePartRequestId] IS NOT NULL");
+
+                    b.ToTable("MaintenanceVisits");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Equipment.RepairRequest", b =>
@@ -908,6 +1228,109 @@ namespace SoitMed.Migrations
                         {
                             t.HasCheckConstraint("CK_RepairRequest_Requestor", "(DoctorId IS NOT NULL AND TechnicianId IS NULL) OR (DoctorId IS NULL AND TechnicianId IS NOT NULL)");
                         });
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.SparePartRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AssignedToCoordinatorId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("AssignedToInventoryManagerId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("CheckedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("CompanyPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool?>("CustomerApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("CustomerApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("CustomerPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("CustomerRejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("DeliveredToEngineerAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaintenanceRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaintenanceVisitId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Manufacturer")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<decimal?>("OriginalPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("PartName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PartNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("PriceSetAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PriceSetByManagerId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("ReadyAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedToCoordinatorId");
+
+                    b.HasIndex("AssignedToInventoryManagerId");
+
+                    b.HasIndex("MaintenanceRequestId");
+
+                    b.HasIndex("PriceSetByManagerId");
+
+                    b.ToTable("SparePartRequests");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Doctor", b =>
@@ -1073,6 +1496,9 @@ namespace SoitMed.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DateOfBirth")
                         .HasColumnType("datetime2");
 
                     b.Property<int?>("DepartmentId")
@@ -1552,6 +1978,9 @@ namespace SoitMed.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("Year")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OfferId");
@@ -1673,6 +2102,171 @@ namespace SoitMed.Migrations
                     b.ToTable("OfferTerms", (string)null);
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Payment.Payment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountingNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomerId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("MaintenanceRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaymentMetadata")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PaymentMethod")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProcessedByAccountantId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int?>("SparePartRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TransactionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaintenanceRequestId");
+
+                    b.HasIndex("ProcessedByAccountantId");
+
+                    b.HasIndex("SparePartRequestId");
+
+                    b.HasIndex("CustomerId", "Status");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Payment.PaymentGatewayConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdditionalConfig")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ApiKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("GatewayName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MerchantId")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("SecretKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PaymentGatewayConfigs");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Payment.PaymentTransaction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("GatewayResponse")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("GatewayTransactionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("PaymentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TransactionType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentId");
+
+                    b.ToTable("PaymentTransactions");
+                });
+
             modelBuilder.Entity("SoitMed.Models.PaymentTerms", b =>
                 {
                     b.Property<long>("Id")
@@ -1740,6 +2334,126 @@ namespace SoitMed.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("PaymentTerms");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Product", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("BasePrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ImagePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("InStock")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Category", "IsActive", "InStock");
+
+                    b.HasIndex("Name", "Model", "Provider");
+
+                    b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.RecentOfferActivity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("ActivityTimestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ClientName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<long>("OfferId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SalesmanName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityTimestamp");
+
+                    b.HasIndex("OfferId");
+
+                    b.ToTable("RecentOfferActivities");
                 });
 
             modelBuilder.Entity("SoitMed.Models.RequestWorkflow", b =>
@@ -1979,8 +2693,7 @@ namespace SoitMed.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("DeliveryTerms")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Documents")
                         .HasMaxLength(2000)
@@ -2001,8 +2714,7 @@ namespace SoitMed.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<string>("PaymentTerms")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PaymentType")
                         .HasMaxLength(50)
@@ -2027,8 +2739,11 @@ namespace SoitMed.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("ValidUntil")
-                        .HasColumnType("datetime2");
+                    b.Property<string>("ValidUntil")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("WarrantyTerms")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -2109,7 +2824,6 @@ namespace SoitMed.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("CreatedByManagerId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<bool>("IsTeamTarget")
@@ -2134,7 +2848,13 @@ namespace SoitMed.Migrations
                     b.Property<int>("TargetOffers")
                         .HasColumnType("int");
 
+                    b.Property<decimal?>("TargetRevenue")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("TargetSuccessfulVisits")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetType")
                         .HasColumnType("int");
 
                     b.Property<int>("TargetVisits")
@@ -2183,10 +2903,6 @@ namespace SoitMed.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("Feedback")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
                     b.Property<string>("FollowUpNotes")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -2216,9 +2932,6 @@ namespace SoitMed.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
-                    b.Property<int?>("SatisfactionRating")
-                        .HasColumnType("int");
 
                     b.Property<long>("TaskId")
                         .HasColumnType("bigint");
@@ -2341,43 +3054,15 @@ namespace SoitMed.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<string>("PlaceName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("PlaceType")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
                     b.Property<DateTime?>("PlannedDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("PlannedTime")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("Priority")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Purpose")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("TaskType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -2394,7 +3079,7 @@ namespace SoitMed.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.HasIndex("WeeklyPlanId", "Status");
+                    b.HasIndex("WeeklyPlanId", "PlannedDate");
 
                     b.ToTable("WeeklyPlanTasks");
                 });
@@ -2513,15 +3198,143 @@ namespace SoitMed.Migrations
                     b.Navigation("Client");
                 });
 
-            modelBuilder.Entity("SoitMed.Models.Equipment.Equipment", b =>
+            modelBuilder.Entity("SoitMed.Models.DeviceToken", b =>
                 {
-                    b.HasOne("SoitMed.Models.Hospital.Hospital", "Hospital")
-                        .WithMany("Equipment")
-                        .HasForeignKey("HospitalId")
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.Equipment", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SoitMed.Models.Hospital.Hospital", "Hospital")
+                        .WithMany("Equipment")
+                        .HasForeignKey("HospitalId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Customer");
+
                     b.Navigation("Hospital");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.MaintenanceRequest", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "AssignedByMaintenanceSupport")
+                        .WithMany()
+                        .HasForeignKey("AssignedByMaintenanceSupportId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "AssignedToEngineer")
+                        .WithMany()
+                        .HasForeignKey("AssignedToEngineerId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Equipment.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Hospital.Hospital", "Hospital")
+                        .WithMany()
+                        .HasForeignKey("HospitalId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AssignedByMaintenanceSupport");
+
+                    b.Navigation("AssignedToEngineer");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Equipment");
+
+                    b.Navigation("Hospital");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.MaintenanceRequestAttachment", b =>
+                {
+                    b.HasOne("SoitMed.Models.Equipment.MaintenanceRequest", "MaintenanceRequest")
+                        .WithMany("Attachments")
+                        .HasForeignKey("MaintenanceRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "UploadedBy")
+                        .WithMany()
+                        .HasForeignKey("UploadedById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("MaintenanceRequest");
+
+                    b.Navigation("UploadedBy");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.MaintenanceRequestRating", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Engineer")
+                        .WithMany()
+                        .HasForeignKey("EngineerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Equipment.MaintenanceRequest", "MaintenanceRequest")
+                        .WithMany("Ratings")
+                        .HasForeignKey("MaintenanceRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Engineer");
+
+                    b.Navigation("MaintenanceRequest");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.MaintenanceVisit", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Engineer")
+                        .WithMany()
+                        .HasForeignKey("EngineerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Equipment.MaintenanceRequest", "MaintenanceRequest")
+                        .WithMany("Visits")
+                        .HasForeignKey("MaintenanceRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Equipment.SparePartRequest", "SparePartRequest")
+                        .WithOne("MaintenanceVisit")
+                        .HasForeignKey("SoitMed.Models.Equipment.MaintenanceVisit", "SparePartRequestId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Engineer");
+
+                    b.Navigation("MaintenanceRequest");
+
+                    b.Navigation("SparePartRequest");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Equipment.RepairRequest", b =>
@@ -2554,6 +3367,38 @@ namespace SoitMed.Migrations
                     b.Navigation("RequestingDoctor");
 
                     b.Navigation("RequestingTechnician");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.SparePartRequest", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "AssignedToCoordinator")
+                        .WithMany()
+                        .HasForeignKey("AssignedToCoordinatorId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "AssignedToInventoryManager")
+                        .WithMany()
+                        .HasForeignKey("AssignedToInventoryManagerId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("SoitMed.Models.Equipment.MaintenanceRequest", "MaintenanceRequest")
+                        .WithMany()
+                        .HasForeignKey("MaintenanceRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "PriceSetByManager")
+                        .WithMany()
+                        .HasForeignKey("PriceSetByManagerId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("AssignedToCoordinator");
+
+                    b.Navigation("AssignedToInventoryManager");
+
+                    b.Navigation("MaintenanceRequest");
+
+                    b.Navigation("PriceSetByManager");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Hospital.Doctor", b =>
@@ -2770,6 +3615,60 @@ namespace SoitMed.Migrations
                     b.Navigation("Offer");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Payment.Payment", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Equipment.MaintenanceRequest", "MaintenanceRequest")
+                        .WithMany("Payments")
+                        .HasForeignKey("MaintenanceRequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "ProcessedByAccountant")
+                        .WithMany()
+                        .HasForeignKey("ProcessedByAccountantId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SoitMed.Models.Equipment.SparePartRequest", "SparePartRequest")
+                        .WithMany("Payments")
+                        .HasForeignKey("SparePartRequestId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("MaintenanceRequest");
+
+                    b.Navigation("ProcessedByAccountant");
+
+                    b.Navigation("SparePartRequest");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Payment.PaymentTransaction", b =>
+                {
+                    b.HasOne("SoitMed.Models.Payment.Payment", "Payment")
+                        .WithMany("Transactions")
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Payment");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.RecentOfferActivity", b =>
+                {
+                    b.HasOne("SoitMed.Models.SalesOffer", "Offer")
+                        .WithMany()
+                        .HasForeignKey("OfferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Offer");
+                });
+
             modelBuilder.Entity("SoitMed.Models.RequestWorkflow", b =>
                 {
                     b.HasOne("SoitMed.Models.ActivityLog", "ActivityLog")
@@ -2908,8 +3807,7 @@ namespace SoitMed.Migrations
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Manager")
                         .WithMany()
                         .HasForeignKey("CreatedByManagerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Salesman")
                         .WithMany()
@@ -3002,6 +3900,24 @@ namespace SoitMed.Migrations
                     b.Navigation("RepairRequests");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Equipment.MaintenanceRequest", b =>
+                {
+                    b.Navigation("Attachments");
+
+                    b.Navigation("Payments");
+
+                    b.Navigation("Ratings");
+
+                    b.Navigation("Visits");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Equipment.SparePartRequest", b =>
+                {
+                    b.Navigation("MaintenanceVisit");
+
+                    b.Navigation("Payments");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Hospital.Doctor", b =>
                 {
                     b.Navigation("DoctorHospitals");
@@ -3038,6 +3954,11 @@ namespace SoitMed.Migrations
             modelBuilder.Entity("SoitMed.Models.Location.Governorate", b =>
                 {
                     b.Navigation("EngineerGovernorates");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Payment.Payment", b =>
+                {
+                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("SoitMed.Models.SalesOffer", b =>

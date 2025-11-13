@@ -83,7 +83,7 @@ namespace SoitMed
                             maxRetryCount: 3,
                             maxRetryDelay: TimeSpan.FromSeconds(30),
                             errorNumbersToAdd: null);
-                        sqlOptions.CommandTimeout(60);
+                        sqlOptions.CommandTimeout(120); // Increased timeout for complex queries
                         // Use split queries for better performance with multiple collections
                         sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
                     })
@@ -95,7 +95,7 @@ namespace SoitMed
                         // Suppress the multiple collection include warning since we're using SplitQuery
                         warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.MultipleCollectionIncludeWarning);
                     });
-                });
+                }, ServiceLifetime.Scoped); // Explicitly set to Scoped to ensure proper disposal
 
                 // Allow reasonably sized image uploads (up to 20MB)
                 builder.Services.Configure<FormOptions>(options =>
@@ -294,7 +294,7 @@ namespace SoitMed
                     {
                         Version = "v1",
                         Title = "SoitMed",
-                        Description = "Comprehensive management system with equipment tracking and repair request management"
+                        Description = ""
                     });
 
                     swagger.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()
@@ -374,6 +374,59 @@ END";
                     }
                 }
 
+                // Ensure SalesmanTargets table has TargetType and TargetRevenue columns
+                using (var scope = app.Services.CreateScope())
+                {
+                    try
+                    {
+                        var db = scope.ServiceProvider.GetRequiredService<Context>();
+                        var connection = db.Database.GetDbConnection();
+                        await connection.OpenAsync();
+                        
+                        // Check and add TargetType column
+                        using (var command = connection.CreateCommand())
+                        {
+                            command.CommandText = @"
+IF NOT EXISTS (
+    SELECT 1 
+    FROM sys.columns 
+    WHERE object_id = OBJECT_ID(N'[dbo].[SalesmanTargets]') 
+    AND name = 'TargetType'
+)
+BEGIN
+    ALTER TABLE [dbo].[SalesmanTargets]
+    ADD [TargetType] INT NOT NULL DEFAULT 2;
+END";
+                            await command.ExecuteNonQueryAsync();
+                        }
+                        
+                        // Check and add TargetRevenue column
+                        using (var command = connection.CreateCommand())
+                        {
+                            command.CommandText = @"
+IF NOT EXISTS (
+    SELECT 1 
+    FROM sys.columns 
+    WHERE object_id = OBJECT_ID(N'[dbo].[SalesmanTargets]') 
+    AND name = 'TargetRevenue'
+)
+BEGIN
+    ALTER TABLE [dbo].[SalesmanTargets]
+    ADD [TargetRevenue] DECIMAL(18, 2) NULL;
+END";
+                            await command.ExecuteNonQueryAsync();
+                        }
+                        
+                        logger.LogInformation("SalesmanTargets table columns verified/updated");
+                    }
+                    catch (Exception guardEx)
+                    {
+                        var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+                        var startupLogger = loggerFactory.CreateLogger("StartupDbGuard");
+                        startupLogger.LogError(guardEx, "Failed to ensure SalesmanTargets columns exist");
+                    }
+                }
+
                 // Seed roles
                 using (var scope = app.Services.CreateScope())
                 {
@@ -445,7 +498,17 @@ END";
                 });
                 
                 app.UseStatusCodePages();
+                
+                // Add CORS middleware for static files BEFORE UseStaticFiles
+                app.UseMiddleware<SoitMed.Middleware.StaticFileCorsMiddleware>();
+                
+                // Configure static files - MUST be before authentication/authorization
+                // wwwroot is already set as web root, so files are served from root
+                // Files in wwwroot/products/ are accessible at /products/
+                // Files in wwwroot/images/ are accessible at /images/
                 app.UseStaticFiles();
+                
+                // CORS must be before authentication
                 app.UseCors("MyPolicy");
                 app.UseResponseCaching();
                 app.UseRateLimiter();
@@ -475,3 +538,6 @@ END";
         }
     }
 }
+
+
+

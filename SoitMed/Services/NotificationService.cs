@@ -65,7 +65,8 @@ namespace SoitMed.Services
                     ["CreatedAt"] = notification.CreatedAt,
                     ["RequestWorkflowId"] = notification.RequestWorkflowId,
                     ["ActivityLogId"] = notification.ActivityLogId,
-                    ["Category"] = type // Add category for easy filtering
+                    ["Category"] = type, // Add category for easy filtering
+                    ["UserId"] = userId // Include userId in payload for verification
                 };
 
                 // Add custom metadata if provided
@@ -78,14 +79,31 @@ namespace SoitMed.Services
                     _logger.LogInformation("📦 Added metadata to notification: {Metadata}", string.Join(", ", metadata.Keys));
                 }
                 
+                // Send to user's personal group
                 await _hubContext.Clients.Group(signalRGroup).SendAsync("ReceiveNotification", signalRPayload);
-
-                _logger.LogInformation("✅ SignalR notification sent successfully to group {Group} for user {UserId}: {Title}", 
+                _logger.LogInformation("✅ SignalR notification sent successfully to personal group {Group} for user {UserId}: {Title}", 
                     signalRGroup, userId, title);
+
+                // Also try to get user's roles and send to role groups as backup
+                try
+                {
+                    var user = await _unitOfWork.Users.GetByIdAsync(userId);
+                    if (user != null)
+                    {
+                        // Note: This requires UserManager which we don't have here
+                        // Role-based broadcasting would need to be handled at the caller level
+                        // For now, personal group should be sufficient
+                    }
+                }
+                catch (Exception roleEx)
+                {
+                    _logger.LogDebug(roleEx, "Could not send to role groups (this is optional)");
+                }
             }
             catch (Exception signalREx)
             {
-                _logger.LogWarning(signalREx, "⚠️ Failed to send SignalR notification to user {UserId} (notification is still saved in DB)", userId);
+                _logger.LogError(signalREx, "⚠️ Failed to send SignalR notification to user {UserId} (notification is still saved in DB). Error: {Error}", 
+                    userId, signalREx.Message);
                 // Don't throw - notification is saved, just real-time delivery failed
             }
 
@@ -130,6 +148,47 @@ namespace SoitMed.Services
             _logger.LogInformation("📬 Notification process completed for user {UserId}: {Title}", userId, title);
 
             return notification;
+        }
+
+        public async Task SendNotificationToRoleGroupAsync(string role, string title, string message, Dictionary<string, object>? metadata = null, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var roleGroup = $"Role_{role}";
+                _logger.LogInformation("📡 Attempting to send SignalR notification to role group: {Group}", roleGroup);
+                
+                // Build SignalR payload
+                var signalRPayload = new Dictionary<string, object>
+                {
+                    ["Title"] = title,
+                    ["Message"] = message,
+                    ["Type"] = "Broadcast",
+                    ["Priority"] = "High",
+                    ["Category"] = role,
+                    ["CreatedAt"] = DateTime.UtcNow
+                };
+
+                // Add custom metadata if provided
+                if (metadata != null && metadata.Count > 0)
+                {
+                    foreach (var kvp in metadata)
+                    {
+                        signalRPayload[kvp.Key] = kvp.Value;
+                    }
+                    _logger.LogInformation("📦 Added metadata to role group notification: {Metadata}", string.Join(", ", metadata.Keys));
+                }
+                
+                // Send to role group
+                await _hubContext.Clients.Group(roleGroup).SendAsync("ReceiveNotification", signalRPayload);
+                _logger.LogInformation("✅ SignalR notification sent successfully to role group {Group}: {Title}", 
+                    roleGroup, title);
+            }
+            catch (Exception signalREx)
+            {
+                _logger.LogError(signalREx, "⚠️ Failed to send SignalR notification to role group {Role}. Error: {Error}", 
+                    role, signalREx.Message);
+                throw;
+            }
         }
 
         public async Task<IEnumerable<Notification>> GetUserNotificationsAsync(string userId, int page = 1, int pageSize = 20, bool unreadOnly = false, CancellationToken cancellationToken = default)
