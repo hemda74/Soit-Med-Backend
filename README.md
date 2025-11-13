@@ -1,284 +1,295 @@
-# Soit-Med Hospital Management System
+# SoitMed Backend - Maintenance Module Branch
 
-A comprehensive hospital management system with equipment tracking, repair request management, sales module, and multi-departmental user roles. Built with ASP.NET Core 8, Entity Framework Core, and JWT authentication.
+## Business Overview
 
-## Features
+The Maintenance Module provides a complete solution for managing equipment maintenance requests from initial customer submission through resolution. It streamlines the maintenance workflow, coordinates between customers, engineers, and support staff, and ensures efficient spare parts management.
 
-### Real-Time Notifications System
-- **Multi-Channel Delivery**: Real-time notifications via SignalR (when app is open) and push notifications (when app is closed)
-- **Cross-Platform Support**: Works seamlessly on Web Dashboard and Mobile App
-- **User-Centric Design**: Notifications are delivered to specific users regardless of business context
-- **Flexible Notification Types**: Support for offers, deals, tasks, clients, workflows, and system notifications
-- **Priority Levels**: High, Medium, and Low priority notifications
-- **Push Notifications**: Native push notifications with sound and banner for mobile devices
-- **In-App Notifications**: Real-time notification list with unread count badge
+### Business Functions
 
-📖 **Technical Documentation**: See [NOTIFICATION.md](../NOTIFICATION.md) for complete implementation details
+#### 1. Maintenance Request Management
+- **Request Submission**: Customers (doctors, technicians, institution managers) can submit maintenance requests through mobile app with:
+  - Equipment selection (linked to hospital or customer)
+  - Detailed problem description
+  - Symptoms and observations
+  - Multimedia attachments (images, videos, audio recordings)
+- **Request Tracking**: Real-time status tracking similar to delivery systems:
+  - Pending: Request submitted, awaiting assignment
+  - Assigned: Assigned to engineer
+  - In Progress: Engineer working on request
+  - Needs Second Visit: Requires follow-up visit
+  - Needs Spare Part: Waiting for spare part
+  - Waiting For Spare Part: Spare part ordered
+  - Waiting For Customer Approval: Customer needs to approve spare part price
+  - Completed: Maintenance completed successfully
+  - Cancelled: Request cancelled
+  - On Hold: Temporarily paused
+- **Request History**: Complete history of all maintenance requests with status changes
 
-### Multi-Departmental Organization
-- **6 Departments**: Administration, Medical, Sales, Engineering, Finance, Legal
-- **10+ User Roles**: SuperAdmin, Admin, Doctor, Technician, Salesman, SalesManager, SalesSupport, Engineer, FinanceManager, FinanceEmployee, LegalManager, LegalEmployee
-- **Role-based Access Control** with hierarchical permissions
+#### 2. Engineer Visit Management
+- **Visit Creation**: Engineers create maintenance visits for assigned requests
+- **Equipment Identification**: 
+  - QR Code scanning to load equipment data
+  - Manual serial number entry if QR code unavailable
+- **Visit Reporting**: Engineers create detailed visit reports with:
+  - Visit outcome (Completed, Needs Second Visit, Needs Spare Part)
+  - Detailed notes and observations
+  - Work performed
+  - Recommendations
+- **Visit History**: Track all visits for each maintenance request
 
-### Hospital Network Management
-- **Hospital Registration** with unique codes and contact information
-- **Doctor & Technician Management** linked to hospitals
-- **Geographic Coverage** through governorate-engineer assignments
+#### 3. Spare Parts Management
+- **Spare Part Requests**: Engineers can request spare parts during visits
+- **Availability Checking**: 
+  - Local availability check by Spare Parts Coordinator
+  - Global availability check if not available locally
+- **Pricing Workflow**:
+  - If local: Inventory Manager prepares part for engineer
+  - If global: Maintenance Manager sets price (original price + company revenue)
+  - Customer receives notification with price
+  - Customer approves or rejects spare part
+- **Spare Part Tracking**: Track spare part status from request to delivery
 
-### Equipment Tracking System
-- **QR Code Integration** for unique equipment identification
-- **Equipment Status Tracking**: Operational, Under Maintenance, Out of Order, Retired
-- **Maintenance History** with detailed repair logs
-- **Visit Counter** for repair frequency tracking
+#### 4. Engineer Assignment
+- **Automatic Assignment**: 
+  - Based on equipment location (hospital location)
+  - Engineer governorate assignments
+  - Current workload (least active requests)
+- **Manual Assignment**: Maintenance Support can manually assign engineers
+- **Assignment Notifications**: Engineers receive notifications when assigned
 
-### Repair Request Management
-- **Automated Assignment** to engineers based on hospital location
-- **Priority-based Queuing**: Emergency, Critical, High, Medium, Low
-- **Complete Workflow**: Pending → Assigned → In Progress → Completed
-- **Cost Tracking** with parts and labor documentation
-- **Time Estimation** vs actual hours reporting
+#### 5. Customer Rating System
+- **Engineer Rating**: Customers can rate engineers after service completion
+- **Rating Tracking**: Track and display engineer ratings
+- **Quality Assurance**: Use ratings for engineer performance evaluation
 
-### Sales Module (Complete CRM System)
-- **Client Management**: Full client lifecycle tracking with profiles, history, and statistics
-- **Weekly Planning**: Salesmen create weekly plans with tasks and track progress
-- **Task Progress Tracking**: Record visits, calls, meetings with detailed notes and follow-ups
-- **Offer Request System**: Salesmen request offers, SalesSupport creates detailed offers with equipment, terms, and installments
-- **Deal Management**: Multi-level approval workflow (Salesman → Manager → SuperAdmin)
-- **Statistics & Reporting**: Performance tracking, targets, and progress monitoring
-- **Target Management**: Set and track quarterly/yearly targets for salesmen and teams
+#### 6. File Attachments
+- **Multimedia Support**: 
+  - Images (JPG, PNG, GIF, BMP, WEBP) - up to 10MB
+  - Videos (MP4, AVI, MOV, WMV, FLV, MKV, WEBM) - up to 100MB
+  - Audio (MP3, WAV, OGG, M4A, AAC, WMA) - up to 20MB
+  - Documents (PDF, DOC, DOCX, TXT, XLS, XLSX) - up to 10MB
+- **Attachment Management**: Upload, view, and delete attachments
+- **Attachment Organization**: Attachments organized by maintenance request
 
-### Advanced Security
-- **JWT Authentication** with 5-year token validity
-- **Role-based Authorization** for all endpoints
-- **Secure API** with CORS support and Swagger documentation
+### Business Workflows
 
-## Getting Started
+#### Standard Maintenance Workflow
+1. Customer submits maintenance request with equipment, description, and attachments
+2. Request appears in Maintenance Support dashboard
+3. System attempts automatic engineer assignment based on location
+4. If auto-assignment fails, Maintenance Support manually assigns engineer
+5. Engineer receives notification and creates maintenance visit
+6. Engineer scans QR code or enters serial number to load equipment data
+7. Engineer performs maintenance and creates visit report
+8. Engineer marks outcome: Completed, Needs Second Visit, or Needs Spare Part
+9. If completed: Customer can rate engineer
+10. If needs spare part: Spare parts workflow initiated
 
-### Prerequisites
-- .NET 8 SDK
-- SQL Server (LocalDB or full instance)
-- Visual Studio 2022 or VS Code
+#### Spare Parts Workflow
+1. Engineer requests spare part during visit
+2. Spare Parts Coordinator checks availability
+3. **If Local Available**:
+   - Coordinator marks as local available
+   - Inventory Manager prepares part
+   - Part marked as ready for engineer
+   - Engineer notified to pick up part
+4. **If Global Required**:
+   - Coordinator marks as global required
+   - Maintenance Manager receives notification
+   - Manager sets customer price (original + company revenue)
+   - Customer receives notification with price
+   - Customer approves or rejects
+   - If approved: Part ordered and delivered
+   - If rejected: Request marked as completed without spare part
 
-### Installation
+#### Equipment Linking
+- Equipment can be linked to:
+  - **Hospital**: Equipment belongs to hospital, accessible to all hospital staff
+  - **Customer (Doctor)**: Equipment directly linked to doctor, even if doctor is in hospital
+- System automatically determines hospital from equipment or doctor's hospital associations
 
-1. **Clone the repository**
-```bash
-git clone https://github.com/hemda74/Soit-Med-Backend.git
-cd Soit-Med-Backend/SoitMed
-```
+### Business Benefits
 
-2. **Update Connection String**
-Edit `appsettings.json`:
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=SoitMedDB;Trusted_Connection=true"
-  },
-  "JWT": {
-    "ValidIss": "https://localhost:7271",
-    "ValidAud": "https://localhost:7271",
-    "SecritKey": "YourSuperSecretKeyHere123456789"
-  }
-}
-```
-
-3. **Run Database Migrations**
-```bash
-dotnet ef database update
-```
-
-4. **Start the Application**
-```bash
-dotnet run
-```
-
-5. **Access Swagger UI**
-Navigate to: `https://localhost:5117/swagger`
-
-## Equipment Management
-
-### Equipment Lifecycle
-1. **Registration**: Add equipment with QR code and hospital assignment
-2. **Operation**: Track status and maintenance schedules
-3. **Repair**: Handle repair requests and track visit counts
-4. **Retirement**: Mark equipment as retired when end-of-life
-
-### QR Code Integration
-- **Unique Identifiers**: Each equipment has a unique QR code
-- **Quick Access**: API endpoint for QR code lookup
-- **Mobile Friendly**: Designed for mobile scanning applications
-
-## Repair Request Workflow
-
-### Request Creation
-1. **Doctor/Technician** identifies equipment issue
-2. **Scans QR code** or selects equipment
-3. **Submits repair request** with description and priority
-4. **System increments** equipment repair visit count
-
-### Automatic Assignment
-1. **System identifies** hospital location
-2. **Finds engineers** in matching governorate
-3. **Assigns to engineer** with lowest current workload
-4. **Updates status** to "Assigned"
-
-### Priority Levels
-- **Emergency (5)**: Immediate attention required
-- **Critical (4)**: Urgent repair needed
-- **High (3)**: Important but not critical
-- **Medium (2)**: Standard priority
-- **Low (1)**: Can be scheduled flexibly
-
-## API Endpoints
-
-### Authentication
-```http
-POST   /api/Account/register     # Register new user with role
-POST   /api/Account/login        # Login and get JWT token (5-year validity)
-```
-
-### Equipment Management
-```http
-GET    /api/Equipment/qr/{qrCode}        # Get equipment by QR code
-POST   /api/Equipment                    # Create equipment
-GET    /api/Equipment/{id}/repair-history    # Get repair history
-```
-
-### Repair Request Management
-```http
-POST   /api/RepairRequest                # Create repair request (Doctor/Technician)
-GET    /api/RepairRequest/pending        # Get pending requests
-GET    /api/RepairRequest/engineer/{id}  # Get engineer's assigned requests
-```
-
-### Required API Endpoints
-```http
-GET    /api/Governorate/{id}/engineers   # Get engineers in governorate
-POST   /api/Role/business                # Create business role
-PUT    /api/Role/business/{id}           # Update business role
-```
-
-## Architecture
-
-### Project Structure
-```
-SoitMed/
-├── Controllers/           # API Controllers
-├── Models/               # Data Models (Organized by Domain)
-│   ├── Core/            # Core business models
-│   ├── Identity/        # User & Authentication models
-│   ├── Hospital/        # Hospital domain models
-│   ├── Location/        # Geographic models
-│   ├── Equipment/       # Equipment domain models
-│   └── Context.cs       # Entity Framework DbContext
-├── DTO/                 # Data Transfer Objects
-├── Migrations/          # Entity Framework Migrations
-└── Program.cs           # Application Entry Point
-```
-
-### Technology Stack
-- **Framework**: ASP.NET Core 8
-- **Database**: SQL Server with Entity Framework Core
-- **Authentication**: JWT Bearer Tokens
-- **Documentation**: Swagger/OpenAPI
-- **Architecture**: Clean Architecture with Domain-Driven Design
-
-## Recent Changes
-
-### Sales Module Implementation (2025)
-- Complete Sales CRM system with client management
-- Weekly planning and task tracking system
-- Offer creation workflow (Salesman → SalesSupport → Salesman)
-- Deal management with multi-level approval (Salesman → Manager → SuperAdmin)
-- Statistics and performance tracking
-- Target management system
-- Performance optimizations with database indexes and computed columns
-- Comprehensive unit tests for all sales endpoints
-
-### Major System Overhaul
-- Equipment Management System with QR code integration
-- Repair Request Workflow with automated engineer assignment
-- Model Restructure into domain-specific folders
-- Extended JWT Tokens to 5-year validity
-- Enhanced Database Schema with proper relationships
-- Comprehensive API Documentation
-- Solution renamed from Lab1 to SoitMed
-
-## Database Schema
-
-### Core Tables
-- **ApplicationUsers** - System users with department assignments
-- **Departments** - Organizational departments
-- **BusinessRoles** - Custom business roles (separate from Identity roles)
-
-### Hospital Domain
-- **Hospitals** - Hospital information with unique codes
-- **Doctors** - Medical staff linked to hospitals
-- **Technicians** - Technical staff linked to hospitals
-
-### Location Domain
-- **Governorates** - Geographic regions
-- **Engineers** - Engineering staff
-- **EngineerGovernorates** - Many-to-many relationship for coverage areas
-
-### Equipment Domain
-- **Equipment** - Medical equipment with QR codes and hospital assignments
-- **RepairRequests** - Repair requests with complete workflow tracking
-
-### Sales Domain
-- **Clients** - Client information with complete history tracking
-- **WeeklyPlans** - Weekly planning system for salesmen
-- **WeeklyPlanTasks** - Tasks within weekly plans
-- **TaskProgresses** - Progress records for visits, calls, meetings
-- **SalesOffers** - Sales offers with equipment, terms, and installments
-- **SalesDeals** - Deals with multi-level approval workflow
-- **OfferRequests** - Requests from salesmen to SalesSupport
-- **SalesmanTargets** - Target tracking for salesmen and teams
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## API Documentation
-
-### Notification System
-- **Complete Notification Guide**: See [NOTIFICATION.md](../NOTIFICATION.md) for full technical documentation
-- **Notification API**: `/api/Notification` endpoints for managing notifications
-- **Real-Time Delivery**: SignalR hub at `/notificationHub` for instant notifications
-- **Push Notifications**: Device token registration and push notification delivery
-
-### Role-Specific API Documentation
-
-- **Salesman API**: See `SALESMAN_API_DOCUMENTATION.md`
-- **Sales Manager API**: See `SALES_MANAGER_API_DOCUMENTATION.md`
-- **Sales Support API**: See `SALES_SUPPORT_API_DOCUMENTATION.md`
-- **Super Admin API**: See `SUPER_ADMIN_API_DOCUMENTATION.md`
-
-Each documentation includes:
-- User stories for the role
-- Complete endpoint details with request/response examples
-- Status values reference
-- Common workflows
-- Error handling guide
-
-## Support
-
-For support and questions:
-- Create an issue in the repository
-- Check the API documentation at `/swagger`
-- Review the comprehensive endpoint documentation above
-- Refer to role-specific API documentation files
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- **Efficient Coordination**: Automated workflows reduce manual coordination effort
+- **Real-time Tracking**: Customers can track request status in real-time
+- **Quick Response**: Automatic engineer assignment ensures quick response times
+- **Transparent Pricing**: Clear spare part pricing with customer approval
+- **Quality Assurance**: Rating system ensures service quality
+- **Complete Documentation**: All requests, visits, and attachments documented
+- **Flexible Equipment Linking**: Supports both hospital and individual customer equipment
 
 ---
 
-**Built for healthcare management excellence**
+## Technical Implementation
 
-*Last Updated: September 2025*
+### Architecture
+
+#### Models
+- **MaintenanceRequest**: Core maintenance request entity with status tracking
+- **MaintenanceVisit**: Engineer visit records with outcomes
+- **MaintenanceRequestAttachment**: File attachments with type and metadata
+- **SparePartRequest**: Spare part requests with availability status
+- **MaintenanceRequestRating**: Customer ratings for engineers
+- **Equipment**: Enhanced to support customer linking (HospitalId or CustomerId)
+
+#### Enums
+- **MaintenanceRequestStatus**: Request status enumeration
+- **MaintenanceVisitOutcome**: Visit outcome types
+- **SparePartAvailabilityStatus**: Spare part availability states
+- **AttachmentType**: File attachment types (Image, Video, Audio, Document)
+
+#### Repositories
+- **MaintenanceRequestRepository**: Request data access with custom queries
+- **MaintenanceVisitRepository**: Visit management operations
+- **MaintenanceRequestAttachmentRepository**: Attachment file management
+- **SparePartRequestRepository**: Spare part request operations
+
+#### Services
+- **MaintenanceRequestService**: 
+  - Request creation and management
+  - Auto-assignment logic based on location and workload
+  - Status tracking and updates
+- **MaintenanceVisitService**: 
+  - Visit creation and reporting
+  - Equipment data loading (QR code or serial number)
+  - Outcome processing
+- **MaintenanceAttachmentService**: 
+  - File upload handling
+  - File type validation
+  - File size limits enforcement
+  - File storage management
+- **SparePartRequestService**: 
+  - Spare part request creation
+  - Availability checking workflow
+  - Price setting and customer approval
+
+#### Controllers
+- **MaintenanceRequestController**: Request CRUD and assignment operations
+- **MaintenanceVisitController**: Visit creation and management
+- **MaintenanceAttachmentController**: File upload and management
+- **SparePartRequestController**: Spare part request operations
+
+### Key Features Implementation
+
+#### Auto-Assignment Algorithm
+```csharp
+1. Get equipment location (from hospital or customer)
+2. Find all active engineers
+3. Filter engineers by governorate matching equipment location
+4. Get current workload for each engineer (active requests count)
+5. Select engineer with least workload
+6. Assign request and notify engineer
+```
+
+#### File Upload Service
+- **Storage Location**: `wwwroot/maintenance-requests/{requestId}/attachments/`
+- **File Naming**: Unique GUID-based filenames to prevent conflicts
+- **Validation**: 
+  - File type validation based on AttachmentType
+  - File size limits per type
+  - MIME type checking
+- **Security**: File type whitelist, size limits, path validation
+
+#### QR Code Integration
+- Equipment QR codes stored in Equipment table
+- QR code scanning loads complete equipment data
+- Fallback to serial number entry if QR unavailable
+- Equipment data includes: Name, Model, Manufacturer, Purchase Date, Warranty, etc.
+
+#### Notification Integration
+- Notifications sent at each workflow step:
+  - Request creation → Maintenance Support (role group)
+  - Assignment → Engineer (individual)
+  - Visit completion → Maintenance Support (role group)
+  - Spare part request → Coordinator (role group)
+  - Price setting → Customer (individual)
+  - Part ready → Engineer (individual)
+- Uses SignalR for real-time notifications
+- Mobile push notifications for critical updates
+
+### API Endpoints
+
+#### Maintenance Requests
+- `GET /api/MaintenanceRequest` - Get all requests (role-filtered)
+- `POST /api/MaintenanceRequest` - Create new request
+- `GET /api/MaintenanceRequest/{id}` - Get request details
+- `GET /api/MaintenanceRequest/customer/{customerId}` - Get customer requests
+- `PUT /api/MaintenanceRequest/{id}/assign` - Assign to engineer
+- `PUT /api/MaintenanceRequest/{id}/status` - Update status
+
+#### Maintenance Visits
+- `POST /api/MaintenanceVisit` - Create visit
+- `GET /api/MaintenanceVisit/request/{requestId}` - Get visits for request
+- `GET /api/MaintenanceVisit/engineer/{engineerId}` - Get engineer visits
+
+#### Attachments
+- `POST /api/MaintenanceAttachment/upload` - Upload attachment
+- `GET /api/MaintenanceAttachment/{id}` - Get attachment
+- `GET /api/MaintenanceAttachment/request/{requestId}` - Get request attachments
+- `DELETE /api/MaintenanceAttachment/{id}` - Delete attachment
+
+#### Spare Parts
+- `POST /api/SparePartRequest` - Create spare part request
+- `GET /api/SparePartRequest/{id}` - Get spare part request
+- `PUT /api/SparePartRequest/{id}/check-availability` - Check availability
+- `PUT /api/SparePartRequest/{id}/set-price` - Set customer price
+- `PUT /api/SparePartRequest/{id}/customer-approval` - Customer approval/rejection
+
+### Database Design
+
+#### Key Tables
+- **MaintenanceRequests**: Core request table with status, assignment, and payment tracking
+- **MaintenanceVisits**: Visit records linked to requests
+- **MaintenanceRequestAttachments**: File attachments with metadata
+- **SparePartRequests**: Spare part requests with availability and pricing
+- **MaintenanceRequestRatings**: Customer ratings
+- **Equipment**: Enhanced with CustomerId for direct customer linking
+
+#### Relationships
+- MaintenanceRequest → Equipment (Many-to-One)
+- MaintenanceRequest → Customer (Many-to-One)
+- MaintenanceRequest → Engineer (Many-to-One, nullable)
+- MaintenanceVisit → MaintenanceRequest (Many-to-One)
+- MaintenanceRequestAttachment → MaintenanceRequest (Many-to-One)
+- SparePartRequest → MaintenanceRequest (One-to-One)
+- MaintenanceRequestRating → MaintenanceRequest (Many-to-One)
+
+#### Constraints
+- Equipment must be linked to either Hospital OR Customer (check constraint)
+- Foreign keys configured with appropriate cascade behaviors
+- Status transitions enforced at service layer
+
+### Integration Points
+
+- **Payment Module**: Payments linked to maintenance requests and spare parts
+- **Equipment Module**: Equipment data loading via QR code or serial number
+- **User Management**: Role-based access for all maintenance roles
+- **Notification System**: Real-time notifications throughout workflow
+
+### Security
+
+- **Role-Based Access**: 
+  - Customers: Create requests, view own requests, rate engineers
+  - Engineers: View assigned requests, create visits, request spare parts
+  - Maintenance Support: View all requests, assign engineers
+  - Coordinators: Check spare part availability
+  - Managers: Set prices, approve purchases
+- **File Upload Security**: File type validation, size limits, path sanitization
+- **Data Isolation**: Customers can only see their own requests
+- **Audit Trail**: Complete logging of all status changes and assignments
+
+### Performance Considerations
+
+- **Indexed Queries**: Database indexes on frequently queried fields (Status, CustomerId, EngineerId)
+- **Eager Loading**: Optimized data loading with Include statements
+- **File Storage**: Efficient file storage with organized directory structure
+- **Caching**: Strategic caching for equipment data and engineer lists
+
+### Future Enhancements
+
+- Scheduled maintenance reminders
+- Maintenance history analytics
+- Predictive maintenance based on equipment age and usage
+- Integration with inventory management system
+- Mobile app optimizations for field engineers
+
