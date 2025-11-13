@@ -86,42 +86,41 @@ namespace SoitMed.Services
             var salesmen = await _unitOfWork.Users.GetUsersInRoleAsync("Salesman");
             var (startDate, endDate) = GetDateRangeForPeriod(year, quarter);
 
-            // Use bulk query instead of per-salesman queries for better performance
+            // Use bulk queries for better performance - fetch all data at once
             var context = _unitOfWork.GetContext();
             var salesmanIds = salesmen.Select(s => s.Id).ToList();
 
+            // Fetch all visits, offers, and deals for all salesmen in one query each
+            var allVisits = await context.TaskProgresses
+                .AsNoTracking()
+                .Where(tp => salesmanIds.Contains(tp.EmployeeId)
+                    && tp.ProgressDate >= startDate
+                    && tp.ProgressDate < endDate
+                    && !string.IsNullOrEmpty(tp.VisitResult))
+                .ToListAsync();
+
+            var allOffers = await context.SalesOffers
+                .AsNoTracking()
+                .Where(o => salesmanIds.Contains(o.AssignedTo)
+                    && o.CreatedAt >= startDate
+                    && o.CreatedAt < endDate)
+                .ToListAsync();
+
+            var allDeals = await context.SalesDeals
+                .AsNoTracking()
+                .Where(d => salesmanIds.Contains(d.SalesmanId)
+                    && d.CreatedAt >= startDate
+                    && d.CreatedAt < endDate)
+                .ToListAsync();
+
+            // Process statistics for each salesman from in-memory data
             var statistics = new List<SalesmanStatisticsDTO>();
 
             foreach (var salesman in salesmen)
             {
-                // Parallel database queries for each salesman
-                var visitsTask = context.TaskProgresses
-                    .AsNoTracking()
-                    .Where(tp => tp.EmployeeId == salesman.Id
-                        && tp.ProgressDate >= startDate
-                        && tp.ProgressDate < endDate
-                        && !string.IsNullOrEmpty(tp.VisitResult))
-                    .ToListAsync();
-
-                var offersTask = context.SalesOffers
-                    .AsNoTracking()
-                    .Where(o => o.AssignedTo == salesman.Id
-                        && o.CreatedAt >= startDate
-                        && o.CreatedAt < endDate)
-                    .ToListAsync();
-
-                var dealsTask = context.SalesDeals
-                    .AsNoTracking()
-                    .Where(d => d.SalesmanId == salesman.Id
-                        && d.CreatedAt >= startDate
-                        && d.CreatedAt < endDate)
-                    .ToListAsync();
-
-                await Task.WhenAll(visitsTask, offersTask, dealsTask);
-
-                var visits = await visitsTask;
-                var offers = await offersTask;
-                var deals = await dealsTask;
+                var visits = allVisits.Where(v => v.EmployeeId == salesman.Id).ToList();
+                var offers = allOffers.Where(o => o.AssignedTo == salesman.Id).ToList();
+                var deals = allDeals.Where(d => d.SalesmanId == salesman.Id).ToList();
 
                 var totalVisits = visits.Count;
                 var successfulVisits = visits.Count(v => v.VisitResult == "Interested");
@@ -162,34 +161,45 @@ namespace SoitMed.Services
 
         #region Targets
 
-        public async Task<SalesmanTargetDTO> CreateTargetAsync(CreateSalesmanTargetDTO dto, string managerId)
+        public async Task<SalesmanTargetDTO> CreateTargetAsync(CreateSalesmanTargetDTO dto, string? managerId, string? salesmanId = null)
         {
+            // Validate target type and permissions
+            if (dto.TargetType == TargetType.Money && string.IsNullOrEmpty(managerId))
+                throw new UnauthorizedAccessException("Money targets can only be set by managers");
+            
+            if (dto.TargetType == TargetType.Activity && string.IsNullOrEmpty(salesmanId))
+                throw new UnauthorizedAccessException("Activity targets must be set by the salesman");
+
             // Validate salesman exists if individual target
-            if (!dto.IsTeamTarget && !string.IsNullOrEmpty(dto.SalesmanId))
+            var targetSalesmanId = dto.TargetType == TargetType.Activity ? salesmanId : dto.SalesmanId;
+            if (!dto.IsTeamTarget && !string.IsNullOrEmpty(targetSalesmanId))
             {
-                var salesman = await _unitOfWork.Users.GetByIdAsync(dto.SalesmanId);
+                var salesman = await _unitOfWork.Users.GetByIdAsync(targetSalesmanId);
                 if (salesman == null)
-                    throw new ArgumentException("Salesman not found", nameof(dto.SalesmanId));
+                    throw new ArgumentException("Salesman not found", nameof(targetSalesmanId));
             }
 
-            // Check if target already exists for this period
-            var existingTarget = await _unitOfWork.SalesmanTargets.GetTargetBySalesmanAndPeriodAsync(
-                dto.SalesmanId, dto.Year, dto.Quarter);
-
+            // Check if target already exists for this period and type
+            var existingTargets = await _unitOfWork.SalesmanTargets.GetTargetsBySalesmanAsync(
+                targetSalesmanId, dto.Year, dto.Quarter);
+            
+            var existingTarget = existingTargets.FirstOrDefault(t => t.TargetType == dto.TargetType);
             if (existingTarget != null)
-                throw new InvalidOperationException("Target already exists for this period");
+                throw new InvalidOperationException($"Target of type {dto.TargetType} already exists for this period");
 
             var target = new SalesmanTarget
             {
-                SalesmanId = dto.SalesmanId,
-                CreatedByManagerId = managerId,
+                SalesmanId = targetSalesmanId,
+                TargetType = dto.TargetType,
+                CreatedByManagerId = dto.TargetType == TargetType.Money ? managerId : null,
                 Year = dto.Year,
                 Quarter = dto.Quarter,
-                TargetVisits = dto.TargetVisits,
-                TargetSuccessfulVisits = dto.TargetSuccessfulVisits,
-                TargetOffers = dto.TargetOffers,
-                TargetDeals = dto.TargetDeals,
+                TargetVisits = dto.TargetVisits ?? 0,
+                TargetSuccessfulVisits = dto.TargetSuccessfulVisits ?? 0,
+                TargetOffers = dto.TargetOffers ?? 0,
+                TargetDeals = dto.TargetDeals ?? 0,
                 TargetOfferAcceptanceRate = dto.TargetOfferAcceptanceRate,
+                TargetRevenue = dto.TargetRevenue,
                 IsTeamTarget = dto.IsTeamTarget,
                 Notes = dto.Notes
             };
@@ -197,7 +207,19 @@ namespace SoitMed.Services
             await _unitOfWork.SalesmanTargets.CreateAsync(target);
             await _unitOfWork.SaveChangesAsync();
 
-            var manager = await _unitOfWork.Users.GetByIdAsync(managerId);
+            ApplicationUser? creator = null;
+            string? createdByName = null;
+            
+            if (dto.TargetType == TargetType.Money && !string.IsNullOrEmpty(managerId))
+            {
+                creator = await _unitOfWork.Users.GetByIdAsync(managerId);
+                createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
+            }
+            else if (dto.TargetType == TargetType.Activity && !string.IsNullOrEmpty(salesmanId))
+            {
+                creator = await _unitOfWork.Users.GetByIdAsync(salesmanId);
+                createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
+            }
 
             return new SalesmanTargetDTO
             {
@@ -208,37 +230,87 @@ namespace SoitMed.Services
                     : "Team",
                 Year = target.Year,
                 Quarter = target.Quarter,
+                TargetType = target.TargetType,
                 TargetVisits = target.TargetVisits,
                 TargetSuccessfulVisits = target.TargetSuccessfulVisits,
                 TargetOffers = target.TargetOffers,
                 TargetDeals = target.TargetDeals,
                 TargetOfferAcceptanceRate = target.TargetOfferAcceptanceRate,
+                TargetRevenue = target.TargetRevenue,
                 IsTeamTarget = target.IsTeamTarget,
                 Notes = target.Notes,
                 CreatedAt = target.CreatedAt,
-                CreatedByManagerName = manager != null 
-                    ? $"{manager.FirstName} {manager.LastName}" 
-                    : "Unknown"
+                CreatedByManagerName = dto.TargetType == TargetType.Money ? createdByName : null,
+                CreatedBySalesmanName = dto.TargetType == TargetType.Activity ? createdByName : null
             };
         }
 
-        public async Task<SalesmanTargetDTO> UpdateTargetAsync(long targetId, CreateSalesmanTargetDTO dto)
+        public async Task<SalesmanTargetDTO> UpdateTargetAsync(long targetId, CreateSalesmanTargetDTO dto, string? currentUserId = null)
         {
             var target = await _unitOfWork.SalesmanTargets.GetByIdAsync(targetId);
             if (target == null)
                 throw new ArgumentException("Target not found", nameof(targetId));
 
-            target.TargetVisits = dto.TargetVisits;
-            target.TargetSuccessfulVisits = dto.TargetSuccessfulVisits;
-            target.TargetOffers = dto.TargetOffers;
-            target.TargetDeals = dto.TargetDeals;
-            target.TargetOfferAcceptanceRate = dto.TargetOfferAcceptanceRate;
-            target.Notes = dto.Notes;
+            // Validate permissions
+            if (target.TargetType == TargetType.Money)
+            {
+                if (string.IsNullOrEmpty(currentUserId))
+                    throw new UnauthorizedAccessException("Money targets can only be updated by managers");
+                
+                // Check if user is a manager (additional validation could be added here)
+            }
+            
+            if (target.TargetType == TargetType.Activity)
+            {
+                if (string.IsNullOrEmpty(currentUserId))
+                    throw new UnauthorizedAccessException("You must be logged in to update activity targets");
+                
+                if (string.IsNullOrEmpty(target.SalesmanId))
+                    throw new UnauthorizedAccessException("This activity target is not associated with a salesman");
+                
+                if (target.SalesmanId != currentUserId)
+                    throw new UnauthorizedAccessException("Activity targets can only be updated by the salesman who created them");
+            }
+
+            // Don't allow changing target type (only check if TargetType is explicitly set)
+            if (dto.TargetType != 0 && target.TargetType != dto.TargetType)
+                throw new InvalidOperationException("Cannot change target type");
+
+            // Only update fields that are provided (for PATCH support)
+            // Nullable int fields: null means field not provided, value means update
+            if (dto.TargetVisits.HasValue)
+                target.TargetVisits = dto.TargetVisits.Value;
+            if (dto.TargetSuccessfulVisits.HasValue)
+                target.TargetSuccessfulVisits = dto.TargetSuccessfulVisits.Value;
+            if (dto.TargetOffers.HasValue)
+                target.TargetOffers = dto.TargetOffers.Value;
+            if (dto.TargetDeals.HasValue)
+                target.TargetDeals = dto.TargetDeals.Value;
+            
+            // For nullable fields, only update if provided
+            if (dto.TargetOfferAcceptanceRate.HasValue)
+                target.TargetOfferAcceptanceRate = dto.TargetOfferAcceptanceRate;
+            if (dto.TargetRevenue.HasValue)
+                target.TargetRevenue = dto.TargetRevenue;
+            if (dto.Notes != null)
+                target.Notes = dto.Notes;
 
             await _unitOfWork.SalesmanTargets.UpdateAsync(target);
             await _unitOfWork.SaveChangesAsync();
 
-            var manager = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
+            ApplicationUser? creator = null;
+            string? createdByName = null;
+            
+            if (target.TargetType == TargetType.Money && !string.IsNullOrEmpty(target.CreatedByManagerId))
+            {
+                creator = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
+                createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
+            }
+            else if (target.TargetType == TargetType.Activity && !string.IsNullOrEmpty(target.SalesmanId))
+            {
+                creator = await _unitOfWork.Users.GetByIdAsync(target.SalesmanId);
+                createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
+            }
 
             return new SalesmanTargetDTO
             {
@@ -249,17 +321,18 @@ namespace SoitMed.Services
                     : "Team",
                 Year = target.Year,
                 Quarter = target.Quarter,
+                TargetType = target.TargetType,
                 TargetVisits = target.TargetVisits,
                 TargetSuccessfulVisits = target.TargetSuccessfulVisits,
                 TargetOffers = target.TargetOffers,
                 TargetDeals = target.TargetDeals,
                 TargetOfferAcceptanceRate = target.TargetOfferAcceptanceRate,
+                TargetRevenue = target.TargetRevenue,
                 IsTeamTarget = target.IsTeamTarget,
                 Notes = target.Notes,
                 CreatedAt = target.CreatedAt,
-                CreatedByManagerName = manager != null 
-                    ? $"{manager.FirstName} {manager.LastName}" 
-                    : "Unknown"
+                CreatedByManagerName = target.TargetType == TargetType.Money ? createdByName : null,
+                CreatedBySalesmanName = target.TargetType == TargetType.Activity ? createdByName : null
             };
         }
 
@@ -280,7 +353,19 @@ namespace SoitMed.Services
             if (target == null)
                 return null;
 
-            var manager = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
+            ApplicationUser? creator = null;
+            string? createdByName = null;
+            
+            if (target.TargetType == TargetType.Money && !string.IsNullOrEmpty(target.CreatedByManagerId))
+            {
+                creator = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
+                createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
+            }
+            else if (target.TargetType == TargetType.Activity && !string.IsNullOrEmpty(target.SalesmanId))
+            {
+                creator = await _unitOfWork.Users.GetByIdAsync(target.SalesmanId);
+                createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
+            }
 
             return new SalesmanTargetDTO
             {
@@ -291,17 +376,18 @@ namespace SoitMed.Services
                     : "Team",
                 Year = target.Year,
                 Quarter = target.Quarter,
+                TargetType = target.TargetType,
                 TargetVisits = target.TargetVisits,
                 TargetSuccessfulVisits = target.TargetSuccessfulVisits,
                 TargetOffers = target.TargetOffers,
                 TargetDeals = target.TargetDeals,
                 TargetOfferAcceptanceRate = target.TargetOfferAcceptanceRate,
+                TargetRevenue = target.TargetRevenue,
                 IsTeamTarget = target.IsTeamTarget,
                 Notes = target.Notes,
                 CreatedAt = target.CreatedAt,
-                CreatedByManagerName = manager != null 
-                    ? $"{manager.FirstName} {manager.LastName}" 
-                    : "Unknown"
+                CreatedByManagerName = target.TargetType == TargetType.Money ? createdByName : null,
+                CreatedBySalesmanName = target.TargetType == TargetType.Activity ? createdByName : null
             };
         }
 
@@ -312,7 +398,20 @@ namespace SoitMed.Services
 
             foreach (var target in targets)
             {
-                var manager = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
+                ApplicationUser? creator = null;
+                string? createdByName = null;
+                
+                if (target.TargetType == TargetType.Money && !string.IsNullOrEmpty(target.CreatedByManagerId))
+                {
+                    creator = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
+                    createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
+                }
+                else if (target.TargetType == TargetType.Activity && !string.IsNullOrEmpty(target.SalesmanId))
+                {
+                    creator = await _unitOfWork.Users.GetByIdAsync(target.SalesmanId);
+                    createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
+                }
+
                 result.Add(new SalesmanTargetDTO
                 {
                     Id = target.Id,
@@ -322,17 +421,18 @@ namespace SoitMed.Services
                         : "Team",
                     Year = target.Year,
                     Quarter = target.Quarter,
+                    TargetType = target.TargetType,
                     TargetVisits = target.TargetVisits,
                     TargetSuccessfulVisits = target.TargetSuccessfulVisits,
                     TargetOffers = target.TargetOffers,
                     TargetDeals = target.TargetDeals,
                     TargetOfferAcceptanceRate = target.TargetOfferAcceptanceRate,
+                    TargetRevenue = target.TargetRevenue,
                     IsTeamTarget = target.IsTeamTarget,
                     Notes = target.Notes,
                     CreatedAt = target.CreatedAt,
-                    CreatedByManagerName = manager != null 
-                        ? $"{manager.FirstName} {manager.LastName}" 
-                        : "Unknown"
+                    CreatedByManagerName = target.TargetType == TargetType.Money ? createdByName : null,
+                    CreatedBySalesmanName = target.TargetType == TargetType.Activity ? createdByName : null
                 });
             }
 
@@ -345,7 +445,14 @@ namespace SoitMed.Services
             if (target == null)
                 return null;
 
-            var manager = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
+            ApplicationUser? creator = null;
+            string? createdByName = null;
+            
+            if (target.TargetType == TargetType.Money && !string.IsNullOrEmpty(target.CreatedByManagerId))
+            {
+                creator = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
+                createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
+            }
 
             return new SalesmanTargetDTO
             {
@@ -354,17 +461,18 @@ namespace SoitMed.Services
                 SalesmanName = "Team",
                 Year = target.Year,
                 Quarter = target.Quarter,
+                TargetType = target.TargetType,
                 TargetVisits = target.TargetVisits,
                 TargetSuccessfulVisits = target.TargetSuccessfulVisits,
                 TargetOffers = target.TargetOffers,
                 TargetDeals = target.TargetDeals,
                 TargetOfferAcceptanceRate = target.TargetOfferAcceptanceRate,
+                TargetRevenue = target.TargetRevenue,
                 IsTeamTarget = target.IsTeamTarget,
                 Notes = target.Notes,
                 CreatedAt = target.CreatedAt,
-                CreatedByManagerName = manager != null 
-                    ? $"{manager.FirstName} {manager.LastName}" 
-                    : "Unknown"
+                CreatedByManagerName = target.TargetType == TargetType.Money ? createdByName : null,
+                CreatedBySalesmanName = null
             };
         }
 
@@ -376,94 +484,161 @@ namespace SoitMed.Services
         {
             var statistics = await GetStatisticsAsync(salesmanId, year, quarter);
             var individualTargets = await _unitOfWork.SalesmanTargets.GetTargetsBySalesmanAsync(salesmanId, year, quarter);
-            var teamTarget = await _unitOfWork.SalesmanTargets.GetTeamTargetAsync(year, quarter);
+            var allTargets = await _unitOfWork.SalesmanTargets.GetAllTargetsForPeriodAsync(year, quarter);
+            var teamTargets = allTargets.Where(t => t.IsTeamTarget).ToList();
 
-            var individualTarget = individualTargets.FirstOrDefault();
+            var individualMoneyTarget = individualTargets.FirstOrDefault(t => t.TargetType == TargetType.Money);
+            var individualActivityTarget = individualTargets.FirstOrDefault(t => t.TargetType == TargetType.Activity);
+            var teamMoneyTarget = teamTargets.FirstOrDefault(t => t.TargetType == TargetType.Money);
+            var teamActivityTarget = teamTargets.FirstOrDefault(t => t.TargetType == TargetType.Activity);
             
             // Convert to DTOs
-            SalesmanTargetDTO? individualTargetDto = null;
-            if (individualTarget != null)
+            SalesmanTargetDTO? individualMoneyTargetDto = null;
+            if (individualMoneyTarget != null)
             {
-                var manager = await _unitOfWork.Users.GetByIdAsync(individualTarget.CreatedByManagerId);
-                individualTargetDto = new SalesmanTargetDTO
+                var manager = await _unitOfWork.Users.GetByIdAsync(individualMoneyTarget.CreatedByManagerId);
+                individualMoneyTargetDto = new SalesmanTargetDTO
                 {
-                    Id = individualTarget.Id,
-                    SalesmanId = individualTarget.SalesmanId,
+                    Id = individualMoneyTarget.Id,
+                    SalesmanId = individualMoneyTarget.SalesmanId,
                     SalesmanName = "Individual",
-                    Year = individualTarget.Year,
-                    Quarter = individualTarget.Quarter,
-                    TargetVisits = individualTarget.TargetVisits,
-                    TargetSuccessfulVisits = individualTarget.TargetSuccessfulVisits,
-                    TargetOffers = individualTarget.TargetOffers,
-                    TargetDeals = individualTarget.TargetDeals,
-                    TargetOfferAcceptanceRate = individualTarget.TargetOfferAcceptanceRate,
-                    IsTeamTarget = individualTarget.IsTeamTarget,
-                    Notes = individualTarget.Notes,
-                    CreatedAt = individualTarget.CreatedAt,
+                    Year = individualMoneyTarget.Year,
+                    Quarter = individualMoneyTarget.Quarter,
+                    TargetType = individualMoneyTarget.TargetType,
+                    TargetVisits = individualMoneyTarget.TargetVisits,
+                    TargetSuccessfulVisits = individualMoneyTarget.TargetSuccessfulVisits,
+                    TargetOffers = individualMoneyTarget.TargetOffers,
+                    TargetDeals = individualMoneyTarget.TargetDeals,
+                    TargetOfferAcceptanceRate = individualMoneyTarget.TargetOfferAcceptanceRate,
+                    TargetRevenue = individualMoneyTarget.TargetRevenue,
+                    IsTeamTarget = individualMoneyTarget.IsTeamTarget,
+                    Notes = individualMoneyTarget.Notes,
+                    CreatedAt = individualMoneyTarget.CreatedAt,
                     CreatedByManagerName = manager != null 
                         ? $"{manager.FirstName} {manager.LastName}" 
                         : "Unknown"
                 };
             }
 
-            SalesmanTargetDTO? teamTargetDto = null;
-            if (teamTarget != null)
+            SalesmanTargetDTO? individualActivityTargetDto = null;
+            if (individualActivityTarget != null)
             {
-                var manager = await _unitOfWork.Users.GetByIdAsync(teamTarget.CreatedByManagerId);
-                teamTargetDto = new SalesmanTargetDTO
+                var salesman = await _unitOfWork.Users.GetByIdAsync(individualActivityTarget.SalesmanId);
+                individualActivityTargetDto = new SalesmanTargetDTO
                 {
-                    Id = teamTarget.Id,
-                    SalesmanId = teamTarget.SalesmanId,
+                    Id = individualActivityTarget.Id,
+                    SalesmanId = individualActivityTarget.SalesmanId,
+                    SalesmanName = "Individual",
+                    Year = individualActivityTarget.Year,
+                    Quarter = individualActivityTarget.Quarter,
+                    TargetType = individualActivityTarget.TargetType,
+                    TargetVisits = individualActivityTarget.TargetVisits,
+                    TargetSuccessfulVisits = individualActivityTarget.TargetSuccessfulVisits,
+                    TargetOffers = individualActivityTarget.TargetOffers,
+                    TargetDeals = individualActivityTarget.TargetDeals,
+                    TargetOfferAcceptanceRate = individualActivityTarget.TargetOfferAcceptanceRate,
+                    TargetRevenue = individualActivityTarget.TargetRevenue,
+                    IsTeamTarget = individualActivityTarget.IsTeamTarget,
+                    Notes = individualActivityTarget.Notes,
+                    CreatedAt = individualActivityTarget.CreatedAt,
+                    CreatedBySalesmanName = salesman != null 
+                        ? $"{salesman.FirstName} {salesman.LastName}" 
+                        : "Unknown"
+                };
+            }
+
+            SalesmanTargetDTO? teamMoneyTargetDto = null;
+            if (teamMoneyTarget != null)
+            {
+                var manager = await _unitOfWork.Users.GetByIdAsync(teamMoneyTarget.CreatedByManagerId);
+                teamMoneyTargetDto = new SalesmanTargetDTO
+                {
+                    Id = teamMoneyTarget.Id,
+                    SalesmanId = teamMoneyTarget.SalesmanId,
                     SalesmanName = "Team",
-                    Year = teamTarget.Year,
-                    Quarter = teamTarget.Quarter,
-                    TargetVisits = teamTarget.TargetVisits,
-                    TargetSuccessfulVisits = teamTarget.TargetSuccessfulVisits,
-                    TargetOffers = teamTarget.TargetOffers,
-                    TargetDeals = teamTarget.TargetDeals,
-                    TargetOfferAcceptanceRate = teamTarget.TargetOfferAcceptanceRate,
-                    IsTeamTarget = teamTarget.IsTeamTarget,
-                    Notes = teamTarget.Notes,
-                    CreatedAt = teamTarget.CreatedAt,
+                    Year = teamMoneyTarget.Year,
+                    Quarter = teamMoneyTarget.Quarter,
+                    TargetType = teamMoneyTarget.TargetType,
+                    TargetVisits = teamMoneyTarget.TargetVisits,
+                    TargetSuccessfulVisits = teamMoneyTarget.TargetSuccessfulVisits,
+                    TargetOffers = teamMoneyTarget.TargetOffers,
+                    TargetDeals = teamMoneyTarget.TargetDeals,
+                    TargetOfferAcceptanceRate = teamMoneyTarget.TargetOfferAcceptanceRate,
+                    TargetRevenue = teamMoneyTarget.TargetRevenue,
+                    IsTeamTarget = teamMoneyTarget.IsTeamTarget,
+                    Notes = teamMoneyTarget.Notes,
+                    CreatedAt = teamMoneyTarget.CreatedAt,
                     CreatedByManagerName = manager != null 
                         ? $"{manager.FirstName} {manager.LastName}" 
                         : "Unknown"
                 };
             }
 
-            // Calculate progress based on individual target if available, otherwise team target
-            var targetToUse = individualTargetDto ?? teamTargetDto;
+            SalesmanTargetDTO? teamActivityTargetDto = null;
+            if (teamActivityTarget != null)
+            {
+                teamActivityTargetDto = new SalesmanTargetDTO
+                {
+                    Id = teamActivityTarget.Id,
+                    SalesmanId = teamActivityTarget.SalesmanId,
+                    SalesmanName = "Team",
+                    Year = teamActivityTarget.Year,
+                    Quarter = teamActivityTarget.Quarter,
+                    TargetType = teamActivityTarget.TargetType,
+                    TargetVisits = teamActivityTarget.TargetVisits,
+                    TargetSuccessfulVisits = teamActivityTarget.TargetSuccessfulVisits,
+                    TargetOffers = teamActivityTarget.TargetOffers,
+                    TargetDeals = teamActivityTarget.TargetDeals,
+                    TargetOfferAcceptanceRate = teamActivityTarget.TargetOfferAcceptanceRate,
+                    TargetRevenue = teamActivityTarget.TargetRevenue,
+                    IsTeamTarget = teamActivityTarget.IsTeamTarget,
+                    Notes = teamActivityTarget.Notes,
+                    CreatedAt = teamActivityTarget.CreatedAt,
+                    CreatedBySalesmanName = null
+                };
+            }
+
+            // Calculate progress based on individual activity target if available, otherwise team activity target
+            var activityTargetToUse = individualActivityTargetDto ?? teamActivityTargetDto;
+            var moneyTargetToUse = individualMoneyTargetDto ?? teamMoneyTargetDto;
             
-            var visitsProgress = targetToUse != null && targetToUse.TargetVisits > 0 
-                ? (decimal)statistics.TotalVisits / targetToUse.TargetVisits * 100 
+            var visitsProgress = activityTargetToUse != null && activityTargetToUse.TargetVisits > 0 
+                ? (decimal)statistics.TotalVisits / activityTargetToUse.TargetVisits * 100 
                 : 0;
 
-            var successfulVisitsProgress = targetToUse != null && targetToUse.TargetSuccessfulVisits > 0 
-                ? (decimal)statistics.SuccessfulVisits / targetToUse.TargetSuccessfulVisits * 100 
+            var successfulVisitsProgress = activityTargetToUse != null && activityTargetToUse.TargetSuccessfulVisits > 0 
+                ? (decimal)statistics.SuccessfulVisits / activityTargetToUse.TargetSuccessfulVisits * 100 
                 : 0;
 
-            var offersProgress = targetToUse != null && targetToUse.TargetOffers > 0 
-                ? (decimal)statistics.TotalOffers / targetToUse.TargetOffers * 100 
+            var offersProgress = activityTargetToUse != null && activityTargetToUse.TargetOffers > 0 
+                ? (decimal)statistics.TotalOffers / activityTargetToUse.TargetOffers * 100 
                 : 0;
 
-            var dealsProgress = targetToUse != null && targetToUse.TargetDeals > 0 
-                ? (decimal)statistics.TotalDeals / targetToUse.TargetDeals * 100 
+            var dealsProgress = activityTargetToUse != null && activityTargetToUse.TargetDeals > 0 
+                ? (decimal)statistics.TotalDeals / activityTargetToUse.TargetDeals * 100 
                 : 0;
 
-            var acceptanceRateProgress = targetToUse != null && targetToUse.TargetOfferAcceptanceRate != null && targetToUse.TargetOfferAcceptanceRate > 0
-                ? statistics.OfferAcceptanceRate / targetToUse.TargetOfferAcceptanceRate * 100
+            var acceptanceRateProgress = activityTargetToUse != null && activityTargetToUse.TargetOfferAcceptanceRate != null && activityTargetToUse.TargetOfferAcceptanceRate > 0
+                ? statistics.OfferAcceptanceRate / activityTargetToUse.TargetOfferAcceptanceRate * 100
+                : null;
+
+            decimal? revenueProgress = moneyTargetToUse != null && moneyTargetToUse.TargetRevenue.HasValue && moneyTargetToUse.TargetRevenue.Value > 0
+                ? (decimal?)(statistics.TotalDealValue / moneyTargetToUse.TargetRevenue.Value * 100)
                 : null;
 
             return new SalesmanProgressDTO
             {
                 CurrentStatistics = statistics,
-                IndividualTarget = individualTargetDto,
-                TeamTarget = teamTargetDto,
+                IndividualMoneyTarget = individualMoneyTargetDto,
+                IndividualActivityTarget = individualActivityTargetDto,
+                TeamMoneyTarget = teamMoneyTargetDto,
+                TeamActivityTarget = teamActivityTargetDto,
                 VisitsProgress = Math.Min(visitsProgress, 100),
                 SuccessfulVisitsProgress = Math.Min(successfulVisitsProgress, 100),
                 OffersProgress = Math.Min(offersProgress, 100),
                 DealsProgress = Math.Min(dealsProgress, 100),
-                OfferAcceptanceRateProgress = acceptanceRateProgress.HasValue ? Math.Min(acceptanceRateProgress.Value, 100) : null
+                OfferAcceptanceRateProgress = acceptanceRateProgress.HasValue ? Math.Min(acceptanceRateProgress.Value, 100) : null,
+                RevenueProgress = revenueProgress.HasValue ? Math.Min(revenueProgress.Value, 100) : null
             };
         }
 

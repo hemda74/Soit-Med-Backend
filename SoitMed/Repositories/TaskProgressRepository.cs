@@ -140,16 +140,7 @@ namespace SoitMed.Repositories
                 .FirstOrDefaultAsync(tp => tp.Id == progressId);
         }
 
-        public async Task<List<TaskProgress>> GetProgressesBySatisfactionRatingAsync(int minRating, int maxRating)
-        {
-            return await _context.TaskProgresses
-                .AsNoTracking()
-                .Where(tp => tp.SatisfactionRating.HasValue &&
-                           tp.SatisfactionRating.Value >= minRating &&
-                           tp.SatisfactionRating.Value <= maxRating)
-                .OrderByDescending(tp => tp.SatisfactionRating)
-                .ToListAsync();
-        }
+       
 
         public async Task<int> GetProgressCountByEmployeeAsync(string employeeId, DateTime? startDate, DateTime? endDate)
         {
@@ -173,20 +164,7 @@ namespace SoitMed.Repositories
                 .CountAsync(tp => tp.ClientId == clientId);
         }
 
-        public async Task<double> GetAverageSatisfactionRatingByEmployeeAsync(string employeeId, DateTime? startDate, DateTime? endDate)
-        {
-            var query = _context.TaskProgresses
-                .AsNoTracking()
-                .Where(tp => tp.EmployeeId == employeeId && tp.SatisfactionRating.HasValue);
-
-            if (startDate.HasValue)
-                query = query.Where(tp => tp.ProgressDate >= startDate.Value);
-
-            if (endDate.HasValue)
-                query = query.Where(tp => tp.ProgressDate <= endDate.Value);
-
-            return await query.AverageAsync(tp => tp.SatisfactionRating!.Value);
-        }
+      
 
         public async Task<List<TaskProgress>> GetRecentProgressesAsync(int count)
         {
@@ -202,7 +180,7 @@ namespace SoitMed.Repositories
             return await _context.TaskProgresses
                 .AsNoTracking()
                 .Include(tp => tp.Task)
-                .Where(tp => tp.Task.Status == taskStatus)
+                // Status removed from Task - now tracked through progress existence
                 .OrderByDescending(tp => tp.ProgressDate)
                 .ToListAsync();
         }

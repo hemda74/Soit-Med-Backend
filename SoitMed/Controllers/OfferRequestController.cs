@@ -117,7 +117,8 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
-        /// Assign offer request to sales support
+        /// Reassign offer request to another SalesSupport member (if needed)
+        /// Note: Requests are automatically assigned to SalesSupport when created
         /// </summary>
         [HttpPut("{id}/assign")]
         [Authorize(Roles = "SalesManager,SalesSupport,SuperAdmin")]
@@ -133,7 +134,7 @@ namespace SoitMed.Controllers
                 var userId = GetCurrentUserId();
                 var result = await _offerRequestService.AssignToSupportAsync(id, assignDto.AssignedTo, userId);
 
-                return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer request assigned successfully"));
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer request reassigned successfully"));
             }
             catch (ArgumentException ex)
             {

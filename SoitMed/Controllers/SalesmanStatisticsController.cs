@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using SoitMed.Common;
 using SoitMed.DTO;
+using SoitMed.Models;
 using SoitMed.Models.Identity;
 using SoitMed.Services;
 
@@ -146,9 +147,11 @@ namespace SoitMed.Controllers
 
         /// <summary>
         /// Create a new target for a salesman or team
+        /// Money targets: SalesManager only
+        /// Activity targets: Salesman can set for themselves
         /// </summary>
         [HttpPost("targets")]
-        [Authorize(Roles = "SalesManager")]
+        [Authorize(Roles = "SalesManager,Salesman")]
         public async Task<IActionResult> CreateTarget([FromBody] CreateSalesmanTargetDTO dto)
         {
             try
@@ -158,9 +161,67 @@ namespace SoitMed.Controllers
                     return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
                 }
 
-                var managerId = GetCurrentUserId();
-                var result = await _statisticsService.CreateTargetAsync(dto, managerId);
+                var currentUserId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(currentUserId))
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("User not authenticated"));
+                
+                var user = await GetCurrentUserAsync();
+                if (user == null)
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("User not found"));
+                
+                var userRoles = await UserManager.GetRolesAsync(user);
+                var isManager = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin");
+                var isSalesman = userRoles.Contains("Salesman");
+
+                // Log for debugging
+                _logger.LogInformation("CreateTarget - UserId: {UserId}, UserName: {UserName}, Roles: [{Roles}], TargetType: {TargetType}, IsManager: {IsManager}, IsSalesman: {IsSalesman}",
+                    currentUserId, user.UserName, string.Join(", ", userRoles), dto.TargetType, isManager, isSalesman);
+
+                string? managerId = null;
+                string? salesmanId = null;
+
+                if (dto.TargetType == TargetType.Money)
+                {
+                    if (!isManager)
+                    {
+                        _logger.LogWarning("User {UserId} attempted to create money target but is not a manager. Roles: {Roles}", 
+                            currentUserId, string.Join(",", userRoles));
+                        return StatusCode(403, ResponseHelper.CreateErrorResponse("Only managers can create money targets"));
+                    }
+                    managerId = currentUserId;
+                }
+                else if (dto.TargetType == TargetType.Activity)
+                {
+                    if (!isSalesman)
+                    {
+                        _logger.LogWarning("User {UserId} attempted to create activity target but is not a salesman. Roles: {Roles}", 
+                            currentUserId, string.Join(",", userRoles));
+                        return StatusCode(403, ResponseHelper.CreateErrorResponse($"Only salesmen can create activity targets. Your roles: {string.Join(", ", userRoles)}"));
+                    }
+                    
+                    // Salesman can only set targets for themselves (not team targets)
+                    // Ignore dto.SalesmanId from client - always use current user's ID for security
+                    if (!dto.IsTeamTarget)
+                    {
+                        // Force salesmanId to be the current user for individual targets
+                        salesmanId = currentUserId;
+                        dto.SalesmanId = currentUserId;
+                    }
+                    else
+                    {
+                        // For team targets, salesmanId should be null
+                        salesmanId = null;
+                        dto.SalesmanId = null;
+                    }
+                }
+
+                var result = await _statisticsService.CreateTargetAsync(dto, managerId, salesmanId);
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Target created successfully"));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized target creation: {Message}", ex.Message);
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
             }
             catch (ArgumentException ex)
             {
@@ -181,9 +242,11 @@ namespace SoitMed.Controllers
 
         /// <summary>
         /// Update an existing target
+        /// Money targets: SalesManager only
+        /// Activity targets: Salesman can update their own
         /// </summary>
         [HttpPut("targets/{targetId}")]
-        [Authorize(Roles = "SalesManager")]
+        [Authorize(Roles = "SalesManager,Salesman")]
         public async Task<IActionResult> UpdateTarget(long targetId, [FromBody] CreateSalesmanTargetDTO dto)
         {
             try
@@ -193,8 +256,46 @@ namespace SoitMed.Controllers
                     return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
                 }
 
-                var result = await _statisticsService.UpdateTargetAsync(targetId, dto);
+                var currentUserId = GetCurrentUserId();
+                var result = await _statisticsService.UpdateTargetAsync(targetId, dto, currentUserId);
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Target updated successfully"));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized target update: {Message}", ex.Message);
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Target not found");
+                return NotFound(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating target {TargetId}", targetId);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while updating target"));
+            }
+        }
+
+        /// <summary>
+        /// Partially update an existing target (PATCH)
+        /// Money targets: SalesManager only
+        /// Activity targets: Salesman can update their own
+        /// </summary>
+        [HttpPatch("targets/{targetId}")]
+        [Authorize(Roles = "SalesManager,Salesman")]
+        public async Task<IActionResult> PatchTarget(long targetId, [FromBody] CreateSalesmanTargetDTO dto)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var result = await _statisticsService.UpdateTargetAsync(targetId, dto, currentUserId);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Target updated successfully"));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized target update: {Message}", ex.Message);
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
             }
             catch (ArgumentException ex)
             {

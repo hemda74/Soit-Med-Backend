@@ -5,7 +5,22 @@ using SoitMed.Models.Identity;
 namespace SoitMed.Models
 {
     /// <summary>
-    /// Represents targets set by managers for individual salesmen or the entire team
+    /// Type of target: Money targets are set by managers, Activity targets (visits/offers/deals) are set by salesmen themselves
+    /// </summary>
+    public enum TargetType
+    {
+        /// <summary>
+        /// Money/revenue target set by manager
+        /// </summary>
+        Money = 1,
+        /// <summary>
+        /// Activity target (visits/offers/deals) set by salesman
+        /// </summary>
+        Activity = 2
+    }
+
+    /// <summary>
+    /// Represents targets set by managers (money) or salesmen themselves (visits/offers/deals)
     /// </summary>
     public class SalesmanTarget : BaseEntity
     {
@@ -15,10 +30,15 @@ namespace SoitMed.Models
         public string? SalesmanId { get; set; }
 
         /// <summary>
-        /// Manager who created this target
+        /// Type of target: Money (set by manager) or Activity (set by salesman)
         /// </summary>
         [Required]
-        public string CreatedByManagerId { get; set; } = string.Empty;
+        public TargetType TargetType { get; set; }
+
+        /// <summary>
+        /// Manager who created this target (null if set by salesman)
+        /// </summary>
+        public string? CreatedByManagerId { get; set; }
         
         /// <summary>
         /// Target year
@@ -63,6 +83,12 @@ namespace SoitMed.Models
         public decimal? TargetOfferAcceptanceRate { get; set; }
         
         /// <summary>
+        /// Target revenue/money amount (for Money type targets)
+        /// </summary>
+        [Range(0, double.MaxValue)]
+        public decimal? TargetRevenue { get; set; }
+        
+        /// <summary>
         /// True if this is a team-wide target
         /// </summary>
         public bool IsTeamTarget { get; set; }
@@ -75,7 +101,7 @@ namespace SoitMed.Models
         
         // Navigation Properties
         public virtual ApplicationUser? Salesman { get; set; }
-        public virtual ApplicationUser Manager { get; set; } = null!;
+        public virtual ApplicationUser? Manager { get; set; }
     }
 }
 

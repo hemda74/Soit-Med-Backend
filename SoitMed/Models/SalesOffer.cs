@@ -2,6 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using SoitMed.Models.Core;
 using SoitMed.Models.Identity;
+using System.Text.Json;
+using System.Linq;
 
 namespace SoitMed.Models
 {
@@ -32,14 +34,20 @@ namespace SoitMed.Models
         [Column(TypeName = "decimal(18,2)")]
         public decimal TotalAmount { get; set; }
         
-        [MaxLength(2000)]
-        public string? PaymentTerms { get; set; }
+        // Payment Terms, Delivery Terms, Warranty Terms, and ValidUntil stored as JSON arrays
+        // These are stored as JSON strings in the database, but exposed as List<string> in DTOs
+        [Column(TypeName = "nvarchar(max)")]
+        public string? PaymentTerms { get; set; } // JSON array of strings (e.g., "[\"term1\", \"term2\"]")
         
-        [MaxLength(2000)]
-        public string? DeliveryTerms { get; set; }
+        [Column(TypeName = "nvarchar(max)")]
+        public string? DeliveryTerms { get; set; } // JSON array of strings
         
-        [Required]
-        public DateTime ValidUntil { get; set; }
+        [Column(TypeName = "nvarchar(max)")]
+        public string? WarrantyTerms { get; set; } // JSON array of strings
+        
+        // ValidUntil is now stored as JSON array of date strings (ISO format: "YYYY-MM-DD")
+        [Column(TypeName = "nvarchar(max)")]
+        public string? ValidUntil { get; set; } // JSON array of date strings (e.g., "[\"2025-12-05\", \"2025-12-15\"]")
         
         [MaxLength(50)]
         public string? PaymentType { get; set; } // Cash, Installments, Other
@@ -103,11 +111,31 @@ namespace SoitMed.Models
         }
 
         /// <summary>
-        /// Checks if the offer is expired
+        /// Checks if the offer is expired (checks all validUntil dates)
         /// </summary>
         public bool IsExpired()
         {
-            return DateTime.UtcNow > ValidUntil;
+            if (string.IsNullOrWhiteSpace(ValidUntil))
+                return false; // No expiration dates defined
+            
+            try
+            {
+                var dates = System.Text.Json.JsonSerializer.Deserialize<List<string>>(ValidUntil);
+                if (dates == null || dates.Count == 0)
+                    return false;
+                
+                var now = DateTime.UtcNow;
+                // Offer is expired if ALL dates have passed
+                return dates.All(dateStr => 
+                    DateTime.TryParse(dateStr, out var date) && now > date);
+            }
+            catch
+            {
+                // Fallback: try to parse as single date (backward compatibility)
+                if (DateTime.TryParse(ValidUntil, out var singleDate))
+                    return DateTime.UtcNow > singleDate;
+                return false;
+            }
         }
 
         /// <summary>
@@ -116,6 +144,39 @@ namespace SoitMed.Models
         public bool CanBeModified()
         {
             return Status == OfferStatus.Draft || Status == OfferStatus.NeedsModification;
+        }
+
+        /// <summary>
+        /// Marks the offer as needing modification
+        /// </summary>
+        public void MarkAsNeedsModification(string? reason = null)
+        {
+            Status = OfferStatus.NeedsModification;
+            if (!string.IsNullOrEmpty(reason))
+            {
+                Notes = string.IsNullOrEmpty(Notes)
+                    ? $"Needs Modification: {reason}"
+                    : $"{Notes}\n\nNeeds Modification: {reason}";
+            }
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Marks the offer as under review
+        /// </summary>
+        public void MarkAsUnderReview()
+        {
+            Status = OfferStatus.UnderReview;
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Marks the offer as expired
+        /// </summary>
+        public void MarkAsExpired()
+        {
+            Status = OfferStatus.Expired;
+            UpdatedAt = DateTime.UtcNow;
         }
         #endregion
     }
@@ -130,8 +191,9 @@ namespace SoitMed.Models
         public const string Rejected = "Rejected";
         public const string NeedsModification = "NeedsModification";
         public const string Expired = "Expired";
+        public const string Completed = "Completed";
         
-        public static readonly string[] AllStatuses = { Draft, Sent, UnderReview, Accepted, Rejected, NeedsModification, Expired };
+        public static readonly string[] AllStatuses = { Draft, Sent, UnderReview, Accepted, Rejected, NeedsModification, Expired, Completed };
     }
     #endregion
 }
