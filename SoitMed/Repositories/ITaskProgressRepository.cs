@@ -19,10 +19,9 @@ namespace SoitMed.Repositories
         Task<List<TaskProgress>> GetProgressesWithOfferRequestsAsync();
         Task<List<TaskProgress>> GetProgressesWithDealsAsync();
         Task<TaskProgress?> GetProgressWithDetailsAsync(long progressId);
-        Task<List<TaskProgress>> GetProgressesBySatisfactionRatingAsync(int minRating, int maxRating);
         Task<int> GetProgressCountByEmployeeAsync(string employeeId, DateTime? startDate, DateTime? endDate);
         Task<int> GetProgressCountByClientAsync(long clientId);
-        Task<double> GetAverageSatisfactionRatingByEmployeeAsync(string employeeId, DateTime? startDate, DateTime? endDate);
+      
         Task<List<TaskProgress>> GetRecentProgressesAsync(int count);
         Task<List<TaskProgress>> GetProgressesByTaskStatusAsync(string taskStatus);
     }

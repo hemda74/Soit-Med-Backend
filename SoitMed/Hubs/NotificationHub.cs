@@ -24,15 +24,21 @@ namespace SoitMed.Hubs
             {
                 // Add user to their personal group for targeted notifications
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"User_{userId}");
+                _logger.LogInformation("✅ User {UserId} added to personal group: User_{UserId}", userId, userId);
                 
-                // Add user to role-based groups for broadcast notifications
-                var userRole = GetUserRole();
-                if (!string.IsNullOrEmpty(userRole))
+                // Add user to ALL their role-based groups for broadcast notifications
+                var userRoles = GetUserRoles();
+                if (userRoles != null && userRoles.Any())
                 {
-                    await Groups.AddToGroupAsync(Context.ConnectionId, $"Role_{userRole}");
+                    foreach (var role in userRoles)
+                    {
+                        await Groups.AddToGroupAsync(Context.ConnectionId, $"Role_{role}");
+                        _logger.LogInformation("✅ User {UserId} added to role group: Role_{Role}", userId, role);
+                    }
                 }
 
-                _logger.LogInformation($"User {userId} connected to notification hub");
+                _logger.LogInformation("📡 User {UserId} connected to notification hub with roles: {Roles}", 
+                    userId, userRoles != null ? string.Join(", ", userRoles) : "None");
             }
 
             await base.OnConnectedAsync();
@@ -75,6 +81,13 @@ namespace SoitMed.Hubs
         private string? GetUserRole()
         {
             return Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+        }
+
+        private List<string>? GetUserRoles()
+        {
+            return Context.User?.FindAll(ClaimTypes.Role)
+                .Select(c => c.Value)
+                .ToList();
         }
     }
 }

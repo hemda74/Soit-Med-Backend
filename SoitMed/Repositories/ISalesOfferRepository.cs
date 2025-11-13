@@ -1,4 +1,6 @@
 using SoitMed.Models;
+using SoitMed.Models.Identity;
+using System.Linq;
 
 namespace SoitMed.Repositories
 {
@@ -7,6 +9,7 @@ namespace SoitMed.Repositories
     /// </summary>
     public interface ISalesOfferRepository : IBaseRepository<SalesOffer>
     {
+        IQueryable<SalesOffer> GetQueryable();
         Task<List<SalesOffer>> GetOffersByClientIdAsync(long clientId);
         Task<List<SalesOffer>> GetOffersBySalesmanAsync(string salesmanId);
         Task<List<SalesOffer>> GetOffersByStatusAsync(string status);
@@ -18,6 +21,17 @@ namespace SoitMed.Repositories
         Task<List<SalesOffer>> GetOffersNeedingFollowUpAsync();
         Task<int> GetOfferCountByStatusAsync(string status);
         Task<decimal> GetTotalOfferValueByStatusAsync(string status);
+        Task<List<SalesOffer>> GetByIdsAsync(IEnumerable<long> ids);
+        
+        // Optimized methods that load related data in a single query
+        Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
+            GetOffersBySalesmanWithRelatedDataAsync(string salesmanId);
+        Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
+            GetOffersByClientIdWithRelatedDataAsync(long clientId);
+        Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
+            GetOffersByStatusWithRelatedDataAsync(string? status);
+        Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
+            GetExpiredOffersWithRelatedDataAsync();
     }
 }
 

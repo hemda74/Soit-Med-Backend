@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Repositories;
+using System.Text.Json;
 
 namespace SoitMed.Services
 {
@@ -28,7 +29,7 @@ namespace SoitMed.Services
                 var client = new Client
                 {
                     Name = createClientDto.Name,
-                    Type = createClientDto.Type,
+                    Type = createClientDto.Type, // Can be null - optional field
                     Specialization = createClientDto.Specialization,
                     Location = createClientDto.Location,
                     Phone = createClientDto.Phone,
@@ -92,20 +93,13 @@ namespace SoitMed.Services
                 // The controller's [Authorize(Roles="Salesman,SalesManager,SuperAdmin")] handles role check
                 // For data filtering, check if client is assigned to user when needed
 
-                // Use parallel queries for better performance
-                var taskProgressesTask = _unitOfWork.TaskProgresses
+                // Load sequentially to avoid DbContext concurrency issues (same DbContext instance)
+                var taskProgresses = await _unitOfWork.TaskProgresses
                     .GetProgressesByClientIdAsync(clientId);
-                var offersTask = _unitOfWork.SalesOffers
+                var offers = await _unitOfWork.SalesOffers
                     .GetOffersByClientIdAsync(clientId);
-                var dealsTask = _unitOfWork.SalesDeals
+                var deals = await _unitOfWork.SalesDeals
                     .GetDealsByClientIdAsync(clientId);
-
-                // Wait for all queries to complete in parallel
-                await Task.WhenAll(taskProgressesTask, offersTask, dealsTask);
-
-                var taskProgresses = await taskProgressesTask;
-                var offers = await offersTask;
-                var deals = await dealsTask;
 
                 // Calculate statistics
                 var statistics = new ClientStatisticsDTO
@@ -115,9 +109,7 @@ namespace SoitMed.Services
                     SuccessfulDeals = deals.Count(d => d.Status == "Success"),
                     FailedDeals = deals.Count(d => d.Status == "Failed"),
                     TotalRevenue = deals.Where(d => d.Status == "Success").Sum(d => d.DealValue),
-                    AverageSatisfaction = taskProgresses.Where(tp => tp.SatisfactionRating.HasValue)
-                        .Any() ? taskProgresses.Where(tp => tp.SatisfactionRating.HasValue)
-                        .Average(tp => tp.SatisfactionRating.Value) : null
+                   
                 };
 
                 return new ClientProfileDTO
@@ -352,19 +344,33 @@ namespace SoitMed.Services
                 ProgressType = taskProgress.ProgressType,
                 VisitResult = taskProgress.VisitResult,
                 NextStep = taskProgress.NextStep,
-                SatisfactionRating = taskProgress.SatisfactionRating
             };
         }
 
         private static OfferSummaryDTO MapToOfferSummaryDTO(SalesOffer offer)
         {
+            // Deserialize ValidUntil from JSON string to List<string>
+            List<string>? validUntilList = null;
+            if (!string.IsNullOrWhiteSpace(offer.ValidUntil))
+            {
+                try
+                {
+                    validUntilList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(offer.ValidUntil);
+                }
+                catch
+                {
+                    // Fallback: treat as single string value (backward compatibility)
+                    validUntilList = new List<string> { offer.ValidUntil };
+                }
+            }
+            
             return new OfferSummaryDTO
             {
                 Id = offer.Id,
                 CreatedAt = offer.CreatedAt,
                 TotalAmount = offer.TotalAmount,
                 Status = offer.Status,
-                ValidUntil = offer.ValidUntil
+                ValidUntil = validUntilList
             };
         }
 

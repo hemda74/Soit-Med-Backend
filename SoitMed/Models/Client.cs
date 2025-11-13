@@ -14,9 +14,8 @@ namespace SoitMed.Models
         [MaxLength(200)]
         public string Name { get; set; } = string.Empty;
 
-        [Required]
         [MaxLength(50)]
-        public string Type { get; set; } = string.Empty; // Doctor, Hospital, Clinic, etc.
+        public string? Type { get; set; } // Doctor, Hospital, Clinic, etc. (optional)
 
         [MaxLength(100)]
         public string? Specialization { get; set; }

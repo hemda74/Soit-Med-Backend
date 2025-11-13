@@ -24,6 +24,7 @@ namespace SoitMed.Repositories
         Task<List<SalesDeal>> GetSuccessfulDealsAsync();
         Task<List<SalesDeal>> GetFailedDealsAsync();
         Task<List<SalesDeal>> GetDealsByRejectionReasonAsync(string rejectionReason);
+        Task<List<SalesDeal>> GetByIdsAsync(IEnumerable<long> ids);
     }
 }
 

@@ -4,6 +4,17 @@ A comprehensive hospital management system with equipment tracking, repair reque
 
 ## Features
 
+### Real-Time Notifications System
+- **Multi-Channel Delivery**: Real-time notifications via SignalR (when app is open) and push notifications (when app is closed)
+- **Cross-Platform Support**: Works seamlessly on Web Dashboard and Mobile App
+- **User-Centric Design**: Notifications are delivered to specific users regardless of business context
+- **Flexible Notification Types**: Support for offers, deals, tasks, clients, workflows, and system notifications
+- **Priority Levels**: High, Medium, and Low priority notifications
+- **Push Notifications**: Native push notifications with sound and banner for mobile devices
+- **In-App Notifications**: Real-time notification list with unread count badge
+
+📖 **Technical Documentation**: See [NOTIFICATION.md](../NOTIFICATION.md) for complete implementation details
+
 ### Multi-Departmental Organization
 - **6 Departments**: Administration, Medical, Sales, Engineering, Finance, Legal
 - **10+ User Roles**: SuperAdmin, Admin, Doctor, Technician, Salesman, SalesManager, SalesSupport, Engineer, FinanceManager, FinanceEmployee, LegalManager, LegalEmployee
@@ -234,7 +245,13 @@ SoitMed/
 
 ## API Documentation
 
-Role-specific API documentation is available:
+### Notification System
+- **Complete Notification Guide**: See [NOTIFICATION.md](../NOTIFICATION.md) for full technical documentation
+- **Notification API**: `/api/Notification` endpoints for managing notifications
+- **Real-Time Delivery**: SignalR hub at `/notificationHub` for instant notifications
+- **Push Notifications**: Device token registration and push notification delivery
+
+### Role-Specific API Documentation
 
 - **Salesman API**: See `SALESMAN_API_DOCUMENTATION.md`
 - **Sales Manager API**: See `SALES_MANAGER_API_DOCUMENTATION.md`

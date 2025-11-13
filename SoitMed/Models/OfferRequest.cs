@@ -27,7 +27,7 @@ namespace SoitMed.Models
         public DateTime RequestDate { get; set; }
 
         [Required, MaxLength(50)]
-        public string Status { get; set; } = "Requested"; // Requested, InProgress, Ready, Sent, Cancelled
+        public string Status { get; set; } = "Requested"; // Requested, Assigned, InProgress, Ready, Sent, Cancelled
 
         public string? AssignedTo { get; set; } // Sales Support ID
 
@@ -52,16 +52,18 @@ namespace SoitMed.Models
         public void AssignTo(string supportUserId)
         {
             AssignedTo = supportUserId;
-            Status = "InProgress";
+            Status = "Assigned";
         }
 
         /// <summary>
         /// Marks the request as completed
         /// </summary>
-        public void MarkAsCompleted(string? notes = null)
+        public void MarkAsCompleted(string? notes = null, long? offerId = null)
         {
             Status = "Ready";
             CompletedAt = DateTime.UtcNow;
+            if (offerId.HasValue)
+                CreatedOfferId = offerId.Value;
             if (!string.IsNullOrEmpty(notes))
                 CompletionNotes = notes;
         }
@@ -89,7 +91,7 @@ namespace SoitMed.Models
         /// </summary>
         public bool IsPending()
         {
-            return Status == "Requested" || Status == "InProgress";
+            return Status == "Requested" || Status == "Assigned" || Status == "InProgress";
         }
 
         /// <summary>
@@ -117,12 +119,13 @@ namespace SoitMed.Models
     public static class OfferRequestStatusConstants
     {
         public const string Requested = "Requested";
+        public const string Assigned = "Assigned";
         public const string InProgress = "InProgress";
         public const string Ready = "Ready";
         public const string Sent = "Sent";
         public const string Cancelled = "Cancelled";
 
-        public static readonly string[] AllStatuses = { Requested, InProgress, Ready, Sent, Cancelled };
+        public static readonly string[] AllStatuses = { Requested, Assigned, InProgress, Ready, Sent, Cancelled };
 
         public static bool IsValidStatus(string status)
         {

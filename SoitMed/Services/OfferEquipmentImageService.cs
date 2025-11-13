@@ -46,19 +46,19 @@ namespace SoitMed.Services
                     };
                 }
 
-                // Generate folder structure: offer-equipment/{offerId}/{equipmentId}
-                var relativeFolderPath = Path.Combine("uploads", "offer-equipment", offerId.ToString(), equipmentId.ToString());
+                // Generate folder structure: offers/{offerId}
+                var relativeFolderPath = Path.Combine("offers", offerId.ToString());
                 _logger.LogInformation("FolderPath: {FolderPath}", relativeFolderPath);
 
                 // Create physical directory
-                var uploadPath = Path.Combine(_uploadsRootPhysicalPath, "offer-equipment", offerId.ToString(), equipmentId.ToString());
+                var uploadPath = Path.Combine(_environment.WebRootPath, "offers", offerId.ToString());
                 _logger.LogInformation("UploadPath: {UploadPath}", uploadPath);
                 Directory.CreateDirectory(uploadPath);
                 _logger.LogInformation("Directory created successfully");
 
-                // Generate unique filename
+                // Generate unique filename with equipment ID prefix
                 var fileExtension = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
-                var fileName = $"{Guid.NewGuid()}{fileExtension}";
+                var fileName = $"equipment-{equipmentId}-{Guid.NewGuid()}{fileExtension}";
                 filePath = Path.Combine(uploadPath, fileName);
                 _logger.LogInformation("FilePath: {FilePath}", filePath);
 
@@ -68,8 +68,8 @@ namespace SoitMed.Services
                     await imageFile.CopyToAsync(stream);
                 }
 
-                // Return relative path for database storage
-                var relativePath = Path.Combine("uploads", "offer-equipment", offerId.ToString(), equipmentId.ToString(), fileName).Replace("\\", "/");
+                // Return relative path for database storage: offers/{offerId}/equipment-{equipmentId}-{guid}.jpg
+                var relativePath = Path.Combine("offers", offerId.ToString(), fileName).Replace("\\", "/");
 
                 _logger.LogInformation("Image uploaded successfully. RelativePath: {RelativePath}", relativePath);
 
@@ -105,6 +105,7 @@ namespace SoitMed.Services
                     _logger.LogInformation("Equipment image deleted successfully: {FilePath}", filePath);
                     return Task.FromResult(true);
                 }
+                _logger.LogWarning("Equipment image file not found: {FilePath}", filePath);
                 return Task.FromResult(false);
             }
             catch (Exception ex)
