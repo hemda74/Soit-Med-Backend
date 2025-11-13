@@ -12,13 +12,14 @@ namespace SoitMed.Models.Identity
 		[ForeignKey("DepartmentId")]
 		public virtual Department? Department { get; set; }
 
-		// Additional user properties
-		public string? FirstName { get; set; }
-		public string? LastName { get; set; }
-		public string? PersonalMail { get; set; }
-		public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-		public DateTime? LastLoginAt { get; set; }
-		public bool IsActive { get; set; } = true;
+	// Additional user properties
+	public string? FirstName { get; set; }
+	public string? LastName { get; set; }
+	public string? PersonalMail { get; set; }
+	public DateTime? DateOfBirth { get; set; }
+	public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+	public DateTime? LastLoginAt { get; set; }
+	public bool IsActive { get; set; } = true;
 
 		// Computed property for full name
 		public string FullName => $"{FirstName} {LastName}".Trim();

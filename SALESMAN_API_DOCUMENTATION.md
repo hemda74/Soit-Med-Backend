@@ -1532,3 +1532,15 @@ if (result.success) {
 **Base URL:** `https://your-api-url.com` (or `http://localhost:port` for development)
 
 **Last Updated:** 2025-10-29
+
+---
+
+## 🔄 Updates: Offer Assignment and Auto-Equipment
+
+- Offer requests you create are auto-assigned to SalesSupport if a support user exists. You can track your own requests at `GET /api/OfferRequest`.
+- Offers will be assigned to you by Sales Support. View assigned offers using:
+     - `GET /api/Offer/assigned-to-me`
+     - `GET /api/Offer/{id}` (includes equipment list with imagePath)
+     - `GET /api/Offer/{offerId}/export-pdf`
+
+No action is needed from Salesman to assign offers; this is handled by Sales Support via a new endpoint.

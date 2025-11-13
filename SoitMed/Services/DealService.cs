@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SoitMed.DTO;
 using SoitMed.Models;
+using SoitMed.Models.Identity;
 using SoitMed.Repositories;
 
 namespace SoitMed.Services
@@ -11,11 +13,19 @@ namespace SoitMed.Services
     public class DealService : IDealService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly INotificationService _notificationService;
         private readonly ILogger<DealService> _logger;
 
-        public DealService(IUnitOfWork unitOfWork, ILogger<DealService> logger)
+        public DealService(
+            IUnitOfWork unitOfWork, 
+            UserManager<ApplicationUser> userManager,
+            INotificationService notificationService,
+            ILogger<DealService> logger)
         {
             _unitOfWork = unitOfWork;
+            _userManager = userManager;
+            _notificationService = notificationService;
             _logger = logger;
         }
 
@@ -51,6 +61,9 @@ namespace SoitMed.Services
 
                 _logger.LogInformation("Deal created successfully. DealId: {DealId}, OfferId: {OfferId}", deal.Id, createDealDto.OfferId);
 
+                // Send notification to Sales Managers for approval
+                await SendManagerApprovalNotificationAsync(deal);
+
                 return await MapToDealResponseDTO(deal);
             }
             catch (Exception ex)
@@ -85,9 +98,15 @@ namespace SoitMed.Services
                 if (deal == null)
                     return null;
 
-                // Check authorization
-                if (userRole != "SuperAdmin" && deal.SalesmanId != userId)
+                // Check authorization:
+                // - SuperAdmin and SalesManager can view any deal
+                // - Salesman can only view their own deals
+                if (userRole != "SuperAdmin" && userRole != "SalesManager" && deal.SalesmanId != userId)
+                {
+                    _logger.LogWarning("Unauthorized access attempt - UserId: {UserId}, UserRole: {UserRole}, DealId: {DealId}, DealSalesmanId: {DealSalesmanId}",
+                        userId, userRole, dealId, deal.SalesmanId);
                     throw new UnauthorizedAccessException("You don't have permission to view this deal");
+                }
 
                 return await MapToDealResponseDTO(deal);
             }
@@ -289,6 +308,12 @@ namespace SoitMed.Services
                 _logger.LogInformation("Manager approval processed for deal. DealId: {DealId}, Approved: {Approved}", 
                     dealId, approvalDto.Approved);
 
+                // If approved, send notification to Super Admins for next level approval
+                if (approvalDto.Approved && deal.Status == "PendingSuperAdminApproval")
+                {
+                    await SendSuperAdminApprovalNotificationAsync(deal);
+                }
+
                 return await MapToDealResponseDTO(deal);
             }
             catch (Exception ex)
@@ -476,6 +501,22 @@ namespace SoitMed.Services
             var superAdminApprover = !string.IsNullOrEmpty(deal.SuperAdminApprovedBy) 
                 ? await _unitOfWork.Users.GetByIdAsync(deal.SuperAdminApprovedBy) : null;
 
+            // Determine manager approval status
+            bool? managerApproved = null;
+            if (deal.ManagerApprovedAt.HasValue)
+            {
+                // If ManagerApprovedAt is set, check if it was approved or rejected
+                managerApproved = string.IsNullOrEmpty(deal.ManagerRejectionReason);
+            }
+
+            // Determine super admin approval status
+            bool? superAdminApproved = null;
+            if (deal.SuperAdminApprovedAt.HasValue)
+            {
+                // If SuperAdminApprovedAt is set, check if it was approved or rejected
+                superAdminApproved = string.IsNullOrEmpty(deal.SuperAdminRejectionReason);
+            }
+
             return new DealResponseDTO
             {
                 Id = deal.Id,
@@ -485,14 +526,225 @@ namespace SoitMed.Services
                 SalesmanId = deal.SalesmanId,
                 SalesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Unknown Salesman",
                 DealValue = deal.DealValue,
+                TotalValue = deal.DealValue, // Alias for mobile compatibility
                 ClosedDate = deal.ClosedDate,
                 Status = deal.Status,
                 ManagerRejectionReason = deal.ManagerRejectionReason,
                 ManagerComments = deal.ManagerComments,
+                ManagerApproved = managerApproved,
+                ManagerApprovedAt = deal.ManagerApprovedAt,
+                ManagerApprovedByName = managerApprover != null ? $"{managerApprover.FirstName} {managerApprover.LastName}" : null,
                 SuperAdminRejectionReason = deal.SuperAdminRejectionReason,
                 SuperAdminComments = deal.SuperAdminComments,
-                CreatedAt = deal.CreatedAt
+                SuperAdminApproved = superAdminApproved,
+                SuperAdminApprovedAt = deal.SuperAdminApprovedAt,
+                SuperAdminApprovedByName = superAdminApprover != null ? $"{superAdminApprover.FirstName} {superAdminApprover.LastName}" : null,
+                CreatedAt = deal.CreatedAt,
+                ExpectedDeliveryDate = deal.ExpectedDeliveryDate,
+                CompletionNotes = deal.CompletionNotes,
+                FailureNotes = deal.Status == DealStatus.Failed ? deal.CompletionNotes : null
             };
+        }
+
+        #endregion
+
+        #region Notification Helpers
+
+        private async Task SendManagerApprovalNotificationAsync(SalesDeal deal)
+        {
+            try
+            {
+                // Get client info for notification
+                var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
+                var clientName = client?.Name ?? "Unknown Client";
+
+                // Get salesman info
+                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
+                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : "Unknown Salesman";
+
+                // Get all Sales Managers
+                var managers = await _userManager.GetUsersInRoleAsync("SalesManager");
+                var activeManagers = managers.Where(m => m.IsActive).ToList();
+
+                if (!activeManagers.Any())
+                {
+                    _logger.LogWarning("No active Sales Managers found to notify for Deal: {DealId}", deal.Id);
+                    return;
+                }
+
+                var notificationTitle = "Deal Pending Manager Approval";
+                var notificationMessage = $"Deal #{deal.Id} from {salesmanName} for {clientName} (Value: {deal.DealValue:C}) requires your approval.";
+
+                var metadata = new Dictionary<string, object>
+                {
+                    ["dealId"] = deal.Id,
+                    ["clientName"] = clientName,
+                    ["salesmanName"] = salesmanName,
+                    ["dealValue"] = deal.DealValue,
+                    ["status"] = deal.Status
+                };
+
+                // Send notification to all Sales Managers
+                _logger.LogInformation("📢 Sending notifications to {Count} active Sales Managers for Deal: {DealId}", 
+                    activeManagers.Count, deal.Id);
+
+                // Also send a broadcast to the role group as backup
+                try
+                {
+                    await _notificationService.SendNotificationToRoleGroupAsync(
+                        "SalesManager",
+                        notificationTitle,
+                        notificationMessage,
+                        metadata,
+                        CancellationToken.None
+                    );
+                    _logger.LogInformation("✅ Broadcast notification sent to Role_SalesManager group for Deal: {DealId}", deal.Id);
+                }
+                catch (Exception broadcastEx)
+                {
+                    _logger.LogWarning(broadcastEx, "⚠️ Failed to send broadcast to role group (continuing with individual notifications)");
+                }
+
+                foreach (var manager in activeManagers)
+                {
+                    try
+                    {
+                        _logger.LogInformation("📤 Creating notification for Sales Manager: {ManagerId} ({ManagerName}) for Deal: {DealId}", 
+                            manager.Id, manager.UserName, deal.Id);
+
+                        var notification = await _notificationService.CreateNotificationAsync(
+                            manager.Id,
+                            notificationTitle,
+                            notificationMessage,
+                            "Deal",
+                            "High",
+                            null,
+                            null,
+                            true, // Mobile push notification
+                            metadata,
+                            CancellationToken.None
+                        );
+
+                        _logger.LogInformation("✅ Notification created and sent to Sales Manager: {ManagerId} ({ManagerName}) for Deal: {DealId}. NotificationId: {NotificationId}", 
+                            manager.Id, manager.UserName, deal.Id, notification.Id);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "❌ Failed to send notification to Sales Manager {ManagerId} ({ManagerName}) for Deal: {DealId}. Error: {Error}", 
+                            manager.Id, manager.UserName, deal.Id, notifEx.Message);
+                        // Continue with other managers even if one fails
+                    }
+                }
+
+                _logger.LogInformation("📬 Completed sending notifications to Sales Managers for Deal: {DealId}", deal.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending manager approval notifications for Deal: {DealId}", deal.Id);
+                // Don't fail the whole operation if notification fails
+            }
+        }
+
+        private async Task SendSuperAdminApprovalNotificationAsync(SalesDeal deal)
+        {
+            try
+            {
+                // Get client info for notification
+                var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
+                var clientName = client?.Name ?? "Unknown Client";
+
+                // Get salesman info
+                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
+                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : "Unknown Salesman";
+
+                // Get manager who approved
+                var manager = deal.ManagerApprovedBy != null 
+                    ? await _unitOfWork.Users.GetByIdAsync(deal.ManagerApprovedBy) 
+                    : null;
+                var managerName = manager != null ? $"{manager.FirstName} {manager.LastName}".Trim() : "Manager";
+
+                // Get all Super Admins
+                var superAdmins = await _userManager.GetUsersInRoleAsync("SuperAdmin");
+                var activeSuperAdmins = superAdmins.Where(sa => sa.IsActive).ToList();
+
+                if (!activeSuperAdmins.Any())
+                {
+                    _logger.LogWarning("No active Super Admins found to notify for Deal: {DealId}", deal.Id);
+                    return;
+                }
+
+                var notificationTitle = "Deal Pending Super Admin Approval";
+                var notificationMessage = $"Deal #{deal.Id} from {salesmanName} for {clientName} (Value: {deal.DealValue:C}) approved by {managerName} and requires your final approval.";
+
+                var metadata = new Dictionary<string, object>
+                {
+                    ["dealId"] = deal.Id,
+                    ["clientName"] = clientName,
+                    ["salesmanName"] = salesmanName,
+                    ["managerName"] = managerName,
+                    ["dealValue"] = deal.DealValue,
+                    ["status"] = deal.Status
+                };
+
+                // Send notification to all Super Admins
+                _logger.LogInformation("📢 Sending notifications to {Count} active Super Admins for Deal: {DealId}", 
+                    activeSuperAdmins.Count, deal.Id);
+
+                // Also send a broadcast to the role group as backup
+                try
+                {
+                    await _notificationService.SendNotificationToRoleGroupAsync(
+                        "SuperAdmin",
+                        notificationTitle,
+                        notificationMessage,
+                        metadata,
+                        CancellationToken.None
+                    );
+                    _logger.LogInformation("✅ Broadcast notification sent to Role_SuperAdmin group for Deal: {DealId}", deal.Id);
+                }
+                catch (Exception broadcastEx)
+                {
+                    _logger.LogWarning(broadcastEx, "⚠️ Failed to send broadcast to role group (continuing with individual notifications)");
+                }
+
+                foreach (var superAdmin in activeSuperAdmins)
+                {
+                    try
+                    {
+                        _logger.LogInformation("📤 Creating notification for Super Admin: {SuperAdminId} ({SuperAdminName}) for Deal: {DealId}", 
+                            superAdmin.Id, superAdmin.UserName, deal.Id);
+
+                        var notification = await _notificationService.CreateNotificationAsync(
+                            superAdmin.Id,
+                            notificationTitle,
+                            notificationMessage,
+                            "Deal",
+                            "High",
+                            null,
+                            null,
+                            true, // Mobile push notification
+                            metadata,
+                            CancellationToken.None
+                        );
+
+                        _logger.LogInformation("✅ Notification created and sent to Super Admin: {SuperAdminId} ({SuperAdminName}) for Deal: {DealId}. NotificationId: {NotificationId}", 
+                            superAdmin.Id, superAdmin.UserName, deal.Id, notification.Id);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "❌ Failed to send notification to Super Admin {SuperAdminId} ({SuperAdminName}) for Deal: {DealId}. Error: {Error}", 
+                            superAdmin.Id, superAdmin.UserName, deal.Id, notifEx.Message);
+                        // Continue with other super admins even if one fails
+                    }
+                }
+
+                _logger.LogInformation("📬 Completed sending notifications to Super Admins for Deal: {DealId}", deal.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending super admin approval notifications for Deal: {DealId}", deal.Id);
+                // Don't fail the whole operation if notification fails
+            }
         }
 
         #endregion

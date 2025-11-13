@@ -170,6 +170,18 @@ namespace SoitMed.Repositories
                 .OrderByDescending(d => d.CreatedAt)
                 .ToListAsync();
         }
+
+        public async Task<List<SalesDeal>> GetByIdsAsync(IEnumerable<long> ids)
+        {
+            var idList = ids.ToList();
+            if (!idList.Any())
+                return new List<SalesDeal>();
+
+            return await _context.SalesDeals
+                .AsNoTracking()
+                .Where(d => idList.Contains(d.Id))
+                .ToListAsync();
+        }
     }
 }
 

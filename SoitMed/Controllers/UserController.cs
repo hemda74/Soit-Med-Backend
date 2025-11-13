@@ -367,35 +367,143 @@ namespace SoitMed.Controllers
 			var roles = await userManager.GetRolesAsync(user);
 			var profileImage = await GetUserProfileImageAsync(user.Id);
 
-			var userData = new CurrentUserDataDTO
-			{
-				Id = user.Id,
-				UserName = user.UserName ?? "",
-				Email = user.Email ?? "",
-				FirstName = user.FirstName,
-				LastName = user.LastName,
-				FullName = user.FullName,
-				IsActive = user.IsActive,
-				CreatedAt = user.CreatedAt,
-				LastLoginAt = user.LastLoginAt,
-				Roles = roles.ToList(),
-				DepartmentId = user.DepartmentId,
-				DepartmentName = user.Department?.Name,
-				DepartmentDescription = user.Department?.Description,
-				ProfileImage = profileImage,
-				EmailConfirmed = user.EmailConfirmed,
-				PhoneNumberConfirmed = user.PhoneNumberConfirmed,
-				PhoneNumber = user.PhoneNumber
-			};
+		var userData = new CurrentUserDataDTO
+		{
+			Id = user.Id,
+			UserName = user.UserName ?? "",
+			Email = user.Email ?? "",
+			FirstName = user.FirstName,
+			LastName = user.LastName,
+			FullName = user.FullName,
+			IsActive = user.IsActive,
+			CreatedAt = user.CreatedAt,
+			LastLoginAt = user.LastLoginAt,
+			Roles = roles.ToList(),
+			DepartmentId = user.DepartmentId,
+			DepartmentName = user.Department?.Name,
+			DepartmentDescription = user.Department?.Description,
+			ProfileImage = profileImage,
+			PhoneNumber = user.PhoneNumber,
+			PersonalMail = user.PersonalMail,
+			DateOfBirth = user.DateOfBirth
+		};
 
-			return Ok(userData);
+		return Ok(userData);
+	}
+
+	// Get current user's profile completion status
+	[HttpGet("profile-completion")]
+	[Authorize]
+	public async Task<IActionResult> GetProfileCompletion()
+	{
+		var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+		if (string.IsNullOrEmpty(userId))
+		{
+			return BadRequest("User ID not found in token");
 		}
 
+		var user = await context.Users
+			.Include(u => u.Department)
+			.FirstOrDefaultAsync(u => u.Id == userId);
 
-		// Get user data by username
-		[HttpGet("username/{username}")]
-		[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
-		public async Task<IActionResult> GetUserByUsername(string username)
+		if (user == null)
+		{
+			return NotFound("User not found");
+		}
+
+		// Get user profile image
+		var profileImage = await GetUserProfileImageAsync(user.Id);
+
+		// Define fields to check (5 fields for all user types)
+		var checks = new List<(string FieldName, bool IsComplete)>
+		{
+			("Profile Image", profileImage != null),
+			("First Name", !string.IsNullOrWhiteSpace(user.FirstName)),
+			("Last Name", !string.IsNullOrWhiteSpace(user.LastName)),
+			("Phone Number", !string.IsNullOrWhiteSpace(user.PhoneNumber)),
+			("Date of Birth", user.DateOfBirth.HasValue)
+		};
+
+		// Calculate completion stats
+		var completedFields = checks.Where(c => c.IsComplete).Select(c => c.FieldName).ToList();
+		var missingFields = checks.Where(c => !c.IsComplete).Select(c => c.FieldName).ToList();
+		var completedSteps = completedFields.Count;
+		var totalSteps = checks.Count;
+		var remainingSteps = totalSteps - completedSteps;
+		var progress = totalSteps > 0 ? (int)Math.Round((double)completedSteps / totalSteps * 100) : 0;
+
+		var result = new ProfileCompletionDTO
+		{
+			Progress = progress,
+			CompletedSteps = completedSteps,
+			TotalSteps = totalSteps,
+			RemainingSteps = remainingSteps,
+			CompletedFields = completedFields,
+			MissingFields = missingFields
+		};
+
+		return Ok(result);
+	}
+
+	// Update current user's own profile
+	[HttpPatch("me")]
+	[Authorize]
+	public async Task<IActionResult> UpdateMyProfile(UpdateMyProfileDTO updateDTO)
+	{
+		var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+		if (string.IsNullOrEmpty(userId))
+		{
+			return BadRequest("User ID not found in token");
+		}
+
+		var user = await userManager.FindByIdAsync(userId);
+		if (user == null)
+		{
+			return NotFound("User not found");
+		}
+
+		// Update fields if provided
+		if (!string.IsNullOrWhiteSpace(updateDTO.FirstName))
+			user.FirstName = updateDTO.FirstName;
+
+		if (!string.IsNullOrWhiteSpace(updateDTO.LastName))
+			user.LastName = updateDTO.LastName;
+
+		if (!string.IsNullOrWhiteSpace(updateDTO.PhoneNumber))
+			user.PhoneNumber = updateDTO.PhoneNumber;
+
+		if (!string.IsNullOrWhiteSpace(updateDTO.PersonalMail))
+			user.PersonalMail = updateDTO.PersonalMail;
+
+		if (updateDTO.DateOfBirth.HasValue)
+			user.DateOfBirth = updateDTO.DateOfBirth;
+
+		var result = await userManager.UpdateAsync(user);
+
+		if (result.Succeeded)
+		{
+			return Ok(new
+			{
+				success = true,
+				message = "Profile updated successfully",
+				timestamp = DateTime.UtcNow
+			});
+		}
+
+		return BadRequest(new
+		{
+			success = false,
+			message = "Failed to update profile",
+			errors = result.Errors.Select(e => e.Description).ToList(),
+			timestamp = DateTime.UtcNow
+		});
+	}
+
+
+	// Get user data by username
+	[HttpGet("username/{username}")]
+	[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
+	public async Task<IActionResult> GetUserByUsername(string username)
 		{
 			var user = await context.Users
 				.Include(u => u.Department)

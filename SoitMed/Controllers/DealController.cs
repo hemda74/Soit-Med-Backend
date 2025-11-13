@@ -93,8 +93,27 @@ namespace SoitMed.Controllers
             try
             {
                 var userId = GetCurrentUserId();
-                var userRole = "Salesman"; // This should be replaced with actual role checking
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("User not authenticated"));
+                }
+
+                var user = await GetCurrentUserAsync();
+                if (user == null)
+                {
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("User not found"));
+                }
+
+                // Get user roles
+                var userRoles = await UserManager.GetRolesAsync(user);
+                var userRole = userRoles.Contains("SuperAdmin") ? "SuperAdmin" 
+                    : userRoles.Contains("SalesManager") ? "SalesManager"
+                    : userRoles.Contains("Salesman") ? "Salesman"
+                    : "Salesman"; // Default fallback
                 
+                _logger.LogInformation("GetDeal - UserId: {UserId}, UserName: {UserName}, Roles: [{Roles}], UserRole: {UserRole}, DealId: {DealId}",
+                    userId, user.UserName, string.Join(", ", userRoles), userRole, id);
+
                 var result = await _dealService.GetDealAsync(id, userId, userRole);
 
                 if (result == null)
@@ -106,8 +125,8 @@ namespace SoitMed.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                _logger.LogWarning(ex, "Unauthorized access to deal");
-                return Forbid();
+                _logger.LogWarning(ex, "Unauthorized access to deal {DealId}: {Message}", id, ex.Message);
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {

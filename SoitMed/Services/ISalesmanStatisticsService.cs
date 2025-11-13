@@ -9,8 +9,8 @@ namespace SoitMed.Services
         Task<List<SalesmanStatisticsDTO>> GetAllSalesmenStatisticsAsync(int year, int? quarter = null);
         
         // Targets
-        Task<SalesmanTargetDTO> CreateTargetAsync(CreateSalesmanTargetDTO dto, string managerId);
-        Task<SalesmanTargetDTO> UpdateTargetAsync(long targetId, CreateSalesmanTargetDTO dto);
+        Task<SalesmanTargetDTO> CreateTargetAsync(CreateSalesmanTargetDTO dto, string? managerId, string? salesmanId = null);
+        Task<SalesmanTargetDTO> UpdateTargetAsync(long targetId, CreateSalesmanTargetDTO dto, string? currentUserId = null);
         Task<bool> DeleteTargetAsync(long targetId);
         Task<SalesmanTargetDTO?> GetTargetAsync(long targetId);
         Task<List<SalesmanTargetDTO>> GetTargetsForSalesmanAsync(string salesmanId, int year);

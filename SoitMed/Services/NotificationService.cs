@@ -12,15 +12,21 @@ namespace SoitMed.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IHubContext<NotificationHub> _hubContext;
         private readonly ILogger<NotificationService> _logger;
+        private readonly IMobileNotificationService _mobileNotificationService;
 
-        public NotificationService(IUnitOfWork unitOfWork, IHubContext<NotificationHub> hubContext, ILogger<NotificationService> logger)
+        public NotificationService(
+            IUnitOfWork unitOfWork, 
+            IHubContext<NotificationHub> hubContext, 
+            ILogger<NotificationService> logger,
+            IMobileNotificationService mobileNotificationService)
         {
             _unitOfWork = unitOfWork;
             _hubContext = hubContext;
             _logger = logger;
+            _mobileNotificationService = mobileNotificationService;
         }
 
-        public async Task<Notification> CreateNotificationAsync(string userId, string title, string message, string type, string? priority = null, long? requestWorkflowId = null, long? activityLogId = null, bool isMobilePush = false, CancellationToken cancellationToken = default)
+        public async Task<Notification> CreateNotificationAsync(string userId, string title, string message, string type, string? priority = null, long? requestWorkflowId = null, long? activityLogId = null, bool isMobilePush = false, Dictionary<string, object>? metadata = null, CancellationToken cancellationToken = default)
         {
             var notification = new Notification
             {
@@ -38,23 +44,151 @@ namespace SoitMed.Services
             await _unitOfWork.Notifications.CreateAsync(notification, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            // Send real-time notification via SignalR
-            await _hubContext.Clients.Group($"User_{userId}").SendAsync("ReceiveNotification", new
-            {
-                Id = notification.Id,
-                Title = notification.Title,
-                Message = notification.Message,
-                Type = notification.Type,
-                Priority = notification.Priority,
-                IsRead = notification.IsRead,
-                CreatedAt = notification.CreatedAt,
-                RequestWorkflowId = notification.RequestWorkflowId,
-                ActivityLogId = notification.ActivityLogId
-            });
+            _logger.LogInformation("📝 Notification saved to database. NotificationId: {NotificationId}, UserId: {UserId}, Type: {Type}, Title: {Title}", 
+                notification.Id, userId, type, title);
 
-            _logger.LogInformation($"Notification sent to user {userId}: {title}");
+            // Send real-time notification via SignalR
+            try
+            {
+                var signalRGroup = $"User_{userId}";
+                _logger.LogInformation("📡 Attempting to send SignalR notification to group: {Group}", signalRGroup);
+                
+                // Build SignalR payload with metadata
+                var signalRPayload = new Dictionary<string, object>
+                {
+                    ["Id"] = notification.Id,
+                    ["Title"] = notification.Title,
+                    ["Message"] = notification.Message,
+                    ["Type"] = notification.Type,
+                    ["Priority"] = notification.Priority,
+                    ["IsRead"] = notification.IsRead,
+                    ["CreatedAt"] = notification.CreatedAt,
+                    ["RequestWorkflowId"] = notification.RequestWorkflowId,
+                    ["ActivityLogId"] = notification.ActivityLogId,
+                    ["Category"] = type, // Add category for easy filtering
+                    ["UserId"] = userId // Include userId in payload for verification
+                };
+
+                // Add custom metadata if provided
+                if (metadata != null && metadata.Count > 0)
+                {
+                    foreach (var kvp in metadata)
+                    {
+                        signalRPayload[kvp.Key] = kvp.Value;
+                    }
+                    _logger.LogInformation("📦 Added metadata to notification: {Metadata}", string.Join(", ", metadata.Keys));
+                }
+                
+                // Send to user's personal group
+                await _hubContext.Clients.Group(signalRGroup).SendAsync("ReceiveNotification", signalRPayload);
+                _logger.LogInformation("✅ SignalR notification sent successfully to personal group {Group} for user {UserId}: {Title}", 
+                    signalRGroup, userId, title);
+
+                // Also try to get user's roles and send to role groups as backup
+                try
+                {
+                    var user = await _unitOfWork.Users.GetByIdAsync(userId);
+                    if (user != null)
+                    {
+                        // Note: This requires UserManager which we don't have here
+                        // Role-based broadcasting would need to be handled at the caller level
+                        // For now, personal group should be sufficient
+                    }
+                }
+                catch (Exception roleEx)
+                {
+                    _logger.LogDebug(roleEx, "Could not send to role groups (this is optional)");
+                }
+            }
+            catch (Exception signalREx)
+            {
+                _logger.LogError(signalREx, "⚠️ Failed to send SignalR notification to user {UserId} (notification is still saved in DB). Error: {Error}", 
+                    userId, signalREx.Message);
+                // Don't throw - notification is saved, just real-time delivery failed
+            }
+
+            // Send push notification if requested (for when app is closed)
+            if (isMobilePush)
+            {
+                try
+                {
+                    // Build push notification data with metadata
+                    var pushData = new Dictionary<string, object>
+                    {
+                        ["notificationId"] = notification.Id,
+                        ["type"] = type,
+                        ["priority"] = priority ?? "Medium"
+                    };
+
+                    // Add custom metadata if provided
+                    if (metadata != null && metadata.Count > 0)
+                    {
+                        foreach (var kvp in metadata)
+                        {
+                            pushData[kvp.Key] = kvp.Value;
+                        }
+                    }
+
+                    await _mobileNotificationService.SendPushNotificationAsync(
+                        userId, 
+                        title, 
+                        message, 
+                        pushData, 
+                        cancellationToken);
+                    
+                    _logger.LogInformation("✅ Push notification sent to user {UserId}: {Title}", userId, title);
+                }
+                catch (Exception pushEx)
+                {
+                    _logger.LogWarning(pushEx, "⚠️ Failed to send push notification to user {UserId} (SignalR notification still sent)", userId);
+                    // Don't throw - SignalR notification was sent, just push notification failed
+                }
+            }
+
+            _logger.LogInformation("📬 Notification process completed for user {UserId}: {Title}", userId, title);
 
             return notification;
+        }
+
+        public async Task SendNotificationToRoleGroupAsync(string role, string title, string message, Dictionary<string, object>? metadata = null, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var roleGroup = $"Role_{role}";
+                _logger.LogInformation("📡 Attempting to send SignalR notification to role group: {Group}", roleGroup);
+                
+                // Build SignalR payload
+                var signalRPayload = new Dictionary<string, object>
+                {
+                    ["Title"] = title,
+                    ["Message"] = message,
+                    ["Type"] = "Broadcast",
+                    ["Priority"] = "High",
+                    ["Category"] = role,
+                    ["CreatedAt"] = DateTime.UtcNow
+                };
+
+                // Add custom metadata if provided
+                if (metadata != null && metadata.Count > 0)
+                {
+                    foreach (var kvp in metadata)
+                    {
+                        signalRPayload[kvp.Key] = kvp.Value;
+                    }
+                    _logger.LogInformation("📦 Added metadata to role group notification: {Metadata}", string.Join(", ", metadata.Keys));
+                }
+                
+                // Send to role group
+                await _hubContext.Clients.Group(roleGroup).SendAsync("ReceiveNotification", signalRPayload);
+                _logger.LogInformation("✅ SignalR notification sent successfully to role group {Group}: {Title}", 
+                    roleGroup, title);
+            }
+            catch (Exception signalREx)
+            {
+                _logger.LogError(signalREx, "⚠️ Failed to send SignalR notification to role group {Role}. Error: {Error}", 
+                    role, signalREx.Message);
+                throw;
+            }
         }
 
         public async Task<IEnumerable<Notification>> GetUserNotificationsAsync(string userId, int page = 1, int pageSize = 20, bool unreadOnly = false, CancellationToken cancellationToken = default)
@@ -154,6 +288,7 @@ namespace SoitMed.Services
                     requestWorkflow.Id, 
                     activityLogId, 
                     true, // Mobile push for important requests
+                    null, // metadata
                     cancellationToken);
             }
 
@@ -194,6 +329,7 @@ namespace SoitMed.Services
                     requestWorkflowId,
                     requestWorkflow.ActivityLogId,
                     true,
+                    null, // metadata
                     cancellationToken);
             }
         }
@@ -233,6 +369,7 @@ namespace SoitMed.Services
                     requestWorkflowId,
                     requestWorkflow.ActivityLogId,
                     false,
+                    null, // metadata
                     cancellationToken);
             }
         }

@@ -48,6 +48,11 @@ namespace SoitMed.Controllers
 
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Task progress created successfully"));
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access attempt for creating task progress by user {UserId}", GetCurrentUserId());
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
+            }
             catch (ArgumentException ex)
             {
                 _logger.LogWarning(ex, "Invalid request for creating task progress");
@@ -78,6 +83,11 @@ namespace SoitMed.Controllers
                 var result = await _taskProgressService.CreateProgressAndOfferRequestAsync(createDto, userId);
 
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Task progress created and offer request triggered successfully"));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access attempt for creating task progress with offer request by user {UserId}", GetCurrentUserId());
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
             }
             catch (ArgumentException ex)
             {
@@ -196,15 +206,15 @@ namespace SoitMed.Controllers
 
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Task progress updated successfully"));
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access attempt for updating task progress by user {UserId}", GetCurrentUserId());
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
+            }
             catch (ArgumentException ex)
             {
                 _logger.LogWarning(ex, "Invalid request for updating task progress");
                 return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                _logger.LogWarning(ex, "Unauthorized access to update task progress");
-                return Forbid();
             }
             catch (Exception ex)
             {

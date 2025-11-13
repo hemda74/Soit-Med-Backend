@@ -190,5 +190,17 @@ namespace SoitMed.Repositories
 
             return TimeSpan.FromMilliseconds(averageTime);
         }
+
+        public async Task<List<OfferRequest>> GetByIdsAsync(IEnumerable<long> ids)
+        {
+            var idList = ids.ToList();
+            if (!idList.Any())
+                return new List<OfferRequest>();
+
+            return await _context.OfferRequests
+                .AsNoTracking()
+                .Where(or => idList.Contains(or.Id))
+                .ToListAsync();
+        }
     }
 }
