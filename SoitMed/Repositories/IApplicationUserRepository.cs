@@ -15,5 +15,6 @@ namespace SoitMed.Repositories
         Task<IEnumerable<ApplicationUser>> GetUsersByRoleAsync(string role, CancellationToken cancellationToken = default);
         Task<IEnumerable<ApplicationUser>> GetUsersInRoleAsync(string role, CancellationToken cancellationToken = default);
         Task<IEnumerable<ApplicationUser>> GetUsersByLastLoginDateAsync(DateTime date, CancellationToken cancellationToken = default);
+        Task<List<ApplicationUser>> GetByIdsAsync(IEnumerable<string> ids);
     }
 }

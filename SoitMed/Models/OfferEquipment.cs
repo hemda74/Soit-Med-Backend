@@ -27,6 +27,8 @@ namespace SoitMed.Models
         [MaxLength(500)]
         public string? ImagePath { get; set; }
         
+        public int? Year { get; set; }
+
         [Required]
         [Column(TypeName = "decimal(18,2)")]
         public decimal Price { get; set; }

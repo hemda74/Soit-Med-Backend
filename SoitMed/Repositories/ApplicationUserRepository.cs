@@ -79,5 +79,24 @@ namespace SoitMed.Repositories
                 .Where(u => u.LastLoginAt.HasValue && u.LastLoginAt.Value.Date == date.Date)
                 .ToListAsync(cancellationToken);
         }
+
+        public async Task<List<ApplicationUser>> GetByIdsAsync(IEnumerable<string> ids)
+        {
+            var idList = ids.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+            if (!idList.Any())
+                return new List<ApplicationUser>();
+
+            // Safety limit to prevent memory issues and connection pool exhaustion
+            const int maxBatchSize = 1000;
+            if (idList.Count > maxBatchSize)
+            {
+                idList = idList.Take(maxBatchSize).ToList();
+            }
+
+            return await _dbSet
+                .AsNoTracking()
+                .Where(u => idList.Contains(u.Id))
+                .ToListAsync();
+        }
     }
 }

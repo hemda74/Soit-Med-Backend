@@ -25,6 +25,15 @@ namespace SoitMed.Repositories
         // Equipment repositories
         private IEquipmentRepository? _equipment;
         private IRepairRequestRepository? _repairRequests;
+        
+        // Maintenance repositories
+        private IMaintenanceRequestRepository? _maintenanceRequests;
+        private IMaintenanceVisitRepository? _maintenanceVisits;
+        private ISparePartRequestRepository? _sparePartRequests;
+        private IMaintenanceRequestAttachmentRepository? _maintenanceRequestAttachments;
+        
+        // Payment repositories
+        private IPaymentRepository? _payments;
 
         // Identity repositories
         private IApplicationUserRepository? _users;
@@ -62,9 +71,13 @@ namespace SoitMed.Repositories
         private IOfferEquipmentRepository? _offerEquipment;
         private IOfferTermsRepository? _offerTerms;
         private IInstallmentPlanRepository? _installmentPlans;
+        private IRecentOfferActivityRepository? _recentOfferActivities;
 
         // Salesman targets repository
         private ISalesmanTargetRepository? _salesmanTargets;
+
+        // Products catalog repository
+        private IProductRepository? _products;
 
         public UnitOfWork(Context context)
         {
@@ -104,6 +117,23 @@ namespace SoitMed.Repositories
 
         public IRepairRequestRepository RepairRequests => 
             _repairRequests ??= new RepairRequestRepository(_context);
+        
+        // Maintenance repositories
+        public IMaintenanceRequestRepository MaintenanceRequests => 
+            _maintenanceRequests ??= new MaintenanceRequestRepository(_context);
+        
+        public IMaintenanceVisitRepository MaintenanceVisits => 
+            _maintenanceVisits ??= new MaintenanceVisitRepository(_context);
+        
+        public ISparePartRequestRepository SparePartRequests => 
+            _sparePartRequests ??= new SparePartRequestRepository(_context);
+        
+        public IMaintenanceRequestAttachmentRepository MaintenanceRequestAttachments => 
+            _maintenanceRequestAttachments ??= new MaintenanceRequestAttachmentRepository(_context);
+        
+        // Payment repositories
+        public IPaymentRepository Payments => 
+            _payments ??= new PaymentRepository(_context);
 
         // Identity repositories
         public IApplicationUserRepository Users => 
@@ -176,8 +206,14 @@ namespace SoitMed.Repositories
         public IInstallmentPlanRepository InstallmentPlans => 
             _installmentPlans ??= new InstallmentPlanRepository(_context);
 
+        public IRecentOfferActivityRepository RecentOfferActivities => 
+            _recentOfferActivities ??= new RecentOfferActivityRepository(_context);
+
         public ISalesmanTargetRepository SalesmanTargets => 
             _salesmanTargets ??= new SalesmanTargetRepository(_context);
+
+        public IProductRepository Products => 
+            _products ??= new ProductRepository(_context);
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

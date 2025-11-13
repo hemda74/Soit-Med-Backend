@@ -17,6 +17,7 @@ namespace SoitMed.Extensions
             services.AddScoped<IValidationService, ValidationService>();
             services.AddScoped<IMappingService, MappingService>();
             services.AddScoped<IWeeklyPlanService, WeeklyPlanService>();
+            services.AddScoped<IWeeklyPlanTaskService, WeeklyPlanTaskService>();
 
             // Sales workflow services
             services.AddScoped<ITaskProgressService, TaskProgressService>();
@@ -26,7 +27,19 @@ namespace SoitMed.Extensions
             
             // Enhanced offer services
             services.AddScoped<IOfferEquipmentImageService, OfferEquipmentImageService>();
-            services.AddScoped<IPdfExportService, PdfExportService>();
+            
+            // Product catalog service
+            services.AddScoped<IProductService, ProductService>();
+
+            // Maintenance services
+            services.AddScoped<IMaintenanceRequestService, MaintenanceRequestService>();
+            services.AddScoped<IMaintenanceVisitService, MaintenanceVisitService>();
+            services.AddScoped<ISparePartRequestService, SparePartRequestService>();
+            services.AddScoped<IMaintenanceAttachmentService, MaintenanceAttachmentService>();
+
+            // Payment services
+            services.AddScoped<IPaymentService, PaymentService>();
+            services.AddScoped<IAccountingService, AccountingService>();
 
             return services;
         }

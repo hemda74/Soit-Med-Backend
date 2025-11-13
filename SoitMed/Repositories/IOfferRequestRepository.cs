@@ -24,6 +24,7 @@ namespace SoitMed.Repositories
         Task<List<OfferRequest>> GetRequestsWithOffersAsync();
         Task<List<OfferRequest>> GetRequestsWithoutOffersAsync();
         Task<TimeSpan?> GetAverageProcessingTimeAsync(DateTime? startDate, DateTime? endDate);
+        Task<List<OfferRequest>> GetByIdsAsync(IEnumerable<long> ids);
     }
 }
 

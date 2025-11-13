@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SoitMed.Models.Identity;
 
 namespace SoitMed.Models.Equipment
 {
@@ -35,12 +36,18 @@ namespace SoitMed.Models.Equipment
         public DateTime? PurchaseDate { get; set; }
         public DateTime? WarrantyExpiry { get; set; }
 
-        // Foreign Key to Hospital
-        [Required]
-        public string HospitalId { get; set; } = string.Empty;
+        // Foreign Key to Hospital (nullable - equipment can be linked to hospital OR customer)
+        public string? HospitalId { get; set; }
 
         [ForeignKey("HospitalId")]
-        public virtual Hospital.Hospital Hospital { get; set; } = null!;
+        public virtual Hospital.Hospital? Hospital { get; set; }
+
+        // Foreign Key to Customer (Doctor/Technician/Manager) - nullable
+        [MaxLength(450)]
+        public string? CustomerId { get; set; }
+
+        [ForeignKey("CustomerId")]
+        public virtual Identity.ApplicationUser? Customer { get; set; }
 
         // Tracking repair visits
         public int RepairVisitCount { get; set; } = 0;

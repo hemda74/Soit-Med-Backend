@@ -22,6 +22,15 @@ namespace SoitMed.Repositories
         // Equipment repositories
         IEquipmentRepository Equipment { get; }
         IRepairRequestRepository RepairRequests { get; }
+        
+        // Maintenance repositories
+        IMaintenanceRequestRepository MaintenanceRequests { get; }
+        IMaintenanceVisitRepository MaintenanceVisits { get; }
+        ISparePartRequestRepository SparePartRequests { get; }
+        IMaintenanceRequestAttachmentRepository MaintenanceRequestAttachments { get; }
+        
+        // Payment repositories
+        IPaymentRepository Payments { get; }
 
         // Identity repositories
         IApplicationUserRepository Users { get; }
@@ -57,9 +66,13 @@ namespace SoitMed.Repositories
         IOfferEquipmentRepository OfferEquipment { get; }
         IOfferTermsRepository OfferTerms { get; }
         IInstallmentPlanRepository InstallmentPlans { get; }
+        IRecentOfferActivityRepository RecentOfferActivities { get; }
 
         // Salesman targets repository
         ISalesmanTargetRepository SalesmanTargets { get; }
+
+        // Products catalog repository
+        IProductRepository Products { get; }
 
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

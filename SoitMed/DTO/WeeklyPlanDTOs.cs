@@ -16,6 +16,11 @@ namespace SoitMed.DTO
 
         [MaxLength(1000)]
         public string? Description { get; set; }
+
+        /// <summary>
+        /// Optional: Tasks to create along with the weekly plan
+        /// </summary>
+        public List<CreateWeeklyPlanTaskDTO>? Tasks { get; set; }
     }
 
     public class UpdateWeeklyPlanDTO
@@ -79,16 +84,17 @@ namespace SoitMed.DTO
     public class WeeklyPlanTaskResponseDTO
     {
         public long Id { get; set; }
-        public string TaskType { get; set; } = string.Empty;
+        public long WeeklyPlanId { get; set; }
+        public string Title { get; set; } = string.Empty;
         public long? ClientId { get; set; }
         public string? ClientName { get; set; }
         public string? ClientStatus { get; set; }
+        public string? ClientPhone { get; set; }
+        public string? ClientAddress { get; set; }
+        public string? ClientLocation { get; set; }
         public string? ClientClassification { get; set; }
         public DateTime? PlannedDate { get; set; }
-        public string? PlannedTime { get; set; }
-        public string? Purpose { get; set; }
-        public string Priority { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
+        public string? Notes { get; set; }
         public int ProgressCount { get; set; }
         public List<TaskProgressSimpleDTO> Progresses { get; set; } = new();
         public List<OfferRequestSimpleDTO> OfferRequests { get; set; } = new();
@@ -121,7 +127,7 @@ namespace SoitMed.DTO
         public long Id { get; set; }
         public string Products { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
-        public DateTime ValidUntil { get; set; }
+        public List<string>? ValidUntil { get; set; } // Changed to List<string> to match SalesOffer model
         public string Status { get; set; } = string.Empty;
         public DateTime? SentToClientAt { get; set; }
     }

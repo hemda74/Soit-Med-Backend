@@ -11,5 +11,6 @@ namespace SoitMed.Repositories
         Task<IEnumerable<Client>> GetClientsNeedingFollowUpAsync(string userId);
         Task<Client?> FindOrCreateClientAsync(string name, string type, string? specialization, string createdBy);
         Task<object> GetClientStatisticsAsync(string userId);
+        Task<List<Client>> GetByIdsAsync(IEnumerable<long> ids);
     }
 }
