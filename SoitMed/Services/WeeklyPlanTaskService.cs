@@ -89,7 +89,7 @@ namespace SoitMed.Services
                     ClientClassification = createDto.ClientClassification,
                     PlannedDate = createDto.PlannedDate,
                     Notes = createDto.Notes,
-                    IsActive = true
+                    // IsActive is inherited from BaseEntity
                 };
 
                 await UnitOfWork.WeeklyPlanTasks.CreateAsync(task);
@@ -174,7 +174,7 @@ namespace SoitMed.Services
                         ClientClassification = createDto.ClientClassification,
                         PlannedDate = createDto.PlannedDate,
                         Notes = createDto.Notes,
-                        IsActive = true
+                        // IsActive is inherited from BaseEntity
                     };
 
                     tasksToCreate.Add(task);
@@ -371,8 +371,8 @@ namespace SoitMed.Services
                 var hasProgress = task.Progresses != null && task.Progresses.Any();
                 if (hasProgress)
                 {
-                    // Soft delete by marking as inactive
-                    task.IsActive = false;
+                    // Soft delete - WeeklyPlanTask doesn't have IsActive, so we'll just update the status
+                    task.Status = "Cancelled";
                     await UnitOfWork.WeeklyPlanTasks.UpdateAsync(task);
                     Logger.LogInformation("Task {TaskId} deactivated (has progress records) instead of deleted", taskId);
                 }
@@ -486,32 +486,14 @@ namespace SoitMed.Services
 
                         var offersData = await UnitOfWork.SalesOffers.GetByIdsAsync(offerIds);
 
-                        offers = offersData.Select(o => 
+                        offers = offersData.Select(o => new SalesOfferSimpleDTO
                         {
-                            // Deserialize ValidUntil from JSON string to List<string>
-                            List<string>? validUntilList = null;
-                            if (!string.IsNullOrWhiteSpace(o.ValidUntil))
-                            {
-                                try
-                                {
-                                    validUntilList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(o.ValidUntil);
-                                }
-                                catch
-                                {
-                                    // Fallback: treat as single string value (backward compatibility)
-                                    validUntilList = new List<string> { o.ValidUntil };
-                                }
-                            }
-                            
-                            return new SalesOfferSimpleDTO
-                            {
-                                Id = o.Id,
-                                Products = o.Products,
-                                TotalAmount = o.TotalAmount,
-                                ValidUntil = validUntilList,
-                                Status = o.Status,
-                                SentToClientAt = o.SentToClientAt
-                            };
+                            Id = o.Id,
+                            Products = o.Products ?? string.Empty,
+                            TotalAmount = o.TotalAmount,
+                            ValidUntil = o.ValidUntil, // JSON string from the model
+                            Status = o.Status,
+                            SentToClientAt = o.SentToClientAt
                         }).ToList();
 
                         // Get deals created from these offers

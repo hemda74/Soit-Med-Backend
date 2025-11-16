@@ -237,7 +237,7 @@ namespace SoitMed.Services
                     offers = offersData.Select(o => new SalesOfferSimpleDTO
                     {
                         Id = o.Id,
-                        Products = o.Products,
+                        Products = o.Products ?? string.Empty,
                         TotalAmount = o.TotalAmount,
                         ValidUntil = o.ValidUntil,
                         Status = o.Status,
@@ -272,16 +272,17 @@ namespace SoitMed.Services
             return new WeeklyPlanTaskResponseDTO
             {
                 Id = task.Id,
-                TaskType = task.TaskType,
+                WeeklyPlanId = task.WeeklyPlanId,
+                Title = task.Title,
                 ClientId = task.ClientId,
                 ClientName = task.ClientName,
                 ClientStatus = task.ClientStatus,
+                ClientPhone = task.ClientPhone,
+                ClientAddress = task.ClientAddress,
+                ClientLocation = task.ClientLocation,
                 ClientClassification = task.ClientClassification,
                 PlannedDate = task.PlannedDate,
-                PlannedTime = task.PlannedTime,
-                Purpose = task.Purpose,
-                Priority = task.Priority,
-                Status = task.Status,
+                Notes = task.Notes,
                 ProgressCount = task.Progresses.Count,
                 Progresses = task.Progresses.Select(p => new TaskProgressSimpleDTO
                 {
@@ -396,16 +397,17 @@ namespace SoitMed.Services
                 Tasks = plan.Tasks.Select(t => new WeeklyPlanTaskResponseDTO
                 {
                     Id = t.Id,
-                    TaskType = t.TaskType,
+                    WeeklyPlanId = t.WeeklyPlanId,
+                    Title = t.Title,
                     ClientId = t.ClientId,
                     ClientName = t.ClientName,
                     ClientStatus = t.ClientStatus,
+                    ClientPhone = t.ClientPhone,
+                    ClientAddress = t.ClientAddress,
+                    ClientLocation = t.ClientLocation,
                     ClientClassification = t.ClientClassification,
                     PlannedDate = t.PlannedDate,
-                    PlannedTime = t.PlannedTime,
-                    Purpose = t.Purpose,
-                    Priority = t.Priority,
-                    Status = t.Status,
+                    Notes = t.Notes,
                     ProgressCount = t.Progresses.Count
                 }).ToList()
             };

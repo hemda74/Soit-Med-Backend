@@ -127,7 +127,7 @@ namespace SoitMed.DTO
         public long Id { get; set; }
         public string Products { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
-        public List<string>? ValidUntil { get; set; } // Changed to List<string> to match SalesOffer model
+        public string? ValidUntil { get; set; } // JSON array of date strings
         public string Status { get; set; } = string.Empty;
         public DateTime? SentToClientAt { get; set; }
     }
