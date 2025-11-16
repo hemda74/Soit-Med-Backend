@@ -201,7 +201,7 @@ namespace SoitMed.Services
                 {
                     query = query.Where(or => or.AssignedTo == userId);
                 }
-                else if (userRole == "Salesman")
+                else if (userRole == "Salesman" || userRole == "Customer")
                 {
                     query = query.Where(or => or.RequestedBy == userId);
                 }

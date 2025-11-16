@@ -30,6 +30,12 @@ namespace SoitMed.DTO
     /// </summary>
     public class CreateDealDto
     {
+        [Required(ErrorMessage = "Client ID is required.")]
+        public long ClientId { get; set; }
+
+        [MaxLength(200)]
+        public string? Title { get; set; }
+
         [Required(ErrorMessage = "Deal value is required.")]
         [Range(0.01, double.MaxValue, ErrorMessage = "Deal value must be greater than 0.")]
         public decimal DealValue { get; set; }
@@ -42,9 +48,18 @@ namespace SoitMed.DTO
     /// </summary>
     public class CreateOfferDto
     {
+        [Required(ErrorMessage = "Client ID is required.")]
+        public long ClientId { get; set; }
+
+        [MaxLength(200)]
+        public string? Title { get; set; }
+
         [Required(ErrorMessage = "Offer details are required.")]
         [MaxLength(2000, ErrorMessage = "Offer details cannot exceed 2000 characters.")]
         public string OfferDetails { get; set; } = string.Empty;
+
+        [Range(0.01, double.MaxValue, ErrorMessage = "Offer value must be greater than 0.")]
+        public decimal? Value { get; set; }
 
         [MaxLength(500, ErrorMessage = "Document URL cannot exceed 500 characters.")]
         public string? DocumentUrl { get; set; }
@@ -58,7 +73,7 @@ namespace SoitMed.DTO
         [Range(0.01, double.MaxValue, ErrorMessage = "Deal value must be greater than 0.")]
         public decimal? DealValue { get; set; }
 
-        public DealStatus? Status { get; set; }
+        public string? Status { get; set; }
         public DateTime? ExpectedCloseDate { get; set; }
     }
 
@@ -70,7 +85,7 @@ namespace SoitMed.DTO
         [MaxLength(2000, ErrorMessage = "Offer details cannot exceed 2000 characters.")]
         public string? OfferDetails { get; set; }
 
-        public OfferStatus? Status { get; set; }
+        public string? Status { get; set; }
 
         [MaxLength(500, ErrorMessage = "Document URL cannot exceed 500 characters.")]
         public string? DocumentUrl { get; set; }
@@ -84,7 +99,7 @@ namespace SoitMed.DTO
     public class ActivityResponseDto
     {
         public long Id { get; set; }
-        public long PlanTaskId { get; set; }
+        public int TaskId { get; set; }
         public string UserId { get; set; } = string.Empty;
         public string UserName { get; set; } = string.Empty;
         public InteractionType InteractionType { get; set; }
@@ -93,7 +108,7 @@ namespace SoitMed.DTO
         public string ClientTypeName { get; set; } = string.Empty;
         public ActivityResult Result { get; set; }
         public string ResultName { get; set; } = string.Empty;
-        public RejectionReason? Reason { get; set; }
+        public string? Reason { get; set; }
         public string? ReasonName { get; set; }
         public string? Comment { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -112,7 +127,7 @@ namespace SoitMed.DTO
         public string UserId { get; set; } = string.Empty;
         public string UserName { get; set; } = string.Empty;
         public decimal DealValue { get; set; }
-        public DealStatus Status { get; set; }
+        public string Status { get; set; } = string.Empty;
         public string StatusName { get; set; } = string.Empty;
         public DateTime? ExpectedCloseDate { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -129,7 +144,7 @@ namespace SoitMed.DTO
         public string UserId { get; set; } = string.Empty;
         public string UserName { get; set; } = string.Empty;
         public string OfferDetails { get; set; } = string.Empty;
-        public OfferStatus Status { get; set; }
+        public string Status { get; set; } = string.Empty;
         public string StatusName { get; set; } = string.Empty;
         public string? DocumentUrl { get; set; }
         public DateTime CreatedAt { get; set; }

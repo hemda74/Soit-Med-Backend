@@ -83,14 +83,22 @@ namespace SoitMed.Controllers
         /// Get all offers
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Customer")]
         public async Task<IActionResult> GetOffers([FromQuery] string? status = null, [FromQuery] string? clientId = null, [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
         {
             try
             {
+                var userId = GetCurrentUserId();
+                var userRole = GetCurrentUserRole();
+                
                 List<OfferResponseDTO> result;
                 
-                if (!string.IsNullOrEmpty(clientId) && long.TryParse(clientId, out var clientIdLong))
+                // If Customer role, only return offers assigned to them
+                if (userRole == "Customer")
+                {
+                    result = await _offerService.GetOffersByCustomerAsync(userId);
+                }
+                else if (!string.IsNullOrEmpty(clientId) && long.TryParse(clientId, out var clientIdLong))
                 {
                     result = await _offerService.GetOffersByClientAsync(clientIdLong);
                 }
@@ -459,10 +467,22 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet("assigned-to-me")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "Salesman,Customer")]
         public async Task<IActionResult> GetAssignedOffers()
         {
-            var result = await _offerService.GetOffersBySalesmanAsync(GetCurrentUserId());
+            var userId = GetCurrentUserId();
+            var userRole = GetCurrentUserRole();
+            
+            List<OfferResponseDTO> result;
+            if (userRole == "Customer")
+            {
+                result = await _offerService.GetOffersByCustomerAsync(userId);
+            }
+            else
+            {
+                result = await _offerService.GetOffersBySalesmanAsync(userId);
+            }
+            
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Retrieved"));
         }
 
@@ -583,7 +603,7 @@ namespace SoitMed.Controllers
         /// Record client response to an offer (Accept/Reject)
         /// </summary>
         [HttpPost("{offerId}/client-response")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin,Customer")]
         public async Task<IActionResult> RecordClientResponse(long offerId, [FromBody] RecordClientResponseDTO dto)
         {
             try
@@ -641,7 +661,7 @@ namespace SoitMed.Controllers
         /// Salesman can request modifications for offers assigned to them (on behalf of clients)
         /// </summary>
         [HttpPost("{offerId}/needs-modification")]
-        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman,Customer")]
         public async Task<IActionResult> MarkAsNeedsModification(long offerId, [FromBody] NeedsModificationDTO dto)
         {
             try
@@ -729,6 +749,25 @@ namespace SoitMed.Controllers
             {
                 _logger.LogError(ex, "Error retrieving recent activity");
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving recent activity"));
+            }
+        }
+
+        /// <summary>
+        /// Get full history of all actions performed on a specific offer (SalesManager and SuperAdmin only)
+        /// </summary>
+        [HttpGet("{id}/history")]
+        [Authorize(Roles = "SalesManager,SuperAdmin")]
+        public async Task<IActionResult> GetOfferHistory(long id)
+        {
+            try
+            {
+                var result = await _offerService.GetOfferHistoryAsync(id);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer history retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving offer history. OfferId: {OfferId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving offer history"));
             }
         }
     }

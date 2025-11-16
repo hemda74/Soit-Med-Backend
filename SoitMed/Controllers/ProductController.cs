@@ -36,7 +36,7 @@ namespace SoitMed.Controllers
         /// Get all products with optional filters
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin,Customer")]
         public async Task<IActionResult> GetAllProducts(
             [FromQuery] string? category = null,
             [FromQuery] bool? inStock = null)

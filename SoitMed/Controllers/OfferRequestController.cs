@@ -33,7 +33,7 @@ namespace SoitMed.Controllers
         /// Create new offer request
         /// </summary>
         [HttpPost]
-        [Authorize(Roles = "Salesman,SalesManager")]
+        [Authorize(Roles = "Salesman,SalesManager,Customer")]
         public async Task<IActionResult> CreateOfferRequest([FromBody] CreateOfferRequestDTO createDto)
         {
             try
@@ -64,7 +64,7 @@ namespace SoitMed.Controllers
         /// Get all offer requests
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "Salesman,SalesManager,SalesSupport,SuperAdmin")]
+        [Authorize(Roles = "Salesman,SalesManager,SalesSupport,SuperAdmin,Customer")]
         public async Task<IActionResult> GetOfferRequests([FromQuery] string? status = null, [FromQuery] string? requestedBy = null)
         {
             try
@@ -223,7 +223,7 @@ namespace SoitMed.Controllers
         /// Get my own offer requests (for salesmen)
         /// </summary>
         [HttpGet("my-requests")]
-        [Authorize(Roles = "Salesman,SalesManager")]
+        [Authorize(Roles = "Salesman,SalesManager,Customer")]
         public async Task<IActionResult> GetMyOfferRequests([FromQuery] string? status = null)
         {
             try

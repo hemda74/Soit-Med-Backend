@@ -130,7 +130,7 @@ namespace SoitMed.DTO
     // ==================== Offer DTOs ====================
     public class CreateOfferDTO
     {
-        public long? OfferRequestId { get; set; } // Optional - can create offer without request
+        public long? OfferRequestId { get; set; } // Optional - for tracking offer history when linked to a request
 
         [Required]
         public long ClientId { get; set; }
@@ -202,7 +202,7 @@ namespace SoitMed.DTO
 
     public class CreateOfferWithItemsDTO
     {
-        public long? OfferRequestId { get; set; }
+        public long? OfferRequestId { get; set; } // Optional - for tracking offer history when linked to a request
 
         [Required]
         public long ClientId { get; set; }
@@ -245,6 +245,8 @@ namespace SoitMed.DTO
     {
         public long Id { get; set; }
         public long? OfferRequestId { get; set; }
+        public string? OfferRequestRequesterId { get; set; } // Salesman or Customer who requested the offer
+        public string? OfferRequestRequesterName { get; set; } // Name of the requester (Salesman or Customer)
         public long ClientId { get; set; }
         public string ClientName { get; set; } = string.Empty;
         public string CreatedBy { get; set; } = string.Empty;

@@ -22,7 +22,7 @@ namespace SoitMed.Models
         public string CreatedBy { get; set; } = string.Empty; // Sales Support ID
         
         [Required]
-        public string AssignedTo { get; set; } = string.Empty; // Salesman ID
+        public string AssignedTo { get; set; } = string.Empty; // User ID (Salesman or Customer)
         #endregion
 
         #region Offer Details

@@ -5,12 +5,12 @@ using SoitMed.Models.Identity;
 namespace SoitMed.Models
 {
     /// <summary>
-    /// Represents a request for an offer from a salesman to sales support
+    /// Represents a request for an offer from a salesman or customer to sales support
     /// </summary>
     public class OfferRequest : BaseEntity
     {
         [Required]
-        public string RequestedBy { get; set; } // Salesman ID
+        public string RequestedBy { get; set; } // User ID (Salesman or Customer)
 
         [Required]
         public long ClientId { get; set; }

@@ -27,6 +27,8 @@ namespace SoitMed.Repositories
         Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
             GetOffersBySalesmanWithRelatedDataAsync(string salesmanId);
         Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
+            GetOffersByCustomerWithRelatedDataAsync(string customerId);
+        Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
             GetOffersByClientIdWithRelatedDataAsync(long clientId);
         Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
             GetOffersByStatusWithRelatedDataAsync(string? status);

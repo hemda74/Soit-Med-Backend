@@ -40,16 +40,39 @@ namespace SoitMed.Services
         {
             try
             {
-                var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId);
-                if (offerRequest == null)
-                    throw new ArgumentException("Offer request not found", nameof(createOfferDto.OfferRequestId));
+                // If OfferRequestId is provided, validate and link it
+                OfferRequest? offerRequest = null;
+                string assignedTo = createOfferDto.AssignedTo;
+
+                if (createOfferDto.OfferRequestId.HasValue)
+                {
+                    offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId.Value);
+                    if (offerRequest == null)
+                        throw new ArgumentException("Offer request not found", nameof(createOfferDto.OfferRequestId));
+
+                    // Determine who the offer should be assigned to:
+                    // - If AssignedTo is provided in DTO, use it (SalesSupport can assign to specific Salesman/Customer)
+                    // - Otherwise, assign to the requester (Salesman or Customer who created the request)
+                    if (string.IsNullOrEmpty(assignedTo))
+                    {
+                        assignedTo = offerRequest.RequestedBy;
+                    }
+                }
+                else
+                {
+                    // If no OfferRequestId, AssignedTo must be provided
+                    if (string.IsNullOrEmpty(createOfferDto.AssignedTo))
+                        throw new ArgumentException("AssignedTo is required when OfferRequestId is not provided", nameof(createOfferDto.AssignedTo));
+                    
+                    assignedTo = createOfferDto.AssignedTo;
+                }
 
                 var offer = new SalesOffer
                 {
                     OfferRequestId = createOfferDto.OfferRequestId,
                     ClientId = createOfferDto.ClientId,
-                    CreatedBy = userId,
-                    AssignedTo = createOfferDto.AssignedTo,
+                    CreatedBy = userId, // SalesSupport/SalesManager who creates the offer
+                    AssignedTo = assignedTo, // Salesman or Customer who requested it
                     Products = createOfferDto.Products,
                     TotalAmount = createOfferDto.TotalAmount,
                     PaymentTerms = createOfferDto.PaymentTerms != null && createOfferDto.PaymentTerms.Count > 0 
@@ -68,10 +91,15 @@ namespace SoitMed.Services
                     PaymentType = createOfferDto.PaymentType,
                     FinalPrice = createOfferDto.FinalPrice,
                     OfferDuration = createOfferDto.OfferDuration,
-                    Status = "Draft"
+                    Status = "Sent" // Start directly as Sent, not Draft - offer is ready to be reviewed by requester
                 };
 
                 await _unitOfWork.SalesOffers.CreateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Mark offer as sent (set SentToClientAt timestamp)
+                offer.MarkAsSent();
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
                 await _unitOfWork.SaveChangesAsync();
 
                 // Save recent activity for new offer creation (from request)
@@ -89,10 +117,13 @@ namespace SoitMed.Services
                     _logger.LogWarning(equipEx, "Failed to auto-add equipment to offer {OfferId}", offer.Id);
                 }
 
-                // Update offer request status and link the created offer
-                offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
-                await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
-                await _unitOfWork.SaveChangesAsync();
+                // Update offer request status and link the created offer (if linked to a request)
+                if (offerRequest != null)
+                {
+                    offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
+                    await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
+                    await _unitOfWork.SaveChangesAsync();
+                }
 
                 _logger.LogInformation("Offer created from request successfully. OfferId: {OfferId}, RequestId: {RequestId}", 
                     offer.Id, createOfferDto.OfferRequestId);
@@ -110,77 +141,8 @@ namespace SoitMed.Services
         {
             try
             {
-                var offer = new SalesOffer
-                {
-                    OfferRequestId = createOfferDto.OfferRequestId,
-                    ClientId = createOfferDto.ClientId,
-                    CreatedBy = userId,
-                    AssignedTo = createOfferDto.AssignedTo,
-                    Products = createOfferDto.Products,
-                    TotalAmount = createOfferDto.TotalAmount,
-                    PaymentTerms = createOfferDto.PaymentTerms != null && createOfferDto.PaymentTerms.Count > 0 
-                        ? JsonSerializer.Serialize(createOfferDto.PaymentTerms) 
-                        : null,
-                    DeliveryTerms = createOfferDto.DeliveryTerms != null && createOfferDto.DeliveryTerms.Count > 0 
-                        ? JsonSerializer.Serialize(createOfferDto.DeliveryTerms) 
-                        : null,
-                    WarrantyTerms = createOfferDto.WarrantyTerms != null && createOfferDto.WarrantyTerms.Count > 0 
-                        ? JsonSerializer.Serialize(createOfferDto.WarrantyTerms) 
-                        : null,
-                    ValidUntil = createOfferDto.ValidUntil != null && createOfferDto.ValidUntil.Count > 0 
-                        ? JsonSerializer.Serialize(createOfferDto.ValidUntil) 
-                        : null,
-                    Notes = createOfferDto.Notes,
-                    PaymentType = createOfferDto.PaymentType,
-                    FinalPrice = createOfferDto.FinalPrice,
-                    OfferDuration = createOfferDto.OfferDuration,
-                    Status = "Draft"
-                };
-
-                await _unitOfWork.SalesOffers.CreateAsync(offer);
-                await _unitOfWork.SaveChangesAsync();
-
-                // Save recent activity for new offer creation
-                await SaveRecentActivityAsync(offer, null);
-
-                // Auto-add equipment based on products
-                try
-                {
-                    await AutoAddEquipmentFromProductsAsync(offer.Id, createOfferDto.Products);
-                    _logger.LogInformation("Equipment auto-added to offer. OfferId: {OfferId}", offer.Id);
-                }
-                catch (Exception equipEx)
-                {
-                    // Log but don't fail offer creation
-                    _logger.LogWarning(equipEx, "Failed to auto-add equipment to offer {OfferId}", offer.Id);
-                }
-
-                // Update offer request if linked
-                if (createOfferDto.OfferRequestId.HasValue)
-                {
-                    try
-                    {
-                        var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId.Value);
-                        if (offerRequest != null)
-                        {
-                            offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
-                            await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
-                            await _unitOfWork.SaveChangesAsync();
-                            _logger.LogInformation("Offer request updated with created offer ID. RequestId: {RequestId}, OfferId: {OfferId}", 
-                                createOfferDto.OfferRequestId.Value, offer.Id);
-                        }
-                    }
-                    catch (Exception requestEx)
-                    {
-                        // Log but don't fail offer creation
-                        _logger.LogWarning(requestEx, "Failed to update offer request {RequestId} with created offer ID", 
-                            createOfferDto.OfferRequestId.Value);
-                    }
-                }
-
-                _logger.LogInformation("Offer created successfully. OfferId: {OfferId}", offer.Id);
-
-                return await MapToOfferResponseDTO(offer);
+                // Use CreateOfferFromRequestAsync - it handles both with and without OfferRequestId
+                return await CreateOfferFromRequestAsync(createOfferDto, userId);
             }
             catch (Exception ex)
             {
@@ -193,12 +155,30 @@ namespace SoitMed.Services
         {
             try
             {
+                // REQUIRE OfferRequestId - offers can only be created from requests
+                if (!createOfferDto.OfferRequestId.HasValue)
+                {
+                    throw new ArgumentException("OfferRequestId is required. Offers can only be created from offer requests initiated by Salesman or Customer.", nameof(createOfferDto.OfferRequestId));
+                }
+
+                // Get the offer request to link the offer properly
+                var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId.Value);
+                if (offerRequest == null)
+                    throw new ArgumentException("Offer request not found", nameof(createOfferDto.OfferRequestId));
+
+                // Determine who the offer should be assigned to:
+                // - If AssignedTo is provided in DTO, use it (SalesSupport can assign to specific Salesman/Customer)
+                // - Otherwise, assign to the requester (Salesman or Customer who created the request)
+                var assignedTo = !string.IsNullOrEmpty(createOfferDto.AssignedTo) 
+                    ? createOfferDto.AssignedTo 
+                    : offerRequest.RequestedBy;
+
                 var offer = new SalesOffer
                 {
-                    OfferRequestId = createOfferDto.OfferRequestId,
+                    OfferRequestId = createOfferDto.OfferRequestId, // REQUIRED - link to offer request
                     ClientId = createOfferDto.ClientId,
-                    CreatedBy = userId,
-                    AssignedTo = createOfferDto.AssignedTo,
+                    CreatedBy = userId, // SalesSupport/SalesManager who creates the offer
+                    AssignedTo = assignedTo, // Salesman or Customer who requested it
                     Products = string.Join(", ", createOfferDto.Products.Select(p => p.Name)),
                     TotalAmount = createOfferDto.TotalAmount,
                     PaymentTerms = createOfferDto.PaymentTerms != null && createOfferDto.PaymentTerms.Count > 0 
@@ -217,10 +197,15 @@ namespace SoitMed.Services
                     PaymentType = createOfferDto.PaymentType,
                     FinalPrice = createOfferDto.FinalPrice,
                     OfferDuration = createOfferDto.OfferDuration,
-                    Status = "Draft"
+                    Status = "Sent" // Start directly as Sent, not Draft - offer is ready to be reviewed by requester
                 };
 
                 await _unitOfWork.SalesOffers.CreateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Mark offer as sent (set SentToClientAt timestamp)
+                offer.MarkAsSent();
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
                 await _unitOfWork.SaveChangesAsync();
 
                 // Save recent activity for new offer creation
@@ -248,17 +233,10 @@ namespace SoitMed.Services
 
                 await _unitOfWork.SaveChangesAsync();
 
-                // Update offer request if linked
-                if (createOfferDto.OfferRequestId.HasValue)
-                {
-                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId.Value);
-                    if (offerRequest != null)
-                    {
-                        offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
-                        await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
-                        await _unitOfWork.SaveChangesAsync();
-                    }
-                }
+                // Update offer request status and link the created offer (REQUIRED - always linked)
+                offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
+                await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
+                await _unitOfWork.SaveChangesAsync();
 
                 _logger.LogInformation("Offer with items created successfully. OfferId: {OfferId}", offer.Id);
 
@@ -320,6 +298,24 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting offers by salesman. SalesmanId: {SalesmanId}", salesmanId);
+                throw;
+            }
+        }
+
+        public async Task<List<OfferResponseDTO>> GetOffersByCustomerAsync(string customerId)
+        {
+            try
+            {
+                // OPTIMIZED: Single method call loads offers + related data in O(1) queries (3 queries total)
+                var (offers, clientsDict, usersDict) = await _unitOfWork.SalesOffers
+                    .GetOffersByCustomerWithRelatedDataAsync(customerId);
+
+                // Map synchronously using pre-loaded data - O(n) in-memory operation
+                return offers.Select(o => MapToOfferResponseDTO(o, clientsDict, usersDict)).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting offers by customer. CustomerId: {CustomerId}", customerId);
                 throw;
             }
         }
@@ -483,6 +479,16 @@ namespace SoitMed.Services
                 var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
                 var clientName = client?.Name ?? "Unknown Client";
 
+                // Check if offer is in Draft status
+                if (offer.Status != OfferStatus.Draft)
+                    throw new InvalidOperationException("Only draft offers can be sent to salesman");
+
+                // Check if assigned user is Customer or Salesman
+                var assignedUser = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
+                var assignedUserRoles = assignedUser != null ? await _userManager.GetRolesAsync(assignedUser) : new List<string>();
+                bool isCustomer = assignedUserRoles.Contains("Customer");
+                bool isSalesman = assignedUserRoles.Contains("Salesman");
+
                 offer.MarkAsSent();
                 await _unitOfWork.SalesOffers.UpdateAsync(offer);
                 
@@ -504,19 +510,21 @@ namespace SoitMed.Services
 
                 _logger.LogInformation("Offer sent to salesman successfully. OfferId: {OfferId}", offerId);
 
-                // Send notification to salesman
+                // Send notification to assigned user (Salesman or Customer)
                 if (!string.IsNullOrEmpty(offer.AssignedTo))
                 {
                     try
                     {
-                        var salesman = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
-                        if (salesman != null && salesman.IsActive)
+                        // Reuse the assignedUser variable from above
+                        if (assignedUser != null && assignedUser.IsActive)
                         {
                             var creatorInfo = await _unitOfWork.Users.GetByIdAsync(userId);
                             var creatorName = creatorInfo != null ? $"{creatorInfo.FirstName} {creatorInfo.LastName}" : "Sales Support";
 
-                            var notificationTitle = "New Offer Available";
-                            var notificationMessage = $"{creatorName} has sent you an offer for {clientName}. Total: {offer.TotalAmount:C}";
+                            var notificationTitle = isCustomer ? "New Offer Received" : "New Offer Available";
+                            var notificationMessage = isCustomer
+                                ? $"You have received a new offer for {clientName}. Total: {offer.TotalAmount:C}"
+                                : $"{creatorName} has sent you an offer for {clientName}. Total: {offer.TotalAmount:C}";
 
                             // Add offerId to metadata for easy navigation
                             var metadata = new Dictionary<string, object>
@@ -539,22 +547,23 @@ namespace SoitMed.Services
                                 CancellationToken.None
                             );
 
-                            _logger.LogInformation("✅ Notification sent to Salesman: {SalesmanId} for Offer: {OfferId}", offer.AssignedTo, offerId);
+                            var userType = isCustomer ? "Customer" : "Salesman";
+                            _logger.LogInformation("✅ Notification sent to {UserType}: {UserId} for Offer: {OfferId}", userType, offer.AssignedTo, offerId);
                         }
                         else
                         {
-                            _logger.LogWarning("⚠️ Salesman {SalesmanId} not found or inactive. Notification not sent for Offer: {OfferId}", offer.AssignedTo, offerId);
+                            _logger.LogWarning("⚠️ Assigned user {UserId} not found or inactive. Notification not sent for Offer: {OfferId}", offer.AssignedTo, offerId);
                         }
                     }
                     catch (Exception notifEx)
                     {
-                        _logger.LogError(notifEx, "❌ Failed to send notification to Salesman {SalesmanId} for Offer: {OfferId}", offer.AssignedTo, offerId);
+                        _logger.LogError(notifEx, "❌ Failed to send notification to assigned user {UserId} for Offer: {OfferId}", offer.AssignedTo, offerId);
                         // Don't fail the whole operation if notification fails
                     }
                 }
                 else
                 {
-                    _logger.LogWarning("⚠️ Offer {OfferId} has no assigned salesman. Notification not sent.", offerId);
+                    _logger.LogWarning("⚠️ Offer {OfferId} has no assigned user. Notification not sent.", offerId);
                 }
 
                 return await MapToOfferResponseDTO(offer);
@@ -574,6 +583,24 @@ namespace SoitMed.Services
                 if (offer == null)
                     throw new ArgumentException("Offer not found", nameof(offerId));
 
+                // Verify user can respond to this offer (must be assigned to them if Customer or Salesman)
+                var user = await _unitOfWork.Users.GetByIdAsync(userId);
+                if (user != null)
+                {
+                    var userRoles = await _userManager.GetRolesAsync(user);
+                    bool isCustomerOrSalesman = userRoles.Contains("Customer") || userRoles.Contains("Salesman");
+                    bool isManagerOrAdmin = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin") || userRoles.Contains("SalesSupport");
+
+                    // If user is Customer or Salesman (and not a Manager/Admin), verify they are assigned to this offer
+                    if (isCustomerOrSalesman && !isManagerOrAdmin)
+                    {
+                        if (string.IsNullOrEmpty(offer.AssignedTo) || offer.AssignedTo != userId)
+                        {
+                            throw new UnauthorizedAccessException("You can only respond to offers assigned to you");
+                        }
+                    }
+                }
+
                 var oldStatus = offer.Status;
                 offer.RecordClientResponse(response, accepted);
                 await _unitOfWork.SalesOffers.UpdateAsync(offer);
@@ -588,8 +615,10 @@ namespace SoitMed.Services
                     try
                     {
                         // Check if deal already exists for this offer
-                        var existingDeal = await _unitOfWork.SalesDeals.GetQueryable()
-                            .FirstOrDefaultAsync(d => d.OfferId == offerId);
+                        var dealsQuery = _unitOfWork.SalesDeals.GetQueryable()
+                            .Where(d => d.OfferId == offerId);
+                        var existingDeals = dealsQuery.ToList();
+                        var existingDeal = existingDeals.FirstOrDefault();
 
                         if (existingDeal == null)
                         {
@@ -682,16 +711,16 @@ namespace SoitMed.Services
                 if (offer.Status != OfferStatus.Draft && offer.Status != OfferStatus.Sent)
                     throw new InvalidOperationException("Only draft or sent offers can be marked as needing modification");
 
-                // Check if user is a Salesman - if so, verify they are assigned to this offer
+                // Check if user is a Salesman or Customer - if so, verify they are assigned to this offer
                 var user = await _unitOfWork.Users.GetByIdAsync(userId);
                 if (user != null)
                 {
                     var userRoles = await _userManager.GetRolesAsync(user);
-                    bool isSalesman = userRoles.Contains("Salesman");
+                    bool isSalesmanOrCustomer = userRoles.Contains("Salesman") || userRoles.Contains("Customer");
                     bool isManagerOrAdmin = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin") || userRoles.Contains("SalesSupport");
 
-                    // If user is a Salesman (and not a Manager/Admin), verify they are assigned to this offer
-                    if (isSalesman && !isManagerOrAdmin)
+                    // If user is a Salesman or Customer (and not a Manager/Admin), verify they are assigned to this offer
+                    if (isSalesmanOrCustomer && !isManagerOrAdmin)
                     {
                         if (string.IsNullOrEmpty(offer.AssignedTo) || offer.AssignedTo != userId)
                         {
@@ -965,6 +994,34 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting recent activity");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Get full history of all actions performed on a specific offer
+        /// </summary>
+        public async Task<List<OfferActivityDTO>> GetOfferHistoryAsync(long offerId)
+        {
+            try
+            {
+                // Get all activities for this specific offer
+                var activities = await _unitOfWork.RecentOfferActivities.GetActivitiesByOfferIdAsync(offerId);
+                
+                return activities.Select(a => new OfferActivityDTO
+                {
+                    OfferId = a.OfferId,
+                    Type = a.Type,
+                    Description = a.Description,
+                    ClientName = a.ClientName,
+                    SalesmanName = a.SalesmanName,
+                    TotalAmount = a.TotalAmount,
+                    Timestamp = a.ActivityTimestamp
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting offer history. OfferId: {OfferId}", offerId);
                 throw;
             }
         }
@@ -1364,7 +1421,7 @@ namespace SoitMed.Services
                 if (matchedProduct == null)
                 {
                     // Extract first 3-4 meaningful words from equipment name for better matching
-                    var words = normalizedEquipmentName
+                    string[] words = normalizedEquipmentName
                         .Split(new[] { ' ', '(', '-', ')', '/', '\\' }, StringSplitOptions.RemoveEmptyEntries)
                         .Where(w => w.Length > 2 && !w.All(char.IsDigit)) // Filter out very short words and pure numbers
                         .Take(4)
@@ -1384,7 +1441,7 @@ namespace SoitMed.Services
                             .OrderByDescending(p => {
                                 var productNameLower = p.Name.ToLower();
                                 // Calculate similarity: check if product name contains key words from equipment name
-                                var matchCount = words.Count(w => productNameLower.Contains(w.ToLower()));
+                                int matchCount = words.Count(w => productNameLower.Contains(w.ToLower()));
                                 // Bonus if product name starts with the first word
                                 if (words.Length > 0 && productNameLower.StartsWith(words[0].ToLower()))
                                     matchCount += 2;
@@ -1405,11 +1462,12 @@ namespace SoitMed.Services
                                 var shorterSearchTerm = string.Join(" ", words.Take(2));
                                 _logger.LogInformation("Trying shorter search term: {SearchTerm}", shorterSearchTerm);
                                 var shorterMatchProducts = (await _unitOfWork.Products.SearchAsync(shorterSearchTerm)).Take(20).ToList();
+                                string[] wordsSubset = words.Take(2).ToArray();
                                 matchedProduct = shorterMatchProducts
                                     .OrderByDescending(p => {
                                         var productNameLower = p.Name.ToLower();
-                                        var matchCount = words.Take(2).Count(w => productNameLower.Contains(w.ToLower()));
-                                        if (words.Length > 0 && productNameLower.StartsWith(words[0].ToLower()))
+                                        int matchCount = wordsSubset.Count(w => productNameLower.Contains(w.ToLower()));
+                                        if (wordsSubset.Length > 0 && productNameLower.StartsWith(wordsSubset[0].ToLower()))
                                             matchCount += 2;
                                         return matchCount;
                                     })
@@ -1463,7 +1521,7 @@ namespace SoitMed.Services
                             matchedProduct = lastResortProducts
                                 .OrderByDescending(p => {
                                     var productNameLower = p.Name.ToLower();
-                                    var matchCount = keyWords.Count(w => productNameLower.Contains(w));
+                                    int matchCount = keyWords.Count(w => productNameLower.Contains(w));
                                     // Bonus if product name starts with first key word
                                     if (keyWords.Any() && productNameLower.StartsWith(keyWords[0]))
                                         matchCount += 3;
@@ -1759,10 +1817,29 @@ namespace SoitMed.Services
             var creator = await _unitOfWork.Users.GetByIdAsync(offer.CreatedBy);
             var salesman = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
 
+            // Get OfferRequest information if linked
+            string? requesterId = null;
+            string? requesterName = null;
+            if (offer.OfferRequestId.HasValue)
+            {
+                var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId.Value);
+                if (offerRequest != null)
+                {
+                    requesterId = offerRequest.RequestedBy;
+                    var requester = await _unitOfWork.Users.GetByIdAsync(offerRequest.RequestedBy);
+                    if (requester != null)
+                    {
+                        requesterName = $"{requester.FirstName} {requester.LastName}".Trim();
+                    }
+                }
+            }
+
             return new OfferResponseDTO
             {
                 Id = offer.Id,
                 OfferRequestId = offer.OfferRequestId,
+                OfferRequestRequesterId = requesterId,
+                OfferRequestRequesterName = requesterName,
                 ClientId = offer.ClientId,
                 ClientName = client?.Name ?? "Unknown Client",
                 CreatedBy = offer.CreatedBy,
@@ -1789,10 +1866,16 @@ namespace SoitMed.Services
             usersDict.TryGetValue(offer.CreatedBy ?? string.Empty, out var creator);
             usersDict.TryGetValue(offer.AssignedTo ?? string.Empty, out var salesman);
 
+            // Note: OfferRequest information should be loaded separately if needed in batch operations
+            // For now, we'll set it to null in batch operations to avoid N+1 queries
+            // Individual offer retrieval will use the async method that loads OfferRequest
+
             return new OfferResponseDTO
             {
                 Id = offer.Id,
                 OfferRequestId = offer.OfferRequestId,
+                OfferRequestRequesterId = null, // Will be populated in individual retrieval
+                OfferRequestRequesterName = null, // Will be populated in individual retrieval
                 ClientId = offer.ClientId,
                 ClientName = client?.Name ?? "Unknown Client",
                 CreatedBy = offer.CreatedBy,

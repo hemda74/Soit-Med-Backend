@@ -14,6 +14,7 @@ namespace SoitMed.Services
         Task<OfferResponseDTO?> GetOfferAsync(long offerId);
         Task<List<OfferResponseDTO>> GetOffersByClientAsync(long clientId);
         Task<List<OfferResponseDTO>> GetOffersBySalesmanAsync(string salesmanId);
+        Task<List<OfferResponseDTO>> GetOffersByCustomerAsync(string customerId);
         Task<List<OfferResponseDTO>> GetOffersByStatusAsync(string status);
         Task<List<OfferResponseDTO>> GetOffersByCreatorAsync(string creatorId);
         Task<PaginatedOffersResponseDTO> GetAllOffersWithFiltersAsync(string? status, string? salesmanId, int page, int pageSize, DateTime? startDate, DateTime? endDate);
@@ -25,6 +26,7 @@ namespace SoitMed.Services
         Task<OfferResponseDTO> MarkAsUnderReviewAsync(long offerId, string userId);
         Task<int> UpdateExpiredOffersAsync();
         Task<List<OfferActivityDTO>> GetRecentActivityAsync(int limit = 20);
+        Task<List<OfferActivityDTO>> GetOfferHistoryAsync(long offerId); // Get full history for a specific offer
         Task<bool> DeleteOfferAsync(long offerId, string userId);
         Task<OfferResponseDTO> AssignOfferToSalesmanAsync(long offerId, string salesmanId, string userId);
         #endregion

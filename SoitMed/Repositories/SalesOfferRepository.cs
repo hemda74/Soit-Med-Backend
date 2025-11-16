@@ -209,6 +209,47 @@ namespace SoitMed.Repositories
             return (offers, clientsDict, usersDict);
         }
 
+        // OPTIMIZED: Single query to load offers with all related data for Customer (same pattern as Salesman)
+        public async Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
+            GetOffersByCustomerWithRelatedDataAsync(string customerId)
+        {
+            // Single query with joins to load everything at once
+            var offers = await _context.SalesOffers
+                .AsNoTracking()
+                .Where(o => o.AssignedTo == customerId)
+                .OrderByDescending(o => o.CreatedAt)
+                .ToListAsync();
+
+            // Extract unique IDs
+            var clientIds = offers.Where(o => o.ClientId > 0).Select(o => o.ClientId).Distinct().ToList();
+            var userIds = offers
+                .SelectMany(o => new[] { o.CreatedBy, o.AssignedTo })
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList();
+
+            // Load related data sequentially to avoid DbContext concurrency issues
+            // Complexity: O(1) - only 3 queries total regardless of number of offers
+            var clientsList = clientIds.Any() 
+                ? await _context.Clients
+                    .AsNoTracking()
+                    .Where(c => clientIds.Contains(c.Id))
+                    .ToListAsync()
+                : new List<Client>();
+            
+            var usersList = userIds.Any()
+                ? await _context.Users
+                    .AsNoTracking()
+                    .Where(u => userIds.Contains(u.Id))
+                    .ToListAsync()
+                : new List<ApplicationUser>();
+
+            var clientsDict = clientsList.ToDictionary(c => c.Id);
+            var usersDict = usersList.ToDictionary(u => u.Id);
+
+            return (offers, clientsDict, usersDict);
+        }
+
         public async Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
             GetOffersByClientIdWithRelatedDataAsync(long clientId)
         {
