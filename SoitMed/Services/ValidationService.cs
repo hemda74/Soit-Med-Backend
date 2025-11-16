@@ -26,30 +26,16 @@ namespace SoitMed.Services
             if (createDto.Name.Length > 200)
                 errors.Add("اسم العميل لا يجب أن يتجاوز 200 حرف");
 
-            if (!string.IsNullOrEmpty(createDto.Type) && createDto.Type.Length > 50)
-                errors.Add("نوع العميل لا يجب أن يتجاوز 50 حرف");
-
-            if (!string.IsNullOrEmpty(createDto.Specialization) && createDto.Specialization.Length > 100)
-                errors.Add("التخصص لا يجب أن يتجاوز 100 حرف");
-
-            // Validate email format
-            if (!string.IsNullOrEmpty(createDto.Email) && !IsValidEmail(createDto.Email))
-                errors.Add("صيغة البريد الإلكتروني غير صحيحة");
+            if (!string.IsNullOrEmpty(createDto.OrganizationName) && createDto.OrganizationName.Length > 200)
+                errors.Add("اسم المؤسسة لا يجب أن يتجاوز 200 حرف");
 
             // Validate phone format
             if (!string.IsNullOrEmpty(createDto.Phone) && !IsValidPhone(createDto.Phone))
                 errors.Add("صيغة رقم الهاتف غير صحيحة");
 
-            // Validate status and priority values
-            if (!IsValidStatus(createDto.Status))
-                errors.Add("حالة العميل غير صحيحة");
-
-            if (!IsValidPriority(createDto.Priority))
-                errors.Add("أولوية العميل غير صحيحة");
-
-            // Validate potential value
-            if (createDto.PotentialValue.HasValue && createDto.PotentialValue < 0)
-                errors.Add("القيمة المحتملة لا يجب أن تكون سالبة");
+            // Validate classification
+            if (!string.IsNullOrEmpty(createDto.Classification) && !Models.ClientClassificationConstants.IsValidClassification(createDto.Classification))
+                errors.Add("التصنيف يجب أن يكون A أو B أو C أو D");
 
             if (errors.Any())
                 return ValidationResult.Failure(errors, "VALIDATION_ERROR");
@@ -62,7 +48,7 @@ namespace SoitMed.Services
             var errors = new List<string>();
 
             // Check if client exists
-                var client = await UnitOfWork.Clients.GetByIdAsync(clientId);
+            var client = await UnitOfWork.Clients.GetByIdAsync(clientId);
             if (client == null)
                 return ValidationResult.Failure("العميل غير موجود", "CLIENT_NOT_FOUND");
 
@@ -70,30 +56,16 @@ namespace SoitMed.Services
             if (!string.IsNullOrEmpty(updateDto.Name) && updateDto.Name.Length > 200)
                 errors.Add("اسم العميل لا يجب أن يتجاوز 200 حرف");
 
-            if (!string.IsNullOrEmpty(updateDto.Type) && updateDto.Type.Length > 50)
-                errors.Add("نوع العميل لا يجب أن يتجاوز 50 حرف");
-
-            if (!string.IsNullOrEmpty(updateDto.Specialization) && updateDto.Specialization.Length > 100)
-                errors.Add("التخصص لا يجب أن يتجاوز 100 حرف");
-
-            // Validate email format
-            if (!string.IsNullOrEmpty(updateDto.Email) && !IsValidEmail(updateDto.Email))
-                errors.Add("صيغة البريد الإلكتروني غير صحيحة");
+            if (!string.IsNullOrEmpty(updateDto.OrganizationName) && updateDto.OrganizationName.Length > 200)
+                errors.Add("اسم المؤسسة لا يجب أن يتجاوز 200 حرف");
 
             // Validate phone format
             if (!string.IsNullOrEmpty(updateDto.Phone) && !IsValidPhone(updateDto.Phone))
                 errors.Add("صيغة رقم الهاتف غير صحيحة");
 
-            // Validate status and priority values
-            if (!string.IsNullOrEmpty(updateDto.Status) && !IsValidStatus(updateDto.Status))
-                errors.Add("حالة العميل غير صحيحة");
-
-            if (!string.IsNullOrEmpty(updateDto.Priority) && !IsValidPriority(updateDto.Priority))
-                errors.Add("أولوية العميل غير صحيحة");
-
-            // Validate potential value
-            if (updateDto.PotentialValue.HasValue && updateDto.PotentialValue < 0)
-                errors.Add("القيمة المحتملة لا يجب أن تكون سالبة");
+            // Validate classification
+            if (!string.IsNullOrEmpty(updateDto.Classification) && !Models.ClientClassificationConstants.IsValidClassification(updateDto.Classification))
+                errors.Add("التصنيف يجب أن يكون A أو B أو C أو D");
 
             if (errors.Any())
                 return ValidationResult.Failure(errors, "VALIDATION_ERROR");
@@ -129,20 +101,14 @@ namespace SoitMed.Services
             if (string.IsNullOrWhiteSpace(findDto.Name))
                 errors.Add("اسم العميل مطلوب");
 
-            if (string.IsNullOrWhiteSpace(findDto.Type))
-                errors.Add("نوع العميل مطلوب");
-
             if (findDto.Name.Length > 200)
                 errors.Add("اسم العميل لا يجب أن يتجاوز 200 حرف");
 
-            if (findDto.Type.Length > 50)
-                errors.Add("نوع العميل لا يجب أن يتجاوز 50 حرف");
+            if (!string.IsNullOrEmpty(findDto.OrganizationName) && findDto.OrganizationName.Length > 200)
+                errors.Add("اسم المؤسسة لا يجب أن يتجاوز 200 حرف");
 
-            if (!string.IsNullOrEmpty(findDto.Specialization) && findDto.Specialization.Length > 100)
-                errors.Add("التخصص لا يجب أن يتجاوز 100 حرف");
-
-            if (!IsValidType(findDto.Type))
-                errors.Add("نوع العميل غير صحيح");
+            if (!string.IsNullOrEmpty(findDto.Phone) && !IsValidPhone(findDto.Phone))
+                errors.Add("صيغة رقم الهاتف غير صحيحة");
 
             if (errors.Any())
                 return ValidationResult.Failure(errors, "VALIDATION_ERROR");
@@ -150,47 +116,10 @@ namespace SoitMed.Services
             return ValidationResult.Success();
         }
 
-        private static bool IsValidEmail(string email)
-        {
-            try
-            {
-                var addr = new System.Net.Mail.MailAddress(email);
-                return addr.Address == email;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
         private static bool IsValidPhone(string phone)
         {
             // Basic phone validation - can be enhanced based on requirements
             return phone.All(c => char.IsDigit(c) || c == '+' || c == '-' || c == ' ' || c == '(' || c == ')');
-        }
-
-        private static bool IsValidStatus(string status)
-        {
-            return status == ClientStatus.Potential || 
-                   status == ClientStatus.Active || 
-                   status == ClientStatus.Inactive || 
-                   status == ClientStatus.Lost;
-        }
-
-        private static bool IsValidPriority(string priority)
-        {
-            return priority == ClientPriority.Low || 
-                   priority == ClientPriority.Medium || 
-                   priority == ClientPriority.High;
-        }
-
-        private static bool IsValidType(string type)
-        {
-            return type == ClientTypeConstants.Doctor || 
-                   type == ClientTypeConstants.Hospital || 
-                   type == ClientTypeConstants.Clinic || 
-                   type == ClientTypeConstants.Pharmacy || 
-                   type == ClientTypeConstants.Laboratory;
         }
     }
 }

@@ -14,29 +14,9 @@ namespace SoitMed.Services
             {
                 Id = client.Id,
                 Name = client.Name,
-                Type = client.Type,
-                Specialization = client.Specialization,
-                Location = client.Location,
                 Phone = client.Phone,
-                Email = client.Email,
-                Website = client.Website,
-                Address = client.Address,
-                City = client.City,
-                Governorate = client.Governorate,
-                PostalCode = client.PostalCode,
-                Notes = client.Notes,
-                Status = client.Status,
-                Priority = client.Priority,
+                OrganizationName = client.OrganizationName,
                 Classification = client.Classification,
-                Rating = client.SatisfactionRating,
-                PotentialValue = client.PotentialValue,
-                ContactPerson = client.ContactPerson,
-                ContactPersonPhone = client.ContactPersonPhone,
-                ContactPersonEmail = client.ContactPersonEmail,
-                ContactPersonPosition = client.ContactPersonPosition,
-                LastContactDate = client.LastContactDate,
-                NextContactDate = client.NextContactDate,
-                SatisfactionRating = client.SatisfactionRating,
                 CreatedBy = client.CreatedBy,
                 AssignedTo = client.AssignedTo,
                 CreatedAt = client.CreatedAt,
@@ -49,26 +29,11 @@ namespace SoitMed.Services
             return new Client
             {
                 Name = createDto.Name,
-                Type = createDto.Type, // Can be null - optional field
-                Specialization = createDto.Specialization,
-                Location = createDto.Location,
                 Phone = createDto.Phone,
-                Email = createDto.Email,
-                Website = createDto.Website,
-                Address = createDto.Address,
-                City = createDto.City,
-                Governorate = createDto.Governorate,
-                PostalCode = createDto.PostalCode,
-                Notes = createDto.Notes,
-                Status = createDto.Status,
-                Priority = createDto.Priority,
-                PotentialValue = createDto.PotentialValue,
-                ContactPerson = createDto.ContactPerson,
-                ContactPersonPhone = createDto.ContactPersonPhone,
-                ContactPersonEmail = createDto.ContactPersonEmail,
-                ContactPersonPosition = createDto.ContactPersonPosition,
+                OrganizationName = createDto.OrganizationName,
+                Classification = createDto.Classification,
                 CreatedBy = userId,
-                AssignedTo = createDto.AssignedTo
+                AssignedTo = createDto.AssignedTo ?? userId
             };
         }
 
@@ -78,11 +43,7 @@ namespace SoitMed.Services
             {
                 Id = client.Id,
                 Name = client.Name,
-                Type = client.Type,
-                LastContactDate = client.LastContactDate,
-                NextContactDate = client.NextContactDate,
-                Priority = client.Priority,
-                Status = client.Status,
+                OrganizationName = client.OrganizationName,
                 AssignedTo = client.AssignedTo
             };
         }
@@ -101,4 +62,3 @@ namespace SoitMed.Services
         }
     }
 }
-

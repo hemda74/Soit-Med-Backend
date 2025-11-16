@@ -10,19 +10,19 @@ namespace SoitMed.Services
     public class MobileNotificationService : IMobileNotificationService
     {
         private readonly IConfiguration _configuration;
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<MobileNotificationService> _logger;
         private readonly IUnitOfWork _unitOfWork;
         private const string ExpoPushApiUrl = "https://exp.host/--/api/v2/push/send";
 
         public MobileNotificationService(
             IConfiguration configuration, 
-            HttpClient httpClient, 
+            IHttpClientFactory httpClientFactory, 
             ILogger<MobileNotificationService> logger,
             IUnitOfWork unitOfWork)
         {
             _configuration = configuration;
-            _httpClient = httpClient;
+            _httpClientFactory = httpClientFactory;
             _logger = logger;
             _unitOfWork = unitOfWork;
         }
@@ -77,7 +77,8 @@ namespace SoitMed.Services
                 request.Headers.AcceptEncoding.Add(new System.Net.Http.Headers.StringWithQualityHeaderValue("gzip"));
                 request.Headers.AcceptEncoding.Add(new System.Net.Http.Headers.StringWithQualityHeaderValue("deflate"));
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var httpClient = _httpClientFactory.CreateClient();
+                var response = await httpClient.SendAsync(request, cancellationToken);
 
                 if (response.IsSuccessStatusCode)
                 {

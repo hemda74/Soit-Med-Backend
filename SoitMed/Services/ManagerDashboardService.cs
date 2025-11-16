@@ -77,21 +77,21 @@ namespace SoitMed.Services
             // Deal statistics
             var deals = activitiesList.Where(a => a.Deal != null).Select(a => a.Deal!).ToList();
             var totalDeals = deals.Count;
-            var wonDeals = deals.Count(d => d.Status == DealStatus.Won);
-            var lostDeals = deals.Count(d => d.Status == DealStatus.Lost);
-            var pendingDeals = deals.Count(d => d.Status == DealStatus.Pending);
+            var wonDeals = deals.Count(d => d.Status == "Won" || d.Status == "Approved" || d.Status == "Completed");
+            var lostDeals = deals.Count(d => d.Status == "Lost" || d.Status == "Rejected");
+            var pendingDeals = deals.Count(d => d.Status == "Pending");
 
             // Offer statistics
             var offers = activitiesList.Where(a => a.Offer != null).Select(a => a.Offer!).ToList();
             var totalOffers = offers.Count;
-            var acceptedOffers = offers.Count(o => o.Status == OfferStatus.Accepted);
-            var rejectedOffers = offers.Count(o => o.Status == OfferStatus.Rejected);
-            var draftOffers = offers.Count(o => o.Status == OfferStatus.Draft);
-            var sentOffers = offers.Count(o => o.Status == OfferStatus.Sent);
+            var acceptedOffers = offers.Count(o => o.Status == "Accepted");
+            var rejectedOffers = offers.Count(o => o.Status == "Rejected");
+            var draftOffers = offers.Count(o => o.Status == "Draft");
+            var sentOffers = offers.Count(o => o.Status == "Sent");
 
             // Value calculations
-            var totalDealValue = deals.Sum(d => d.DealValue);
-            var wonDealValue = deals.Where(d => d.Status == DealStatus.Won).Sum(d => d.DealValue);
+            var totalDealValue = deals.Sum(d => d.Value);
+            var wonDealValue = deals.Where(d => d.Status == "Won" || d.Status == "Approved" || d.Status == "Completed").Sum(d => d.Value);
             var averageDealValue = totalDeals > 0 ? totalDealValue / totalDeals : 0;
 
             // Conversion rates
@@ -107,7 +107,7 @@ namespace SoitMed.Services
                     ClientTypeName = g.Key.ToString(),
                     Count = g.Count(),
                     Percentage = totalActivities > 0 ? (decimal)g.Count() / totalActivities * 100 : 0,
-                    TotalValue = g.Where(a => a.Deal != null).Sum(a => a.Deal!.DealValue)
+                    TotalValue = g.Where(a => a.Deal != null).Sum(a => a.Deal!.Value)
                 })
                 .OrderBy(s => s.ClientType)
                 .ToList();
@@ -128,9 +128,9 @@ namespace SoitMed.Services
                     UserName = userName,
                     TotalActivities = userActivities.Count,
                     TotalDeals = userDeals.Count,
-                    WonDeals = userDeals.Count(d => d.Status == DealStatus.Won),
-                    TotalValue = userDeals.Sum(d => d.DealValue),
-                    WonValue = userDeals.Where(d => d.Status == DealStatus.Won).Sum(d => d.DealValue),
+                    WonDeals = userDeals.Count(d => d.Status == "Won" || d.Status == "Approved" || d.Status == "Completed"),
+                    TotalValue = userDeals.Sum(d => d.Value),
+                    WonValue = userDeals.Where(d => d.Status == "Won" || d.Status == "Approved" || d.Status == "Completed").Sum(d => d.Value),
                     ConversionRate = userActivities.Count > 0 ? (decimal)userDeals.Count / userActivities.Count * 100 : 0
                 });
             }
@@ -152,8 +152,8 @@ namespace SoitMed.Services
                     ResultName = a.Result.ToString(),
                     Comment = a.Comment,
                     CreatedAt = a.CreatedAt,
-                    DealValue = a.Deal?.DealValue,
-                    OfferDetails = a.Offer?.OfferDetails
+                    DealValue = a.Deal?.Value,
+                    OfferDetails = a.Offer?.Description
                 })
                 .ToList();
 
