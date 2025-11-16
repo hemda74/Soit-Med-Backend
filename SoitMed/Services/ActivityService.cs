@@ -47,12 +47,12 @@ namespace SoitMed.Services
                     // Create the activity log
                     var activityLog = new ActivityLog
                     {
-                        PlanTaskId = taskId,
+                        TaskId = taskId,
                         UserId = userId,
                         InteractionType = request.InteractionType,
                         ClientType = request.ClientType,
                         Result = request.Result,
-                        Reason = request.Reason,
+                        Reason = request.Reason?.ToString(),
                         Comment = request.Comment,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
@@ -68,9 +68,11 @@ namespace SoitMed.Services
                         deal = new Deal
                         {
                             ActivityLogId = activityLog.Id,
+                            ClientId = request.DealInfo.ClientId,
                             UserId = userId,
-                            DealValue = request.DealInfo.DealValue,
-                            Status = DealStatus.Pending,
+                            Title = request.DealInfo.Title ?? "Deal",
+                            Value = request.DealInfo.DealValue,
+                            Status = "Pending",
                             ExpectedCloseDate = request.DealInfo.ExpectedCloseDate,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
@@ -86,10 +88,12 @@ namespace SoitMed.Services
                         offer = new Offer
                         {
                             ActivityLogId = activityLog.Id,
+                            ClientId = request.OfferInfo.ClientId,
                             UserId = userId,
-                            OfferDetails = request.OfferInfo.OfferDetails,
-                            Status = OfferStatus.Draft,
-                            DocumentUrl = request.OfferInfo.DocumentUrl,
+                            Title = request.OfferInfo.Title ?? "Offer",
+                            Description = request.OfferInfo.OfferDetails,
+                            Value = request.OfferInfo.Value ?? 0,
+                            Status = "Draft",
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };
@@ -123,10 +127,10 @@ namespace SoitMed.Services
             }
 
             if (updateDto.DealValue.HasValue)
-                deal.DealValue = updateDto.DealValue.Value;
+                deal.Value = updateDto.DealValue.Value;
 
-            if (updateDto.Status.HasValue)
-                deal.Status = updateDto.Status.Value;
+            if (!string.IsNullOrEmpty(updateDto.Status))
+                deal.Status = updateDto.Status;
 
             if (updateDto.ExpectedCloseDate.HasValue)
                 deal.ExpectedCloseDate = updateDto.ExpectedCloseDate.Value;
@@ -151,13 +155,10 @@ namespace SoitMed.Services
             }
 
             if (!string.IsNullOrEmpty(updateDto.OfferDetails))
-                offer.OfferDetails = updateDto.OfferDetails;
+                offer.Description = updateDto.OfferDetails;
 
-            if (updateDto.Status.HasValue)
-                offer.Status = updateDto.Status.Value;
-
-            if (updateDto.DocumentUrl != null)
-                offer.DocumentUrl = updateDto.DocumentUrl;
+            if (!string.IsNullOrEmpty(updateDto.Status))
+                offer.Status = updateDto.Status;
 
             offer.UpdatedAt = DateTime.UtcNow;
 
@@ -224,7 +225,7 @@ namespace SoitMed.Services
             return new ActivityResponseDto
             {
                 Id = activity.Id,
-                PlanTaskId = activity.PlanTaskId,
+                TaskId = activity.TaskId,
                 UserId = activity.UserId,
                 UserName = userName,
                 InteractionType = activity.InteractionType,
@@ -251,9 +252,9 @@ namespace SoitMed.Services
                 ActivityLogId = deal.ActivityLogId,
                 UserId = deal.UserId,
                 UserName = userName,
-                DealValue = deal.DealValue,
+                DealValue = deal.Value,
                 Status = deal.Status,
-                StatusName = deal.Status.ToString(),
+                StatusName = deal.Status,
                 ExpectedCloseDate = deal.ExpectedCloseDate,
                 CreatedAt = deal.CreatedAt,
                 UpdatedAt = deal.UpdatedAt
@@ -268,10 +269,10 @@ namespace SoitMed.Services
                 ActivityLogId = offer.ActivityLogId,
                 UserId = offer.UserId,
                 UserName = userName,
-                OfferDetails = offer.OfferDetails,
+                OfferDetails = offer.Description,
                 Status = offer.Status,
-                StatusName = offer.Status.ToString(),
-                DocumentUrl = offer.DocumentUrl,
+                StatusName = offer.Status,
+                DocumentUrl = null, // Offer model doesn't have DocumentUrl
                 CreatedAt = offer.CreatedAt,
                 UpdatedAt = offer.UpdatedAt
             };
