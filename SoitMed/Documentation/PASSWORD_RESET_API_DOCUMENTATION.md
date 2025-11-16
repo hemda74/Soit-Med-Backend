@@ -161,7 +161,7 @@ This document provides comprehensive information about the password reset functi
 #### Step 1: Check Email & Send Code
 
 ```bash
-curl -X POST "http://192.168.1.182:5117/api/Account/forgot-password" \
+curl -X POST "http://192.168.1.6:5117/api/Account/forgot-password" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com"}'
 ```
@@ -179,7 +179,7 @@ curl -X POST "http://192.168.1.182:5117/api/Account/forgot-password" \
 #### Step 2: Verify Code & Get Reset Token
 
 ```bash
-curl -X POST "http://192.168.1.182:5117/api/Account/verify-code" \
+curl -X POST "http://192.168.1.6:5117/api/Account/verify-code" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "code": "123456"}'
 ```
@@ -198,7 +198,7 @@ curl -X POST "http://192.168.1.182:5117/api/Account/verify-code" \
 #### Step 3: Reset Password with Token
 
 ```bash
-curl -X POST "http://192.168.1.182:5117/api/Account/reset-password" \
+curl -X POST "http://192.168.1.6:5117/api/Account/reset-password" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -279,7 +279,7 @@ The system sends HTML emails with:
 1. **Send Forgot Password Request:**
 
       ```bash
-      curl -X POST "http://192.168.1.182:5117/api/Account/forgot-password" \
+      curl -X POST "http://192.168.1.6:5117/api/Account/forgot-password" \
         -H "Content-Type: application/json" \
         -d '{"email": "test@example.com"}'
       ```
@@ -292,14 +292,14 @@ The system sends HTML emails with:
 3. **Verify Code:**
 
       ```bash
-      curl -X POST "http://192.168.1.182:5117/api/Account/verify-code" \
+      curl -X POST "http://192.168.1.6:5117/api/Account/verify-code" \
         -H "Content-Type: application/json" \
         -d '{"email": "test@example.com", "code": "ACTUAL_CODE_FROM_EMAIL"}'
       ```
 
 4. **Reset Password:**
       ```bash
-      curl -X POST "http://192.168.1.182:5117/api/Account/reset-password" \
+      curl -X POST "http://192.168.1.6:5117/api/Account/reset-password" \
         -H "Content-Type: application/json" \
         -d '{
           "email": "test@example.com",
@@ -314,7 +314,7 @@ The system sends HTML emails with:
 1. **Invalid Email:**
 
       ```bash
-      curl -X POST "http://192.168.1.182:5117/api/Account/forgot-password" \
+      curl -X POST "http://192.168.1.6:5117/api/Account/forgot-password" \
         -H "Content-Type: application/json" \
         -d '{"email": "nonexistent@example.com"}'
       ```
@@ -322,7 +322,7 @@ The system sends HTML emails with:
 2. **Invalid Verification Code:**
 
       ```bash
-      curl -X POST "http://192.168.1.182:5117/api/Account/reset-password" \
+      curl -X POST "http://192.168.1.6:5117/api/Account/reset-password" \
         -H "Content-Type: application/json" \
         -d '{
           "email": "test@example.com",

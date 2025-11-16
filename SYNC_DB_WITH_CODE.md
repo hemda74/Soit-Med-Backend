@@ -157,3 +157,9 @@ Once synced, you can:
 2. Apply them: `dotnet ef database update`
 3. Continue development with confidence that migrations will work
 
+
+
+
+
+
+
