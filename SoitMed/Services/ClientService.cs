@@ -29,24 +29,11 @@ namespace SoitMed.Services
                 var client = new Client
                 {
                     Name = createClientDto.Name,
-                    Type = createClientDto.Type, // Can be null - optional field
-                    Specialization = createClientDto.Specialization,
-                    Location = createClientDto.Location,
                     Phone = createClientDto.Phone,
-                    Email = createClientDto.Email,
-                    Address = createClientDto.Address,
-                    City = createClientDto.City,
-                    Governorate = createClientDto.Governorate,
-                    ContactPerson = createClientDto.ContactPerson,
-                    ContactPersonPhone = createClientDto.ContactPersonPhone,
-                    ContactPersonEmail = createClientDto.ContactPersonEmail,
-                    ContactPersonPosition = createClientDto.ContactPersonPosition,
-                    Notes = createClientDto.Notes,
-                    Priority = createClientDto.Priority,
+                    OrganizationName = createClientDto.OrganizationName,
                     Classification = createClientDto.Classification,
-                    Status = "Active",
                     CreatedBy = userId,
-                    AssignedTo = userId
+                    AssignedTo = createClientDto.AssignedTo ?? userId
                 };
 
                 await _unitOfWork.Clients.CreateAsync(client);
@@ -142,21 +129,9 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<List<ClientResponseDTO>> GetClientsNeedingFollowUpAsync(string userId)
-        {
-            try
-            {
-                var clients = await _unitOfWork.Clients.GetClientsNeedingFollowUpAsync(userId);
-                return clients.Select(MapToClientResponseDTO).ToList();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting clients needing follow-up. UserId: {UserId}", userId);
-                throw;
-            }
-        }
+        // Note: GetClientsNeedingFollowUpAsync removed - no longer needed without NextContactDate field
 
-        public async Task<ClientResponseDTO> UpdateClientAsync(long clientId, CreateClientDTO updateClientDto, string userId)
+        public async Task<ClientResponseDTO> UpdateClientAsync(long clientId, UpdateClientDTO updateClientDto, string userId)
         {
             try
             {
@@ -164,23 +139,22 @@ namespace SoitMed.Services
                 if (client == null)
                     throw new ArgumentException("Client not found", nameof(clientId));
 
-                // Update client properties
-                client.Name = updateClientDto.Name;
-                client.Type = updateClientDto.Type;
-                client.Specialization = updateClientDto.Specialization;
-                client.Location = updateClientDto.Location;
-                client.Phone = updateClientDto.Phone;
-                client.Email = updateClientDto.Email;
-                client.Address = updateClientDto.Address;
-                client.City = updateClientDto.City;
-                client.Governorate = updateClientDto.Governorate;
-                client.ContactPerson = updateClientDto.ContactPerson;
-                client.ContactPersonPhone = updateClientDto.ContactPersonPhone;
-                client.ContactPersonEmail = updateClientDto.ContactPersonEmail;
-                client.ContactPersonPosition = updateClientDto.ContactPersonPosition;
-                client.Notes = updateClientDto.Notes;
-                client.Priority = updateClientDto.Priority;
-                client.Classification = updateClientDto.Classification;
+                // Update client properties (only if provided)
+                if (!string.IsNullOrWhiteSpace(updateClientDto.Name))
+                    client.Name = updateClientDto.Name;
+                
+                if (updateClientDto.Phone != null)
+                    client.Phone = updateClientDto.Phone;
+                
+                if (updateClientDto.OrganizationName != null)
+                    client.OrganizationName = updateClientDto.OrganizationName;
+                
+                if (updateClientDto.Classification != null)
+                    client.Classification = updateClientDto.Classification;
+                
+                if (updateClientDto.AssignedTo != null)
+                    client.AssignedTo = updateClientDto.AssignedTo;
+                
                 client.UpdatedAt = DateTime.UtcNow;
 
                 await _unitOfWork.Clients.UpdateAsync(client);
@@ -223,33 +197,31 @@ namespace SoitMed.Services
 
         #region Search and Filter
 
-        public async Task<List<ClientResponseDTO>> SearchClientsAsync(SearchClientDTO searchDto, string userId)
+        public async Task<List<ClientResponseDTO>> SearchClientsAsync(SearchClientDTO searchDto, string userId, bool isAdminOrManager = false)
         {
             try
             {
-                // Repository now handles empty search terms and returns all clients
-                var clients = await _unitOfWork.Clients.SearchClientsAsync(searchDto.Query ?? string.Empty, searchDto.Page, searchDto.PageSize);
+                IEnumerable<Client> clients;
+                
+                if (isAdminOrManager)
+                {
+                    // SuperAdmin, SalesManager, and SalesSupport can search all clients
+                    clients = await _unitOfWork.Clients.SearchClientsAsync(searchDto.Query ?? string.Empty, searchDto.Classification, searchDto.Page, searchDto.PageSize);
+                }
+                else
+                {
+                    // Salesmen can only search their own clients
+                    var allClients = await _unitOfWork.Clients.SearchClientsAsync(searchDto.Query ?? string.Empty, searchDto.Classification, 1, 1000);
+                    clients = allClients.Where(c => c.CreatedBy == userId || c.AssignedTo == userId)
+                        .Skip((searchDto.Page - 1) * searchDto.PageSize)
+                        .Take(searchDto.PageSize);
+                }
+                
                 return clients.Select(MapToClientResponseDTO).ToList();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error searching clients. Query: {Query}, UserId: {UserId}", searchDto.Query, userId);
-                throw;
-            }
-        }
-
-        public async Task<List<ClientResponseDTO>> GetClientsByClassificationAsync(string classification, string userId)
-        {
-            try
-            {
-                // Get all clients and filter by classification
-                var allClients = await _unitOfWork.Clients.GetMyClientsAsync(userId, 1, 20);
-                var clients = allClients.Where(c => c.Classification == classification);
-                return clients.Select(MapToClientResponseDTO).ToList();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting clients by classification. Classification: {Classification}, UserId: {UserId}", classification, userId);
+                _logger.LogError(ex, "Error searching clients. Query: {Query}, Classification: {Classification}, UserId: {UserId}", searchDto.Query, searchDto.Classification, userId);
                 throw;
             }
         }
@@ -258,8 +230,8 @@ namespace SoitMed.Services
         {
             try
             {
-                // Try to find existing client
-                var existingClient = await _unitOfWork.Clients.FindByNameAndTypeAsync(findDto.Name, findDto.Type);
+                // Try to find existing client by name
+                var existingClient = await _unitOfWork.Clients.FindByNameAsync(findDto.Name);
                 if (existingClient != null)
                 {
                     return MapToClientResponseDTO(existingClient);
@@ -269,16 +241,16 @@ namespace SoitMed.Services
                 var createDto = new CreateClientDTO
                 {
                     Name = findDto.Name,
-                    Type = findDto.Type,
-                    Specialization = findDto.Specialization
+                    OrganizationName = findDto.OrganizationName,
+                    Phone = findDto.Phone
                 };
 
                 return await CreateClientAsync(createDto, userId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error finding or creating client. Name: {Name}, Type: {Type}, UserId: {UserId}", 
-                    findDto.Name, findDto.Type, userId);
+                _logger.LogError(ex, "Error finding or creating client. Name: {Name}, OrganizationName: {OrganizationName}, UserId: {UserId}", 
+                    findDto.Name, findDto.OrganizationName, userId);
                 throw;
             }
         }
@@ -320,18 +292,12 @@ namespace SoitMed.Services
             {
                 Id = client.Id,
                 Name = client.Name,
-                Type = client.Type,
-                Specialization = client.Specialization,
-                Location = client.Location,
                 Phone = client.Phone,
-                Email = client.Email,
-                Status = client.Status,
-                Priority = client.Priority,
-                Classification = client.Classification,
-                LastContactDate = client.LastContactDate,
-                NextContactDate = client.NextContactDate,
-                SatisfactionRating = client.SatisfactionRating,
-                CreatedAt = client.CreatedAt
+                OrganizationName = client.OrganizationName,
+                CreatedBy = client.CreatedBy,
+                AssignedTo = client.AssignedTo,
+                CreatedAt = client.CreatedAt,
+                UpdatedAt = client.UpdatedAt
             };
         }
 

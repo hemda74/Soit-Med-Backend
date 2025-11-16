@@ -49,10 +49,10 @@ namespace SoitMed.Repositories
                 TotalInteractions = totalInteractions,
                 LastVisitDate = lastVisit?.VisitDate,
                 NextScheduledVisit = nextVisit?.VisitDate,
-                ClientSatisfactionScore = client.SatisfactionRating,
-                Status = client.Status,
-                Priority = client.Priority,
-                PotentialValue = client.PotentialValue
+                ClientSatisfactionScore = (int?)null, // Removed from simplified Client model
+                Status = (string?)null, // Removed from simplified Client model
+                Priority = (string?)null, // Removed from simplified Client model
+                PotentialValue = (decimal?)null // Removed from simplified Client model
             };
         }
 

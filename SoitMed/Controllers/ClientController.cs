@@ -29,11 +29,15 @@ namespace SoitMed.Controllers
             _logger = logger;
         }
 
+        /// <summary>
+        /// Search clients - Available for SuperAdmin, SalesManager, and SalesSupport
+        /// Salesmen can only search their own clients
+        /// </summary>
         [HttpGet("search")]
+        [Authorize(Roles = "SuperAdmin,SalesManager,SalesSupport,Salesman")]
         public async Task<IActionResult> SearchClients(
             [FromQuery] string? searchTerm = null,
-            [FromQuery] string? status = null,
-            [FromQuery] string? priority = null,
+            [FromQuery] string? classification = null,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
         {
@@ -43,10 +47,17 @@ namespace SoitMed.Controllers
                 if (currentUser == null)
                     return Unauthorized(CreateErrorResponse("غير مصرح لك"));
 
+                // Validate classification if provided
+                if (!string.IsNullOrWhiteSpace(classification) && !Models.ClientClassificationConstants.IsValidClassification(classification))
+                {
+                    return BadRequest(CreateErrorResponse("Invalid classification. Must be A, B, C, or D"));
+                }
+
                 // Map query parameters to SearchClientDTO
                 var searchDto = new SearchClientDTO
                 {
                     Query = searchTerm ?? string.Empty,
+                    Classification = classification,
                     Page = page,
                     PageSize = pageSize
                 };
@@ -56,7 +67,9 @@ namespace SoitMed.Controllers
                 if (!validationResult.IsValid)
                     return BadRequest(CreateErrorResponse(string.Join(", ", validationResult.Errors)));
 
-                var result = await _clientService.SearchClientsAsync(searchDto, currentUser.Id);
+                // Check if user is admin/manager/support
+                var isAdminOrManager = User.IsInRole("SuperAdmin") || User.IsInRole("SalesManager") || User.IsInRole("SalesSupport");
+                var result = await _clientService.SearchClientsAsync(searchDto, currentUser.Id, isAdminOrManager);
                 return Ok(CreateSuccessResponse(result));
             }
             catch (Exception ex)
@@ -127,31 +140,7 @@ namespace SoitMed.Controllers
                 if (!validationResult.IsValid)
                     return BadRequest(CreateErrorResponse(string.Join(", ", validationResult.Errors)));
 
-                // Convert UpdateClientDTO to CreateClientDTO
-                var createDto = new CreateClientDTO
-                {
-                    Name = updateDto.Name,
-                    Type = updateDto.Type,
-                    Specialization = updateDto.Specialization,
-                    Location = updateDto.Location,
-                    Phone = updateDto.Phone,
-                    Email = updateDto.Email,
-                    Website = updateDto.Website,
-                    Address = updateDto.Address,
-                    City = updateDto.City,
-                    Governorate = updateDto.Governorate,
-                    PostalCode = updateDto.PostalCode,
-                    Notes = updateDto.Notes,
-                    Status = updateDto.Status,
-                    Priority = updateDto.Priority,
-                    PotentialValue = updateDto.PotentialValue,
-                    ContactPerson = updateDto.ContactPerson,
-                    ContactPersonPhone = updateDto.ContactPersonPhone,
-                    ContactPersonEmail = updateDto.ContactPersonEmail,
-                    ContactPersonPosition = updateDto.ContactPersonPosition
-                };
-
-                var result = await _clientService.UpdateClientAsync(id, createDto, currentUser.Id);
+                var result = await _clientService.UpdateClientAsync(id, updateDto, currentUser.Id);
                 return Ok(CreateSuccessResponse(result));
             }
             catch (Exception ex)
@@ -185,8 +174,17 @@ namespace SoitMed.Controllers
             }
         }
 
+        /// <summary>
+        /// Get all clients for the current salesman
+        /// Supports optional search query
+        /// </summary>
         [HttpGet("my-clients")]
-        public async Task<IActionResult> GetMyClients([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        public async Task<IActionResult> GetMyClients(
+            [FromQuery] string? searchTerm = null,
+            [FromQuery] string? classification = null,
+            [FromQuery] int page = 1, 
+            [FromQuery] int pageSize = 20)
         {
             try
             {
@@ -198,8 +196,31 @@ namespace SoitMed.Controllers
                 if (page < 1 || pageSize < 1 || pageSize > 100)
                     return BadRequest(CreateErrorResponse("معاملات الصفحة غير صحيحة"));
 
-                var result = await _clientService.GetMyClientsAsync(currentUser.Id, page, pageSize);
-                return Ok(CreateSuccessResponse(result));
+                // Validate classification if provided
+                if (!string.IsNullOrWhiteSpace(classification) && !Models.ClientClassificationConstants.IsValidClassification(classification))
+                {
+                    return BadRequest(CreateErrorResponse("Invalid classification. Must be A, B, C, or D"));
+                }
+
+                // If search term or classification is provided, use search; otherwise get all my clients
+                if (!string.IsNullOrWhiteSpace(searchTerm) || !string.IsNullOrWhiteSpace(classification))
+                {
+                    var searchDto = new SearchClientDTO
+                    {
+                        Query = searchTerm ?? string.Empty,
+                        Classification = classification,
+                        Page = page,
+                        PageSize = pageSize
+                    };
+                    // For salesmen, search only returns their clients
+                    var result = await _clientService.SearchClientsAsync(searchDto, currentUser.Id);
+                    return Ok(CreateSuccessResponse(result));
+                }
+                else
+                {
+                    var result = await _clientService.GetMyClientsAsync(currentUser.Id, page, pageSize);
+                    return Ok(CreateSuccessResponse(result));
+                }
             }
             catch (Exception ex)
             {
@@ -208,24 +229,7 @@ namespace SoitMed.Controllers
             }
         }
 
-        [HttpGet("follow-up-needed")]
-        public async Task<IActionResult> GetClientsNeedingFollowUp()
-        {
-            try
-            {
-                var currentUser = await GetCurrentUserAsync();
-                if (currentUser == null)
-                    return Unauthorized(CreateErrorResponse("غير مصرح لك"));
-
-                var result = await _clientService.GetClientsNeedingFollowUpAsync(currentUser.Id);
-                return Ok(CreateSuccessResponse(result));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting clients needing follow-up");
-                return StatusCode(500, CreateErrorResponse("حدث خطأ في جلب العملاء المحتاجين لمتابعة"));
-            }
-        }
+        // Note: GetClientsNeedingFollowUp endpoint removed - no longer needed without NextContactDate and Status fields
 
         [HttpGet("statistics")]
         public async Task<IActionResult> GetClientStatistics()

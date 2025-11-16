@@ -9,25 +9,27 @@ namespace SoitMed.Repositories
         {
         }
 
-        public async Task<IEnumerable<Client>> SearchClientsAsync(string query, int page = 1, int pageSize = 20)
+        public async Task<IEnumerable<Client>> SearchClientsAsync(string query, string? classification = null, int page = 1, int pageSize = 20)
         {
             var baseQuery = _context.Clients
                 .AsNoTracking()
                 .AsQueryable();
             
             // If query is provided, filter by it
-            // Note: After migration adds computed columns, use NameLower and EmailLower
-            // For now, using EF.Functions.Like for better index usage
+            // Search in Name, Phone, and OrganizationName only
             if (!string.IsNullOrWhiteSpace(query))
             {
-                var normalizedQuery = query.ToLower();
                 // Use EF.Functions.Like for case-insensitive search that can use indexes
                 baseQuery = baseQuery.Where(c => 
                     EF.Functions.Like(c.Name, $"%{query}%") ||
-                    (c.Specialization != null && EF.Functions.Like(c.Specialization, $"%{query}%")) ||
-                    (c.Location != null && EF.Functions.Like(c.Location, $"%{query}%")) ||
                     (c.Phone != null && EF.Functions.Like(c.Phone, $"%{query}%")) ||
-                    (c.Email != null && EF.Functions.Like(c.Email, $"%{query}%")));
+                    (c.OrganizationName != null && EF.Functions.Like(c.OrganizationName, $"%{query}%")));
+            }
+            
+            // Filter by classification if provided
+            if (!string.IsNullOrWhiteSpace(classification))
+            {
+                baseQuery = baseQuery.Where(c => c.Classification == classification);
             }
             
             // Apply pagination
@@ -45,12 +47,18 @@ namespace SoitMed.Repositories
                 .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, name));
         }
 
-        public async Task<Client?> FindByNameAndTypeAsync(string name, string type)
+        public async Task<Client?> FindByNameAndOrganizationAsync(string name, string? organizationName)
         {
+            if (string.IsNullOrWhiteSpace(organizationName))
+            {
+                return await FindByNameAsync(name);
+            }
+            
             return await _context.Clients
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, name) && 
-                                        EF.Functions.Like(c.Type, type));
+                                        c.OrganizationName != null &&
+                                        EF.Functions.Like(c.OrganizationName, organizationName));
         }
 
         public async Task<IEnumerable<Client>> GetMyClientsAsync(string userId, int page = 1, int pageSize = 20)
@@ -64,24 +72,12 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<IEnumerable<Client>> GetClientsNeedingFollowUpAsync(string userId)
-        {
-            var today = DateTime.UtcNow.Date;
-            
-            return await _context.Clients
-                .AsNoTracking()
-                .Where(c => (c.CreatedBy == userId || c.AssignedTo == userId) &&
-                           c.NextContactDate.HasValue &&
-                           c.NextContactDate.Value.Date <= today &&
-                           c.Status == "Active")
-                .OrderBy(c => c.NextContactDate)
-                .ToListAsync();
-        }
+        // Note: GetClientsNeedingFollowUpAsync removed - no longer needed without NextContactDate and Status fields
 
-        public async Task<Client?> FindOrCreateClientAsync(string name, string type, string? specialization, string createdBy)
+        public async Task<Client?> FindOrCreateClientAsync(string name, string? organizationName, string? phone, string createdBy)
         {
-            // First try to find existing client
-            var existingClient = await FindByNameAndTypeAsync(name, type);
+            // First try to find existing client by name
+            var existingClient = await FindByNameAsync(name);
             if (existingClient != null)
             {
                 return existingClient;
@@ -91,10 +87,8 @@ namespace SoitMed.Repositories
             var newClient = new Client
             {
                 Name = name,
-                Type = type,
-                Specialization = specialization,
-                Status = "Potential",
-                Priority = "Medium",
+                OrganizationName = organizationName,
+                Phone = phone,
                 CreatedBy = createdBy,
                 CreatedAt = DateTime.UtcNow
             };
@@ -116,28 +110,17 @@ namespace SoitMed.Repositories
                 .AsNoTracking()
                 .CountAsync();
 
-            var clientsByType = myClients
-                .GroupBy(c => c.Type)
-                .Select(g => new { Type = g.Key, Count = g.Count() })
-                .ToList();
-
-            var clientsByStatus = myClients
-                .GroupBy(c => c.Status)
-                .Select(g => new { Status = g.Key, Count = g.Count() })
-                .ToList();
-
-            var clientsByPriority = myClients
-                .GroupBy(c => c.Priority)
-                .Select(g => new { Priority = g.Key, Count = g.Count() })
+            var clientsByOrganization = myClients
+                .Where(c => !string.IsNullOrEmpty(c.OrganizationName))
+                .GroupBy(c => c.OrganizationName)
+                .Select(g => new { OrganizationName = g.Key, Count = g.Count() })
                 .ToList();
 
             return new
             {
                 MyClientsCount = myClients.Count,
                 TotalClientsCount = totalClients,
-                ClientsByType = clientsByType,
-                ClientsByStatus = clientsByStatus,
-                ClientsByPriority = clientsByPriority
+                ClientsByOrganization = clientsByOrganization
             };
         }
 
