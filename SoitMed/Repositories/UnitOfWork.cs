@@ -65,6 +65,21 @@ namespace SoitMed.Repositories
 
         // Salesman targets repository
         private ISalesmanTargetRepository? _salesmanTargets;
+        
+        // Product catalog repository
+        private IProductRepository? _products;
+        
+        // Payment repositories
+        private IPaymentRepository? _payments;
+        
+        // Maintenance repositories
+        private IMaintenanceRequestRepository? _maintenanceRequests;
+        private IMaintenanceVisitRepository? _maintenanceVisits;
+        private IMaintenanceRequestAttachmentRepository? _maintenanceRequestAttachments;
+        private ISparePartRequestRepository? _sparePartRequests;
+        
+        // Activity tracking repository
+        private IRecentOfferActivityRepository? _recentOfferActivities;
 
         public UnitOfWork(Context context)
         {
@@ -178,6 +193,31 @@ namespace SoitMed.Repositories
 
         public ISalesmanTargetRepository SalesmanTargets => 
             _salesmanTargets ??= new SalesmanTargetRepository(_context);
+        
+        // Product catalog repository
+        public IProductRepository Products => 
+            _products ??= new ProductRepository(_context);
+        
+        // Payment repositories
+        public IPaymentRepository Payments => 
+            _payments ??= new PaymentRepository(_context);
+        
+        // Maintenance repositories
+        public IMaintenanceRequestRepository MaintenanceRequests => 
+            _maintenanceRequests ??= new MaintenanceRequestRepository(_context);
+        
+        public IMaintenanceVisitRepository MaintenanceVisits => 
+            _maintenanceVisits ??= new MaintenanceVisitRepository(_context);
+        
+        public IMaintenanceRequestAttachmentRepository MaintenanceRequestAttachments => 
+            _maintenanceRequestAttachments ??= new MaintenanceRequestAttachmentRepository(_context);
+        
+        public ISparePartRequestRepository SparePartRequests => 
+            _sparePartRequests ??= new SparePartRequestRepository(_context);
+        
+        // Activity tracking repository
+        public IRecentOfferActivityRepository RecentOfferActivities => 
+            _recentOfferActivities ??= new RecentOfferActivityRepository(_context);
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

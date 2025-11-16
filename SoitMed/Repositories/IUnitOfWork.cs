@@ -60,6 +60,21 @@ namespace SoitMed.Repositories
 
         // Salesman targets repository
         ISalesmanTargetRepository SalesmanTargets { get; }
+        
+        // Product catalog repository
+        IProductRepository Products { get; }
+        
+        // Payment repositories
+        IPaymentRepository Payments { get; }
+        
+        // Maintenance repositories
+        IMaintenanceRequestRepository MaintenanceRequests { get; }
+        IMaintenanceVisitRepository MaintenanceVisits { get; }
+        IMaintenanceRequestAttachmentRepository MaintenanceRequestAttachments { get; }
+        ISparePartRequestRepository SparePartRequests { get; }
+        
+        // Activity tracking repository
+        IRecentOfferActivityRepository RecentOfferActivities { get; }
 
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
