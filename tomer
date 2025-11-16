@@ -1,0 +1,95 @@
+warning: in the working copy of 'SoitMed/Controllers/ClientController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Controllers/OfferController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Controllers/OfferRequestController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Controllers/ProductController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/DTO/ClientDTOs.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/DTO/ClientFollowUpDTO.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/DTO/WeeklyPlanDTOs.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Extensions/ServiceCollectionExtensions.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Models/ActivityLog.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Models/Client.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Models/Context.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Models/Identity/ApplicationUser.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Models/OfferRequest.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Models/WeeklyPlanTask.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/ActivityLogRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/ClientAnalyticsRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/ClientRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/DealRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/IActivityLogRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/IClientRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/IDealRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/IOfferRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/IUnitOfWork.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/IWeeklyPlanRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/IWeeklyPlanTaskRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/OfferRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/UnitOfWork.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/WeeklyPlanRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Repositories/WeeklyPlanTaskRepository.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Services/ActivityService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Services/ClientService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Services/IClientService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Services/IOfferService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Services/MappingService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Services/OfferRequestService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Services/OfferService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Services/ValidationService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SoitMed/Services/WeeklyPlanService.cs', LF will be replaced by CRLF the next time Git touches it
+ SYNC_DB_WITH_CODE.md                               |   6 [32m+[m
+ SoitMed/APPLY_MIGRATION.md                         |   6 [32m+[m
+ SoitMed/Controllers/ClientController.cs            | 102 [32m+++[m[31m----[m
+ SoitMed/Controllers/OfferController.cs             |  51 [32m+++[m[31m-[m
+ SoitMed/Controllers/OfferRequestController.cs      |   6 [32m+[m[31m-[m
+ SoitMed/Controllers/ProductController.cs           |   2 [32m+[m[31m-[m
+ SoitMed/DTO/ClientDTOs.cs                          | 141 [32m+[m[31m--------[m
+ SoitMed/DTO/ClientFollowUpDTO.cs                   |  13 [32m+[m[31m-[m
+ SoitMed/DTO/SalesFunnelDTOs.cs                     |  27 [32m+[m[31m-[m
+ SoitMed/DTO/SalesModuleDTOs.cs                     |   6 [32m+[m[31m-[m
+ SoitMed/DTO/WeeklyPlanDTOs.cs                      |   2 [32m+[m[31m-[m
+ .../PASSWORD_RESET_API_DOCUMENTATION.md            |  16 [32m+[m[31m-[m
+ SoitMed/Extensions/ServiceCollectionExtensions.cs  |   3 [32m+[m
+ SoitMed/Models/ActivityLog.cs                      |  29 [32m+[m[31m-[m
+ SoitMed/Models/Client.cs                           | 190 [32m+[m[31m------------[m
+ SoitMed/Models/Context.cs                          |  28 [32m++[m
+ SoitMed/Models/DailyProgress.cs                    |   2 [32m+[m[31m-[m
+ SoitMed/Models/Enums/SalesFunnelEnums.cs           |  66 [31m-----[m
+ SoitMed/Models/Identity/ApplicationUser.cs         |   6 [32m+[m
+ SoitMed/Models/OfferRequest.cs                     |   4 [32m+[m[31m-[m
+ SoitMed/Models/SalesOffer.cs                       |   2 [32m+[m[31m-[m
+ SoitMed/Program.cs                                 |   3 [32m+[m
+ SoitMed/Properties/launchSettings.json             |   4 [31m-[m
+ SoitMed/Repositories/ActivityLogRepository.cs      |  66 [31m-----[m
+ SoitMed/Repositories/ClientAnalyticsRepository.cs  |   8 [32m+[m[31m-[m
+ SoitMed/Repositories/ClientRepository.cs           |  73 [32m++[m[31m---[m
+ SoitMed/Repositories/DealRepository.cs             |  80 [31m------[m
+ SoitMed/Repositories/IActivityLogRepository.cs     |  15 [31m-[m
+ SoitMed/Repositories/IClientRepository.cs          |   7 [32m+[m[31m-[m
+ SoitMed/Repositories/IDealRepository.cs            |  14 [31m-[m
+ SoitMed/Repositories/IOfferRepository.cs           |  12 [31m-[m
+ .../Repositories/IRecentOfferActivityRepository.cs |   1 [32m+[m
+ SoitMed/Repositories/ISalesOfferRepository.cs      |   2 [32m+[m
+ SoitMed/Repositories/IUnitOfWork.cs                |  15 [32m+[m
+ SoitMed/Repositories/IWeeklyPlanRepository.cs      |  31 [31m--[m
+ SoitMed/Repositories/IWeeklyPlanTaskRepository.cs  |  19 [31m--[m
+ SoitMed/Repositories/OfferRepository.cs            |  63 [31m-----[m
+ .../Repositories/RecentOfferActivityRepository.cs  |   8 [32m+[m
+ SoitMed/Repositories/SalesOfferRepository.cs       |  41 [32m+++[m
+ SoitMed/Repositories/UnitOfWork.cs                 |  40 [32m+++[m
+ SoitMed/Repositories/WeeklyPlanRepository.cs       | 150 [31m----------[m
+ SoitMed/Repositories/WeeklyPlanTaskRepository.cs   |  76 [31m-----[m
+ SoitMed/Services/ActivityService.cs                |  45 [32m+[m[31m--[m
+ SoitMed/Services/ClientService.cs                  | 132 [32m++++[m[31m-----[m
+ SoitMed/Services/IClientService.cs                 |   6 [32m+[m[31m-[m
+ SoitMed/Services/IOfferService.cs                  |   2 [32m+[m
+ SoitMed/Services/ManagerDashboardService.cs        |  30 [32m+[m[31m-[m
+ SoitMed/Services/MappingService.cs                 |  50 [32m+[m[31m---[m
+ SoitMed/Services/MobileNotificationService.cs      |   9 [32m+[m[31m-[m
+ SoitMed/Services/OfferRequestService.cs            |   2 [32m+[m[31m-[m
+ SoitMed/Services/OfferService.cs                   | 315 [32m+++++++++++++[m[31m--------[m
+ SoitMed/Services/SalesmanStatsService.cs           |  30 [32m+[m[31m-[m
+ SoitMed/Services/ValidationService.cs              | 101 [32m+[m[31m------[m
+ SoitMed/Services/WeeklyPlanService.cs              |  24 [32m+[m[31m-[m
+ SoitMed/Services/WeeklyPlanTaskService.cs          |  40 [32m+[m[31m--[m
+ SoitMed/Validators/SalesFunnelValidators.cs        |  20 [32m+[m[31m-[m
+ 56 files changed, 725 insertions(+), 1517 deletions(-)
