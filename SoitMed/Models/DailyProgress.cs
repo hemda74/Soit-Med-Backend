@@ -12,7 +12,7 @@ namespace SoitMed.Models
         public int Id { get; set; }
 
         [Required]
-        public int WeeklyPlanId { get; set; }
+        public long WeeklyPlanId { get; set; }
 
         [Required]
         public DateOnly ProgressDate { get; set; }

@@ -21,6 +21,12 @@ namespace SoitMed.Models.Identity
 	public DateTime? LastLoginAt { get; set; }
 	public bool IsActive { get; set; } = true;
 
+	// Customer-Client linking (optional - for Customer role users)
+	public long? ClientId { get; set; }
+	
+	[ForeignKey("ClientId")]
+	public virtual Client? Client { get; set; }
+
 		// Computed property for full name
 		public string FullName => $"{FirstName} {LastName}".Trim();
 

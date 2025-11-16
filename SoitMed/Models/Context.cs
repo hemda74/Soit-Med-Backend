@@ -69,6 +69,27 @@ namespace SoitMed.Models
         
         // Salesman targets and statistics
         public DbSet<SalesmanTarget> SalesmanTargets { get; set; }
+        
+        // Product catalog
+        public DbSet<Product> Products { get; set; }
+        
+        // Payment entities
+        public DbSet<Payment.Payment> Payments { get; set; }
+        public DbSet<Payment.PaymentTransaction> PaymentTransactions { get; set; }
+        
+        // Maintenance entities
+        public DbSet<Equipment.MaintenanceRequest> MaintenanceRequests { get; set; }
+        public DbSet<Equipment.MaintenanceVisit> MaintenanceVisits { get; set; }
+        public DbSet<Equipment.MaintenanceRequestAttachment> MaintenanceRequestAttachments { get; set; }
+        public DbSet<Equipment.SparePartRequest> SparePartRequests { get; set; }
+        
+        // Notification and activity tracking
+        public DbSet<DeviceToken> DeviceTokens { get; set; }
+        public DbSet<RecentOfferActivity> RecentOfferActivities { get; set; }
+        
+        // Daily progress tracking
+        public DbSet<DailyProgress> DailyProgresses { get; set; }
+        
         public Context(DbContextOptions options) : base(options)
         {
 
@@ -83,6 +104,13 @@ namespace SoitMed.Models
                 .HasOne(u => u.Department)
                 .WithMany(d => d.Users)
                 .HasForeignKey(u => u.DepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Configure ApplicationUser-Client relationship (for Customer role)
+            modelBuilder.Entity<ApplicationUser>()
+                .HasOne(u => u.Client)
+                .WithMany()
+                .HasForeignKey(u => u.ClientId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             // Configure Department entity
