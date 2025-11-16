@@ -103,14 +103,20 @@ namespace SoitMed.Validators
                 .WithMessage("Deal value must be greater than 0");
 
             RuleFor(x => x.Status)
-                .IsInEnum()
-                .When(x => x.Status.HasValue)
+                .Must(s => string.IsNullOrEmpty(s) || IsValidDealStatus(s))
+                .When(x => !string.IsNullOrEmpty(x.Status))
                 .WithMessage("Invalid deal status");
 
             RuleFor(x => x.ExpectedCloseDate)
                 .GreaterThan(DateTime.Today)
                 .When(x => x.ExpectedCloseDate.HasValue)
                 .WithMessage("Expected close date must be in the future");
+        }
+
+        private static bool IsValidDealStatus(string status)
+        {
+            var validStatuses = new[] { "Pending", "Approved", "Rejected", "Completed", "Closed", "Lost", "Won" };
+            return validStatuses.Contains(status);
         }
     }
 
@@ -124,8 +130,8 @@ namespace SoitMed.Validators
                 .WithMessage("Offer details cannot exceed 2000 characters");
 
             RuleFor(x => x.Status)
-                .IsInEnum()
-                .When(x => x.Status.HasValue)
+                .Must(s => string.IsNullOrEmpty(s) || IsValidOfferStatus(s))
+                .When(x => !string.IsNullOrEmpty(x.Status))
                 .WithMessage("Invalid offer status");
 
             RuleFor(x => x.DocumentUrl)
@@ -142,6 +148,12 @@ namespace SoitMed.Validators
                 return true;
 
             return Uri.TryCreate(url, UriKind.Absolute, out _);
+        }
+
+        private static bool IsValidOfferStatus(string status)
+        {
+            var validStatuses = new[] { "Draft", "Sent", "Accepted", "Rejected", "UnderReview", "NeedsModification", "Completed" };
+            return validStatuses.Contains(status);
         }
     }
 }
