@@ -203,6 +203,9 @@ namespace SoitMed
             builder.Services.AddScoped<IEmailService, EmailService>();
             builder.Services.AddScoped<IVerificationCodeService, VerificationCodeService>();
             
+            // Register HttpClient factory (required for MobileNotificationService)
+            builder.Services.AddHttpClient();
+            
             // Register Workflow and Notification Services
             builder.Services.AddScoped<INotificationService, NotificationService>();
             builder.Services.AddScoped<IRequestWorkflowService, RequestWorkflowService>();

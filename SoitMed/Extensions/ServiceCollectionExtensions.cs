@@ -40,6 +40,9 @@ namespace SoitMed.Extensions
             // Payment services
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IAccountingService, AccountingService>();
+            
+            // Mobile notification service (IHttpClientFactory registered in Program.cs)
+            services.AddScoped<IMobileNotificationService, MobileNotificationService>();
 
             return services;
         }
