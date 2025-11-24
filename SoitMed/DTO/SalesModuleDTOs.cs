@@ -260,6 +260,11 @@ namespace SoitMed.DTO
         public string Status { get; set; } = string.Empty;
         public DateTime? SentToClientAt { get; set; }
         public string? ClientResponse { get; set; }
+        // SalesManager Approval/Rejection fields
+        public string? SalesManagerApprovedBy { get; set; }
+        public DateTime? SalesManagerApprovedAt { get; set; }
+        public string? SalesManagerComments { get; set; }
+        public string? SalesManagerRejectionReason { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 
