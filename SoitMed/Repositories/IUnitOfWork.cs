@@ -36,9 +36,6 @@ namespace SoitMed.Repositories
         IApplicationUserRepository Users { get; }
         IUserImageRepository UserImages { get; }
 
-        // Sales report repository (already exists)
-        ISalesReportRepository SalesReports { get; }
-
         // Sales funnel repositories
         IActivityLogRepository ActivityLogs { get; }
         IDealRepository Deals { get; }
@@ -61,6 +58,10 @@ namespace SoitMed.Repositories
         IOfferRequestRepository OfferRequests { get; }
         ISalesOfferRepository SalesOffers { get; }
         ISalesDealRepository SalesDeals { get; }
+
+        // Chat repositories
+        IChatConversationRepository ChatConversations { get; }
+        IChatMessageRepository ChatMessages { get; }
         
         // Enhanced offer repositories
         IOfferEquipmentRepository OfferEquipment { get; }
