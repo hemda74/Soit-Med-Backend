@@ -145,7 +145,7 @@ namespace SoitMed.Controllers
             try
             {
                 var userId = GetCurrentUserId();
-                var userRole = "Salesman"; // This should be replaced with actual role checking
+                var userRole = GetCurrentUserRole();
                 
                 var result = await _dealService.GetDealsByClientAsync(clientId, userId, userRole);
 
