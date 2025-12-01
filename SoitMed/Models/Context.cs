@@ -45,9 +45,6 @@ namespace SoitMed.Models
         // User image entities
         public DbSet<UserImage> UserImages { get; set; }
 
-        // Sales report entities
-        public DbSet<SalesReport> SalesReports { get; set; }
-
         // Sales funnel entities
         public DbSet<ActivityLog> ActivityLogs { get; set; }
         public DbSet<Deal> Deals { get; set; }
@@ -70,6 +67,10 @@ namespace SoitMed.Models
         public DbSet<WeeklyPlan> WeeklyPlans { get; set; }
         public DbSet<WeeklyPlanTask> WeeklyPlanTasks { get; set; }
         public DbSet<TaskProgress> TaskProgresses { get; set; }
+
+        // Chat entities
+        public DbSet<ChatConversation> ChatConversations { get; set; }
+        public DbSet<ChatMessage> ChatMessages { get; set; }
 
         // Sales workflow entities
         public DbSet<OfferRequest> OfferRequests { get; set; }

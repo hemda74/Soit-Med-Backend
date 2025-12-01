@@ -39,9 +39,6 @@ namespace SoitMed.Repositories
         private IApplicationUserRepository? _users;
         private IUserImageRepository? _userImages;
 
-        // Sales report repository
-        private ISalesReportRepository? _salesReports;
-
         // Sales funnel repositories
         private IActivityLogRepository? _activityLogs;
         private IDealRepository? _deals;
@@ -67,6 +64,10 @@ namespace SoitMed.Repositories
         private ISalesOfferRepository? _salesOffers;
         private ISalesDealRepository? _salesDeals;
         
+        // Chat repositories
+        private IChatConversationRepository? _chatConversations;
+        private IChatMessageRepository? _chatMessages;
+        
         // Enhanced offer repositories
         private IOfferEquipmentRepository? _offerEquipment;
         private IOfferTermsRepository? _offerTerms;
@@ -78,6 +79,7 @@ namespace SoitMed.Repositories
 
         // Products catalog repository
         private IProductRepository? _products;
+
 
         public UnitOfWork(Context context)
         {
@@ -142,10 +144,6 @@ namespace SoitMed.Repositories
         public IUserImageRepository UserImages => 
             _userImages ??= new UserImageRepository(_context);
 
-        // Sales report repository
-        public ISalesReportRepository SalesReports => 
-            _salesReports ??= new SalesReportRepository(_context);
-
         // Sales funnel repositories
         public IActivityLogRepository ActivityLogs => 
             _activityLogs ??= new ActivityLogRepository(_context);
@@ -195,6 +193,13 @@ namespace SoitMed.Repositories
 
         public ISalesDealRepository SalesDeals => 
             _salesDeals ??= new SalesDealRepository(_context);
+
+        // Chat repositories
+        public IChatConversationRepository ChatConversations =>
+            _chatConversations ??= new ChatConversationRepository(_context);
+
+        public IChatMessageRepository ChatMessages =>
+            _chatMessages ??= new ChatMessageRepository(_context);
         
         // Enhanced offer repositories
         public IOfferEquipmentRepository OfferEquipment => 
