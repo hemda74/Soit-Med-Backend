@@ -30,11 +30,14 @@ namespace SoitMed.Services
                 throw new InvalidOperationException("يوجد خطة أسبوعية بالفعل لهذا الأسبوع");
             }
 
+            // Auto-calculate end date as 7 days from start date
+            var weekEndDate = createDto.WeekStartDate.AddDays(6); // 7 days total (start day + 6 more days)
+
             var plan = new Models.WeeklyPlan
             {
                 EmployeeId = userId,
                 WeekStartDate = createDto.WeekStartDate,
-                WeekEndDate = createDto.WeekEndDate,
+                WeekEndDate = weekEndDate, // Auto-calculated: 7 days from start
                 Title = createDto.Title,
                 Description = createDto.Description,
                 IsActive = true
@@ -377,6 +380,7 @@ namespace SoitMed.Services
                     ProgressDate = p.ProgressDate,
                     ProgressType = p.ProgressType,
                     Description = p.Description,
+					VoiceDescriptionUrl = p.VoiceDescriptionUrl,
                     VisitResult = p.VisitResult,
                     NextStep = p.NextStep,
                     OfferRequestId = p.OfferRequestId

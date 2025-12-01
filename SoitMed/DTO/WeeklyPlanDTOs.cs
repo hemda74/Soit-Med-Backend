@@ -7,8 +7,11 @@ namespace SoitMed.DTO
         [Required]
         public DateTime WeekStartDate { get; set; }
 
-        [Required]
-        public DateTime WeekEndDate { get; set; }
+        /// <summary>
+        /// End date is auto-calculated as 7 days from start date.
+        /// This field is optional and will be ignored if provided.
+        /// </summary>
+        public DateTime? WeekEndDate { get; set; }
 
         [Required]
         [MaxLength(200)]
@@ -108,6 +111,7 @@ namespace SoitMed.DTO
         public DateTime ProgressDate { get; set; }
         public string ProgressType { get; set; } = string.Empty;
         public string? Description { get; set; }
+		public string? VoiceDescriptionUrl { get; set; }
         public string? VisitResult { get; set; }
         public string? NextStep { get; set; }
         public long? OfferRequestId { get; set; }
