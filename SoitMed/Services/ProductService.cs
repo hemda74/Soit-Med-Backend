@@ -160,6 +160,7 @@ namespace SoitMed.Services
                     Name = createDto.Name,
                     Model = createDto.Model,
                     Provider = createDto.Provider,
+                    ProviderImagePath = createDto.ProviderImagePath,
                     Country = createDto.Country,
                     Category = createDto.Category,
                     BasePrice = createDto.BasePrice,
@@ -203,6 +204,9 @@ namespace SoitMed.Services
 
                 if (updateDto.Provider != null)
                     product.Provider = updateDto.Provider;
+
+                if (updateDto.ProviderImagePath != null)
+                    product.ProviderImagePath = updateDto.ProviderImagePath;
 
                 if (updateDto.Country != null)
                     product.Country = updateDto.Country;
@@ -292,6 +296,31 @@ namespace SoitMed.Services
             }
         }
 
+        public async Task<ProductResponseDTO> UpdateProviderImageAsync(long id, string imagePath)
+        {
+            try
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(id);
+                if (product == null)
+                    throw new ArgumentException("Product not found", nameof(id));
+
+                product.ProviderImagePath = imagePath;
+                product.UpdatedAt = DateTime.UtcNow;
+
+                await _unitOfWork.Products.UpdateAsync(product);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Product provider image updated. ProductId: {ProductId}, ImagePath: {ImagePath}", id, imagePath);
+
+                return await MapToProductResponseDTO(product);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating provider image. ProductId: {ProductId}", id);
+                throw;
+            }
+        }
+
         #region Private Mapping Methods
 
         private async Task<ProductResponseDTO> MapToProductResponseDTO(Product product)
@@ -302,6 +331,7 @@ namespace SoitMed.Services
                 Name = product.Name,
                 Model = product.Model,
                 Provider = product.Provider,
+                ProviderImagePath = product.ProviderImagePath,
                 Country = product.Country,
                 Category = product.Category,
                 BasePrice = product.BasePrice,
@@ -337,6 +367,7 @@ namespace SoitMed.Services
                 Name = product.Name,
                 Model = product.Model,
                 Provider = product.Provider,
+                ProviderImagePath = product.ProviderImagePath,
                 Country = product.Country,
                 Category = product.Category,
                 BasePrice = product.BasePrice,
