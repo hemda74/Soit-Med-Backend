@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SoitMed.DTO;
 using SoitMed.Models;
+using SoitMed.Models.Location;
 using SoitMed.Repositories;
 using System.Text.Json;
 
@@ -102,13 +103,29 @@ namespace SoitMed.Services
                     .GetDealsByClientIdAsync(clientId);
 
                 // Calculate statistics
+                // Count deals that are approved, sent to legal, or successful as successful deals
+                // Include: Success (completed), SentToLegal, and Approved
+                // Only count failed or rejected deals as failed
+                var successfulDealStatuses = new[] { "Success", "SentToLegal", "Approved" };
+                var failedDealStatuses = new[] { "Failed", "RejectedByManager", "RejectedBySuperAdmin" };
+                
+                // Calculate successful deals count - includes both SentToLegal AND Success (Completed)
+                var successfulDealsCount = deals.Count(d => successfulDealStatuses.Contains(d.Status));
+                
+                // Calculate total revenue from successful deals
+                // This includes revenue from BOTH SentToLegal deals AND Success (Completed) deals
+                // DealValue is non-nullable decimal, so we can use it directly
+                var totalRevenueValue = deals
+                    .Where(d => successfulDealStatuses.Contains(d.Status))
+                    .Sum(d => d.DealValue);
+                
                 var statistics = new ClientStatisticsDTO
                 {
                     TotalVisits = taskProgresses.Count,
                     TotalOffers = offers.Count,
-                    SuccessfulDeals = deals.Count(d => d.Status == "Success"),
-                    FailedDeals = deals.Count(d => d.Status == "Failed"),
-                    TotalRevenue = deals.Where(d => d.Status == "Success").Sum(d => d.DealValue),
+                    SuccessfulDeals = successfulDealsCount,
+                    FailedDeals = deals.Count(d => failedDealStatuses.Contains(d.Status)),
+                    TotalRevenue = totalRevenueValue,
                    
                 };
 
@@ -223,13 +240,142 @@ namespace SoitMed.Services
 
         #region Search and Filter
 
-        public async Task<List<ClientResponseDTO>> SearchClientsAsync(SearchClientDTO searchDto, string userId)
+        public async Task<PaginatedClientsResponseDTO> SearchClientsAsync(SearchClientDTO searchDto, string userId)
         {
             try
             {
-                // Repository now handles empty search terms and returns all clients
-                var clients = await _unitOfWork.Clients.SearchClientsAsync(searchDto.Query ?? string.Empty, searchDto.Page, searchDto.PageSize);
-                return clients.Select(MapToClientResponseDTO).ToList();
+                // Get total count first using the same query logic as repository
+                var context = _unitOfWork.GetContext();
+                var baseQuery = context.Clients.AsQueryable();
+                
+                // Apply search filter if query is provided
+                if (!string.IsNullOrWhiteSpace(searchDto.Query))
+                {
+                    var query = searchDto.Query;
+                    var namePattern = "%" + query + "%";
+                    baseQuery = baseQuery.Where(c => 
+                        EF.Functions.Like(c.Name, namePattern) ||
+                        (c.Specialization != null && EF.Functions.Like(c.Specialization, namePattern)) ||
+                        (c.Location != null && EF.Functions.Like(c.Location, namePattern)) ||
+                        (c.Phone != null && EF.Functions.Like(c.Phone, namePattern)) ||
+                        (c.Email != null && EF.Functions.Like(c.Email, namePattern)));
+                }
+
+                // Filter by classification
+                if (!string.IsNullOrWhiteSpace(searchDto.Classification))
+                {
+                    baseQuery = baseQuery.Where(c => c.Classification == searchDto.Classification);
+                }
+
+                // Filter by assigned salesman
+                if (!string.IsNullOrWhiteSpace(searchDto.AssignedSalesmanId))
+                {
+                    baseQuery = baseQuery.Where(c => c.AssignedTo == searchDto.AssignedSalesmanId);
+                }
+
+                // Filter by city
+                if (!string.IsNullOrWhiteSpace(searchDto.City))
+                {
+                    var cityPattern = "%" + searchDto.City + "%";
+                    baseQuery = baseQuery.Where(c => c.City != null && EF.Functions.Like(c.City, cityPattern));
+                }
+
+                // Filter by governorate - need to look up governorate name from ID
+                if (searchDto.GovernorateId.HasValue)
+                {
+                    // Look up the governorate name from the Governorates table first
+                    var governorate = await context.Governorates
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(g => g.GovernorateId == searchDto.GovernorateId.Value);
+                    
+                    if (governorate != null && !string.IsNullOrWhiteSpace(governorate.Name))
+                    {
+                        var govPattern = "%" + governorate.Name + "%";
+                        baseQuery = baseQuery.Where(c => c.Governorate != null && 
+                            EF.Functions.Like(c.Governorate, govPattern));
+                    }
+                }
+
+                // Filter by equipment categories
+                if (searchDto.EquipmentCategories != null && searchDto.EquipmentCategories.Any())
+                {
+                    // InterestedEquipmentCategories is stored as JSON array string like ["Category1", "Category2"]
+                    // Pre-process all search patterns outside LINQ to avoid string operations in query
+                    var allPatterns = new List<string>();
+                    foreach (var category in searchDto.EquipmentCategories)
+                    {
+                        // Add quoted versions (JSON format) - use string concatenation, not interpolation
+                        allPatterns.Add("\"" + category + "\"");
+                        allPatterns.Add("\"" + category.Replace("+", " ") + "\"");
+                        allPatterns.Add("\"" + category.Replace(" ", "+") + "\"");
+                        // Add unquoted versions (fallback)
+                        allPatterns.Add(category);
+                        allPatterns.Add(category.Replace("+", " "));
+                        allPatterns.Add(category.Replace(" ", "+"));
+                    }
+                    
+                    // Build a single OR condition that EF Core can translate
+                    // Limit to reasonable number of patterns to avoid query complexity
+                    var patternsToCheck = allPatterns.Take(18).ToList();
+                    
+                    if (patternsToCheck.Count > 0)
+                    {
+                        var p0 = patternsToCheck[0];
+                        var p1 = patternsToCheck.Count > 1 ? patternsToCheck[1] : p0;
+                        var p2 = patternsToCheck.Count > 2 ? patternsToCheck[2] : p0;
+                        var p3 = patternsToCheck.Count > 3 ? patternsToCheck[3] : p0;
+                        var p4 = patternsToCheck.Count > 4 ? patternsToCheck[4] : p0;
+                        var p5 = patternsToCheck.Count > 5 ? patternsToCheck[5] : p0;
+                        var p6 = patternsToCheck.Count > 6 ? patternsToCheck[6] : p0;
+                        var p7 = patternsToCheck.Count > 7 ? patternsToCheck[7] : p0;
+                        var p8 = patternsToCheck.Count > 8 ? patternsToCheck[8] : p0;
+                        var p9 = patternsToCheck.Count > 9 ? patternsToCheck[9] : p0;
+                        var p10 = patternsToCheck.Count > 10 ? patternsToCheck[10] : p0;
+                        var p11 = patternsToCheck.Count > 11 ? patternsToCheck[11] : p0;
+                        var p12 = patternsToCheck.Count > 12 ? patternsToCheck[12] : p0;
+                        var p13 = patternsToCheck.Count > 13 ? patternsToCheck[13] : p0;
+                        var p14 = patternsToCheck.Count > 14 ? patternsToCheck[14] : p0;
+                        var p15 = patternsToCheck.Count > 15 ? patternsToCheck[15] : p0;
+                        var p16 = patternsToCheck.Count > 16 ? patternsToCheck[16] : p0;
+                        var p17 = patternsToCheck.Count > 17 ? patternsToCheck[17] : p0;
+                        
+                        baseQuery = baseQuery.Where(c => 
+                            !string.IsNullOrEmpty(c.InterestedEquipmentCategories) &&
+                            (c.InterestedEquipmentCategories.Contains(p0) ||
+                             (patternsToCheck.Count > 1 && c.InterestedEquipmentCategories.Contains(p1)) ||
+                             (patternsToCheck.Count > 2 && c.InterestedEquipmentCategories.Contains(p2)) ||
+                             (patternsToCheck.Count > 3 && c.InterestedEquipmentCategories.Contains(p3)) ||
+                             (patternsToCheck.Count > 4 && c.InterestedEquipmentCategories.Contains(p4)) ||
+                             (patternsToCheck.Count > 5 && c.InterestedEquipmentCategories.Contains(p5)) ||
+                             (patternsToCheck.Count > 6 && c.InterestedEquipmentCategories.Contains(p6)) ||
+                             (patternsToCheck.Count > 7 && c.InterestedEquipmentCategories.Contains(p7)) ||
+                             (patternsToCheck.Count > 8 && c.InterestedEquipmentCategories.Contains(p8)) ||
+                             (patternsToCheck.Count > 9 && c.InterestedEquipmentCategories.Contains(p9)) ||
+                             (patternsToCheck.Count > 10 && c.InterestedEquipmentCategories.Contains(p10)) ||
+                             (patternsToCheck.Count > 11 && c.InterestedEquipmentCategories.Contains(p11)) ||
+                             (patternsToCheck.Count > 12 && c.InterestedEquipmentCategories.Contains(p12)) ||
+                             (patternsToCheck.Count > 13 && c.InterestedEquipmentCategories.Contains(p13)) ||
+                             (patternsToCheck.Count > 14 && c.InterestedEquipmentCategories.Contains(p14)) ||
+                             (patternsToCheck.Count > 15 && c.InterestedEquipmentCategories.Contains(p15)) ||
+                             (patternsToCheck.Count > 16 && c.InterestedEquipmentCategories.Contains(p16)) ||
+                             (patternsToCheck.Count > 17 && c.InterestedEquipmentCategories.Contains(p17)))
+                        );
+                    }
+                }
+                
+                var totalCount = await baseQuery.CountAsync();
+                
+                // Get paginated clients with all filters
+                var clients = await _unitOfWork.Clients.SearchClientsAsync(searchDto);
+                var clientDTOs = clients.Select(MapToClientResponseDTO).ToList();
+                
+                return new PaginatedClientsResponseDTO
+                {
+                    Clients = clientDTOs,
+                    TotalCount = totalCount,
+                    Page = searchDto.Page,
+                    PageSize = searchDto.PageSize
+                };
             }
             catch (Exception ex)
             {
@@ -316,22 +462,69 @@ namespace SoitMed.Services
 
         private static ClientResponseDTO MapToClientResponseDTO(Client client)
         {
+            // Parse InterestedEquipmentCategories from JSON string to List<string>
+            List<string>? equipmentCategoriesList = null;
+            if (!string.IsNullOrWhiteSpace(client.InterestedEquipmentCategories))
+            {
+                try
+                {
+                    // Try to parse as JSON array
+                    equipmentCategoriesList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(client.InterestedEquipmentCategories);
+                }
+                catch
+                {
+                    // If parsing fails, try to parse as array of objects with Category property
+                    try
+                    {
+                        var categoryObjects = System.Text.Json.JsonSerializer.Deserialize<List<Dictionary<string, string>>>(client.InterestedEquipmentCategories);
+                        if (categoryObjects != null)
+                        {
+                            equipmentCategoriesList = categoryObjects
+                                .Where(obj => obj.ContainsKey("Category"))
+                                .Select(obj => obj["Category"])
+                                .ToList();
+                        }
+                    }
+                    catch
+                    {
+                        // If all parsing fails, leave as null
+                        equipmentCategoriesList = null;
+                    }
+                }
+            }
+
             return new ClientResponseDTO
             {
                 Id = client.Id,
                 Name = client.Name,
                 Type = client.Type,
+                OrganizationName = client.OrganizationName,
                 Specialization = client.Specialization,
                 Location = client.Location,
                 Phone = client.Phone,
                 Email = client.Email,
+                Website = client.Website,
+                Address = client.Address,
+                City = client.City,
+                Governorate = client.Governorate,
+                PostalCode = client.PostalCode,
+                Notes = client.Notes,
                 Status = client.Status,
                 Priority = client.Priority,
                 Classification = client.Classification,
+                PotentialValue = client.PotentialValue,
+                ContactPerson = client.ContactPerson,
+                ContactPersonPhone = client.ContactPersonPhone,
+                ContactPersonEmail = client.ContactPersonEmail,
+                ContactPersonPosition = client.ContactPersonPosition,
                 LastContactDate = client.LastContactDate,
                 NextContactDate = client.NextContactDate,
                 SatisfactionRating = client.SatisfactionRating,
-                CreatedAt = client.CreatedAt
+                InterestedEquipmentCategories = equipmentCategoriesList, // Use parsed list instead of JSON string
+                CreatedBy = client.CreatedBy,
+                AssignedTo = client.AssignedTo,
+                CreatedAt = client.CreatedAt,
+                UpdatedAt = client.UpdatedAt
             };
         }
 

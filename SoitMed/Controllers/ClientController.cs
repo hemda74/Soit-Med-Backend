@@ -32,6 +32,11 @@ namespace SoitMed.Controllers
         [HttpGet("search")]
         public async Task<IActionResult> SearchClients(
             [FromQuery] string? searchTerm = null,
+            [FromQuery] string? classification = null,
+            [FromQuery] string? assignedSalesmanId = null,
+            [FromQuery] string? city = null,
+            [FromQuery] int? governorateId = null,
+            [FromQuery] List<string>? equipmentCategories = null,
             [FromQuery] string? status = null,
             [FromQuery] string? priority = null,
             [FromQuery] int page = 1,
@@ -47,9 +52,19 @@ namespace SoitMed.Controllers
                 var searchDto = new SearchClientDTO
                 {
                     Query = searchTerm ?? string.Empty,
+                    Classification = classification,
+                    AssignedSalesmanId = assignedSalesmanId,
+                    City = city,
+                    GovernorateId = governorateId,
+                    EquipmentCategories = equipmentCategories,
                     Page = page,
                     PageSize = pageSize
                 };
+
+                // Debug logging
+                _logger.LogInformation("SearchClients called with: Query={Query}, Classification={Classification}, AssignedSalesmanId={AssignedSalesmanId}, City={City}, GovernorateId={GovernorateId}, EquipmentCategories={EquipmentCategories}, Page={Page}, PageSize={PageSize}",
+                    searchDto.Query, searchDto.Classification, searchDto.AssignedSalesmanId, searchDto.City, searchDto.GovernorateId, 
+                    searchDto.EquipmentCategories != null ? string.Join(",", searchDto.EquipmentCategories) : "null", searchDto.Page, searchDto.PageSize);
 
                 // Validate search parameters
                 var validationResult = _validationService.ValidateClientSearch(searchDto);
