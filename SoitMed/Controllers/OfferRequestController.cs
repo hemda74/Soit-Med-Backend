@@ -33,7 +33,7 @@ namespace SoitMed.Controllers
         /// Create new offer request
         /// </summary>
         [HttpPost]
-        [Authorize(Roles = "Salesman,SalesManager")]
+        [Authorize(Roles = "Salesman,SalesManager,Customer,Doctor,Technician")]
         public async Task<IActionResult> CreateOfferRequest([FromBody] CreateOfferRequestDTO createDto)
         {
             try
