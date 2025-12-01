@@ -53,7 +53,7 @@ namespace SoitMed.Services
                     DeliveryTerms = createDealDto.DeliveryTerms,
                     ExpectedDeliveryDate = createDealDto.ExpectedDeliveryDate,
                     Notes = createDealDto.Notes,
-                    Status = "PendingManagerApproval"
+                    Status = "PendingSuperAdminApproval"
                 };
 
                 await _unitOfWork.SalesDeals.CreateAsync(deal);
@@ -61,8 +61,8 @@ namespace SoitMed.Services
 
                 _logger.LogInformation("Deal created successfully. DealId: {DealId}, OfferId: {OfferId}", deal.Id, createDealDto.OfferId);
 
-                // Send notification to Sales Managers for approval
-                await SendManagerApprovalNotificationAsync(deal);
+                // Send notification to SuperAdmin for approval (deals now go directly to SuperAdmin approval)
+                await SendSuperAdminApprovalNotificationAsync(deal);
 
                 return await MapToDealResponseDTO(deal);
             }
@@ -163,8 +163,8 @@ namespace SoitMed.Services
 
                 foreach (var deal in deals)
                 {
-                    // Check authorization
-                    if (userRole == "SuperAdmin" || deal.SalesmanId == userId)
+                    // Check authorization - SuperAdmin and SalesManager can see all deals, Salesman can only see their own
+                    if (userRole == "SuperAdmin" || userRole == "SalesManager" || deal.SalesmanId == userId)
                     {
                         result.Add(await MapToDealResponseDTO(deal));
                     }
@@ -331,14 +331,18 @@ namespace SoitMed.Services
                 if (deal == null)
                     throw new ArgumentException("Deal not found", nameof(dealId));
 
-                if (deal.Status != "PendingSuperAdminApproval")
-                    throw new InvalidOperationException("Deal is not pending super admin approval");
+                // SuperAdmin can approve deals that are either:
+                // 1. PendingSuperAdminApproval (new deals created after client response)
+                // 2. PendingManagerApproval (legacy deals - SalesManager only approves offers, not deals)
+                if (deal.Status != "PendingSuperAdminApproval" && deal.Status != "PendingManagerApproval")
+                    throw new InvalidOperationException($"Deal is not pending approval. Current status: {deal.Status}");
 
                 if (approvalDto.Approved)
                 {
                     deal.ApproveBySuperAdmin(superAdminId, approvalDto.Comments);
-                    // Automatically send to legal after super admin approval
+                    // Automatically send to legal department after super admin approval
                     deal.SendToLegal();
+                    _logger.LogInformation("Deal approved by SuperAdmin and sent to Legal. DealId: {DealId}", dealId);
                 }
                 else
                 {
@@ -346,6 +350,8 @@ namespace SoitMed.Services
                         throw new ArgumentException("Rejection reason is required when rejecting a deal");
 
                     deal.RejectBySuperAdmin(superAdminId, approvalDto.RejectionReason, approvalDto.Comments);
+                    _logger.LogInformation("Deal rejected by SuperAdmin. DealId: {DealId}, Reason: {Reason}", 
+                        dealId, approvalDto.RejectionReason);
                 }
 
                 await _unitOfWork.SalesDeals.UpdateAsync(deal);
@@ -674,7 +680,10 @@ namespace SoitMed.Services
                 }
 
                 var notificationTitle = "Deal Pending Super Admin Approval";
-                var notificationMessage = $"Deal #{deal.Id} from {salesmanName} for {clientName} (Value: {deal.DealValue:C}) approved by {managerName} and requires your final approval.";
+                // Check if deal was approved by manager first, or goes directly to SuperAdmin
+                var notificationMessage = deal.ManagerApprovedBy != null
+                    ? $"Deal #{deal.Id} from {salesmanName} for {clientName} (Value: {deal.DealValue:C}) approved by {managerName} and requires your final approval."
+                    : $"Deal #{deal.Id} from {salesmanName} for {clientName} (Value: {deal.DealValue:C}) requires your approval.";
 
                 var metadata = new Dictionary<string, object>
                 {
