@@ -132,14 +132,17 @@ namespace SoitMed.Repositories
 
         public async Task<WeeklyPlan?> GetCurrentWeekPlanAsync(string employeeId)
         {
-            var now = DateTime.UtcNow;
-            var weekStart = now.Date.AddDays(-(int)now.DayOfWeek);
+            var now = DateTime.UtcNow.Date;
             
             // OPTIMIZATION: Eagerly load Tasks and Progresses to avoid N+1 queries
             // Use AsNoTracking for read-only operations to improve performance
+            // Check if current date falls within the week range (inclusive)
             return await _context.WeeklyPlans
                 .AsNoTracking()
-                .Where(p => p.EmployeeId == employeeId && p.WeekStartDate == weekStart)
+                .Where(p => p.EmployeeId == employeeId 
+                    && p.WeekStartDate <= now 
+                    && p.WeekEndDate >= now
+                    && p.IsActive)
                 .Include(p => p.Tasks)
                     .ThenInclude(t => t.Progresses)
                 .FirstOrDefaultAsync();
