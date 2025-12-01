@@ -17,6 +17,9 @@ namespace SoitMed.Models
         [MaxLength(50)]
         public string? Type { get; set; } // Doctor, Hospital, Clinic, etc. (optional)
 
+        [MaxLength(200)]
+        public string? OrganizationName { get; set; } // Organization/Company name
+
         [MaxLength(100)]
         public string? Specialization { get; set; }
 
@@ -84,6 +87,9 @@ namespace SoitMed.Models
 
         [Range(1, 5)]
         public int? SatisfactionRating { get; set; }
+
+        [Column(TypeName = "nvarchar(max)")]
+        public string? InterestedEquipmentCategories { get; set; } // JSON array of equipment categories
         #endregion
 
         #region System Information

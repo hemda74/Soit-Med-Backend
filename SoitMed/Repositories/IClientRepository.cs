@@ -4,7 +4,7 @@ namespace SoitMed.Repositories
 {
     public interface IClientRepository : IBaseRepository<Client>
     {
-        Task<IEnumerable<Client>> SearchClientsAsync(string query, int page = 1, int pageSize = 20);
+        Task<IEnumerable<Client>> SearchClientsAsync(SoitMed.DTO.SearchClientDTO searchDto);
         Task<Client?> FindByNameAsync(string name);
         Task<Client?> FindByNameAndTypeAsync(string name, string type);
         Task<IEnumerable<Client>> GetMyClientsAsync(string userId, int page = 1, int pageSize = 20);
