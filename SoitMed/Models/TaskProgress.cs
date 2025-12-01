@@ -55,6 +55,10 @@ namespace SoitMed.Models
         [MaxLength(2000)]
         public string? Attachments { get; set; } // JSON array of file paths
 
+        // ========== Voice Description ==========
+        [MaxLength(2000)]
+        public string? VoiceDescriptionUrl { get; set; }
+
         // Navigation Properties
         public virtual WeeklyPlanTask Task { get; set; }
         public virtual Client? Client { get; set; }
@@ -168,3 +172,6 @@ namespace SoitMed.Models
     }
     #endregion
 }
+
+
+
