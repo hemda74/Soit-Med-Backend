@@ -17,6 +17,9 @@ namespace SoitMed.DTO
         [MaxLength(100)]
         public string? Provider { get; set; }
 
+        [MaxLength(500)]
+        public string? ProviderImagePath { get; set; }
+
         [MaxLength(100)]
         public string? Country { get; set; }
 
@@ -49,6 +52,9 @@ namespace SoitMed.DTO
         [MaxLength(100)]
         public string? Provider { get; set; }
 
+        [MaxLength(500)]
+        public string? ProviderImagePath { get; set; }
+
         [MaxLength(100)]
         public string? Country { get; set; }
 
@@ -77,6 +83,7 @@ namespace SoitMed.DTO
         public string Name { get; set; } = string.Empty;
         public string? Model { get; set; }
         public string? Provider { get; set; }
+        public string? ProviderImagePath { get; set; }
         public string? Country { get; set; }
         public string? Category { get; set; }
         public decimal BasePrice { get; set; }
@@ -100,6 +107,7 @@ namespace SoitMed.DTO
         public string Name { get; set; } = string.Empty;
         public string? Model { get; set; }
         public string? Provider { get; set; }
+        public string? ProviderImagePath { get; set; }
         public string? Category { get; set; }
         public decimal BasePrice { get; set; }
         public bool InStock { get; set; }

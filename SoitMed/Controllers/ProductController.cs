@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Hosting;
 using SoitMed.Common;
 using SoitMed.DTO;
 using SoitMed.Models.Identity;
 using SoitMed.Services;
+using System.IO;
 
 namespace SoitMed.Controllers
 {
@@ -19,17 +21,20 @@ namespace SoitMed.Controllers
         private readonly IProductService _productService;
         private readonly IImageUploadService _imageUploadService;
         private readonly ILogger<ProductController> _logger;
+        private readonly IWebHostEnvironment _environment;
 
         public ProductController(
             IProductService productService,
             IImageUploadService imageUploadService,
             ILogger<ProductController> logger,
-            UserManager<ApplicationUser> userManager) 
+            UserManager<ApplicationUser> userManager,
+            IWebHostEnvironment environment) 
             : base(userManager)
         {
             _productService = productService;
             _imageUploadService = imageUploadService;
             _logger = logger;
+            _environment = environment;
         }
 
         /// <summary>
@@ -258,6 +263,127 @@ namespace SoitMed.Controllers
             {
                 _logger.LogError(ex, "Error uploading product image. ProductId: {ProductId}", id);
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while uploading product image"));
+            }
+        }
+
+        /// <summary>
+        /// Upload provider logo/image for a product
+        /// </summary>
+        [HttpPost("{id}/upload-provider-image")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
+        public async Task<IActionResult> UploadProviderImage(long id, IFormFile file)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("File is required"));
+                }
+
+                // Validate using shared service helpers
+                if (!_imageUploadService.IsValidImageFile(file))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("Invalid file type. Only JPG, PNG, GIF, and SVG are allowed"));
+                }
+
+                if (file.Length > 5 * 1024 * 1024)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("File size exceeds 5MB limit"));
+                }
+
+                var uploadResult = await _imageUploadService.UploadImageAsync(file, "providers");
+                if (!uploadResult.Success || string.IsNullOrWhiteSpace(uploadResult.FilePath))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse(uploadResult.ErrorMessage ?? "Failed to upload provider image"));
+                }
+
+                var result = await _productService.UpdateProviderImageAsync(id, uploadResult.FilePath);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Provider image uploaded successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for uploading provider image. ProductId: {ProductId}", id);
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error uploading provider image. ProductId: {ProductId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while uploading provider image"));
+            }
+        }
+
+        /// <summary>
+        /// Handle CORS preflight for provider image endpoint
+        /// </summary>
+        [HttpOptions("{id}/provider-image-file")]
+        [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+        public IActionResult OptionsProviderImageFile()
+        {
+            Response.Headers.Append("Access-Control-Allow-Origin", "*");
+            Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+            Response.Headers.Append("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+            Response.Headers.Append("Access-Control-Max-Age", "86400");
+            return Ok();
+        }
+
+        /// <summary>
+        /// Get provider image file directly (returns file stream)
+        /// AllowAnonymous is required because img tags cannot send Authorization headers
+        /// </summary>
+        [HttpGet("{id}/provider-image-file")]
+        [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+        public async Task<IActionResult> GetProviderImageFile(long id)
+        {
+            try
+            {
+                var product = await _productService.GetProductByIdAsync(id);
+                
+                if (product == null)
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("Product not found"));
+                }
+
+                if (string.IsNullOrWhiteSpace(product.ProviderImagePath))
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("Provider image not found for this product"));
+                }
+
+                // Get the physical file path using WebRootPath
+                var fullPath = Path.Combine(_environment.WebRootPath, product.ProviderImagePath.Replace('/', Path.DirectorySeparatorChar));
+
+                if (!System.IO.File.Exists(fullPath))
+                {
+                    _logger.LogWarning("Provider image file not found at path: {FullPath}", fullPath);
+                    return NotFound(ResponseHelper.CreateErrorResponse("Provider image file not found on server"));
+                }
+
+                // Determine content type based on file extension
+                var extension = Path.GetExtension(fullPath).ToLowerInvariant();
+                var contentType = extension switch
+                {
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".png" => "image/png",
+                    ".gif" => "image/gif",
+                    ".svg" => "image/svg+xml",
+                    _ => "application/octet-stream"
+                };
+
+                // Add CORS headers to allow cross-origin image loading
+                // These headers must be set before returning the file to prevent ORB (Opaque Response Blocking)
+                Response.Headers.Append("Access-Control-Allow-Origin", "*");
+                Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+                Response.Headers.Append("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+                Response.Headers.Append("Access-Control-Expose-Headers", "Content-Length, Content-Type");
+                
+                // Read file bytes and return with proper content type
+                // File() method will set Content-Type header automatically
+                var fileBytes = await System.IO.File.ReadAllBytesAsync(fullPath);
+                return File(fileBytes, contentType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving provider image file. ProductId: {ProductId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving the provider image file"));
             }
         }
     }
