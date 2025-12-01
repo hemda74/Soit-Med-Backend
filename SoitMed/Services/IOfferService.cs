@@ -18,15 +18,19 @@ namespace SoitMed.Services
         Task<List<OfferResponseDTO>> GetOffersByCreatorAsync(string creatorId);
         Task<PaginatedOffersResponseDTO> GetAllOffersWithFiltersAsync(string? status, string? salesmanId, int page, int pageSize, DateTime? startDate, DateTime? endDate);
         Task<OfferResponseDTO> UpdateOfferAsync(long offerId, CreateOfferDTO updateOfferDto, string userId);
+        Task<OfferResponseDTO> UpdateOfferBySalesManagerAsync(long offerId, UpdateOfferDTO updateDto, string userId);
         Task<OfferResponseDTO> SendToSalesmanAsync(long offerId, string userId);
         Task<OfferResponseDTO> RecordClientResponseAsync(long offerId, string response, bool accepted, string userId);
         Task<OfferResponseDTO> CompleteOfferAsync(long offerId, string? completionNotes, string userId);
         Task<OfferResponseDTO> MarkAsNeedsModificationAsync(long offerId, string? reason, string userId);
         Task<OfferResponseDTO> MarkAsUnderReviewAsync(long offerId, string userId);
+        Task<OfferResponseDTO> ResumeFromUnderReviewAsync(long offerId, string userId);
         Task<int> UpdateExpiredOffersAsync();
         Task<List<OfferActivityDTO>> GetRecentActivityAsync(int limit = 20);
         Task<bool> DeleteOfferAsync(long offerId, string userId);
         Task<OfferResponseDTO> AssignOfferToSalesmanAsync(long offerId, string salesmanId, string userId);
+        Task<OfferResponseDTO> SalesManagerApprovalAsync(long offerId, ApproveOfferDTO approvalDto, string salesManagerId);
+        Task<List<OfferResponseDTO>> GetPendingSalesManagerApprovalsAsync();
         #endregion
 
         #region Enhanced Offer Features - Equipment Management

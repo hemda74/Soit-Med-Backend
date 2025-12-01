@@ -19,7 +19,10 @@ namespace SoitMed.Models
         public string? Model { get; set; }
         
         [MaxLength(100)]
-        public string? Provider { get; set; }
+        public string? Provider { get; set; } // Legacy text - kept for backward compatibility
+        
+        [MaxLength(500)]
+        public string? ProviderImagePath { get; set; } // Provider logo/image path
         
         [MaxLength(100)]
         public string? Country { get; set; }

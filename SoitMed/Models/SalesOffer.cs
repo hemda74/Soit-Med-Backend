@@ -62,12 +62,23 @@ namespace SoitMed.Models
         #region Status and Workflow
         [Required]
         [MaxLength(50)]
-        public string Status { get; set; } = OfferStatus.Draft; // Draft, Sent, UnderReview, Accepted, Rejected, NeedsModification, Expired
+        public string Status { get; set; } = OfferStatus.Draft; // Draft, PendingSalesManagerApproval, Sent, UnderReview, Accepted, Rejected, NeedsModification, Expired
         
         public DateTime? SentToClientAt { get; set; }
         
         [MaxLength(2000)]
         public string? ClientResponse { get; set; }
+        #endregion
+
+        #region SalesManager Approval
+        public string? SalesManagerApprovedBy { get; set; }
+        public DateTime? SalesManagerApprovedAt { get; set; }
+        
+        [MaxLength(2000)]
+        public string? SalesManagerComments { get; set; }
+        
+        [MaxLength(2000)]
+        public string? SalesManagerRejectionReason { get; set; }
         #endregion
 
         #region Additional Information
@@ -178,6 +189,47 @@ namespace SoitMed.Models
             Status = OfferStatus.Expired;
             UpdatedAt = DateTime.UtcNow;
         }
+
+        /// <summary>
+        /// Marks the offer as pending SalesManager approval
+        /// </summary>
+        public void MarkAsPendingSalesManagerApproval()
+        {
+            Status = OfferStatus.PendingSalesManagerApproval;
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Approves the offer by SalesManager and sends it to Salesman
+        /// </summary>
+        public void ApproveBySalesManager(string salesManagerId, string? comments = null)
+        {
+            if (Status != OfferStatus.PendingSalesManagerApproval)
+                throw new InvalidOperationException("Offer is not pending SalesManager approval");
+
+            Status = OfferStatus.Sent;
+            SalesManagerApprovedBy = salesManagerId;
+            SalesManagerApprovedAt = DateTime.UtcNow;
+            SalesManagerComments = comments;
+            SentToClientAt = DateTime.UtcNow;
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Rejects the offer by SalesManager
+        /// </summary>
+        public void RejectBySalesManager(string salesManagerId, string rejectionReason, string? comments = null)
+        {
+            if (Status != OfferStatus.PendingSalesManagerApproval)
+                throw new InvalidOperationException("Offer is not pending SalesManager approval");
+
+            Status = OfferStatus.Rejected;
+            SalesManagerApprovedBy = salesManagerId; // Track who rejected
+            SalesManagerApprovedAt = DateTime.UtcNow;
+            SalesManagerRejectionReason = rejectionReason;
+            SalesManagerComments = comments;
+            UpdatedAt = DateTime.UtcNow;
+        }
         #endregion
     }
 
@@ -185,6 +237,7 @@ namespace SoitMed.Models
     public static class OfferStatus
     {
         public const string Draft = "Draft";
+        public const string PendingSalesManagerApproval = "PendingSalesManagerApproval";
         public const string Sent = "Sent";
         public const string UnderReview = "UnderReview";
         public const string Accepted = "Accepted";
@@ -193,7 +246,7 @@ namespace SoitMed.Models
         public const string Expired = "Expired";
         public const string Completed = "Completed";
         
-        public static readonly string[] AllStatuses = { Draft, Sent, UnderReview, Accepted, Rejected, NeedsModification, Expired, Completed };
+        public static readonly string[] AllStatuses = { Draft, PendingSalesManagerApproval, Sent, UnderReview, Accepted, Rejected, NeedsModification, Expired, Completed };
     }
     #endregion
 }
