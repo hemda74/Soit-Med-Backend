@@ -6,7 +6,6 @@ using SoitMed.Models.Hospital;
 using SoitMed.Services;
 using SoitMed.Repositories;
 using SoitMed.Extensions;
-using SoitMed.Validators;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -189,11 +188,10 @@ namespace SoitMed
                 builder.Services.AddScoped<IQRCodeService, QRCodeService>();
                 builder.Services.AddScoped<UserIdGenerationService>();
                 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-                builder.Services.AddScoped<ISalesReportRepository, SalesReportRepository>();
-                builder.Services.AddScoped<ISalesReportService, SalesReportService>();
                 builder.Services.AddScoped<ISalesmanStatisticsService, SalesmanStatisticsService>();
                 builder.Services.AddScoped<IImageUploadService, ImageUploadService>();
                 builder.Services.AddScoped<IRoleBasedImageUploadService, RoleBasedImageUploadService>();
+                builder.Services.AddScoped<IVoiceUploadService, VoiceUploadService>();
                 builder.Services.AddScoped<IEmailService, EmailService>();
                 builder.Services.AddScoped<IVerificationCodeService, VerificationCodeService>();
                 builder.Services.AddScoped<INotificationService, NotificationService>();
@@ -202,7 +200,6 @@ namespace SoitMed
                 builder.Services.AddApplicationServices();
                 builder.Services.AddSignalR();
                 builder.Services.AddFluentValidationAutoValidation();
-                builder.Services.AddValidatorsFromAssemblyContaining<CreateSalesReportDtoValidator>();
                 builder.Services.AddMemoryCache();
                 builder.Services.AddResponseCaching();
 

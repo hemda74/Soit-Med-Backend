@@ -30,7 +30,7 @@ namespace SoitMed.Extensions
             
             // Product catalog service
             services.AddScoped<IProductService, ProductService>();
-
+            
             // Maintenance services
             services.AddScoped<IMaintenanceRequestService, MaintenanceRequestService>();
             services.AddScoped<IMaintenanceVisitService, MaintenanceVisitService>();
