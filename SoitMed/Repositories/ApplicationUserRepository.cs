@@ -57,19 +57,39 @@ namespace SoitMed.Repositories
 
         public async Task<IEnumerable<ApplicationUser>> GetUsersByRoleAsync(string role, CancellationToken cancellationToken = default)
         {
-            // This would require a more complex query with role checking
-            // For now, returning all users - this can be enhanced based on your role management system
+            // Get user IDs that have the specified role
+            var userIds = await _context.UserRoles
+                .Join(_context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, RoleName = r.Name })
+                .Where(x => x.RoleName == role)
+                .Select(x => x.UserId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            if (!userIds.Any())
+                return new List<ApplicationUser>();
+
+            // Return users with those IDs
             return await _dbSet
-                .Where(u => u.IsActive)
+                .Where(u => userIds.Contains(u.Id) && u.IsActive)
                 .ToListAsync(cancellationToken);
         }
 
         public async Task<IEnumerable<ApplicationUser>> GetUsersInRoleAsync(string role, CancellationToken cancellationToken = default)
         {
-            // This would require a more complex query with role checking
-            // For now, returning all users - this can be enhanced based on your role management system
+            // Get user IDs that have the specified role
+            var userIds = await _context.UserRoles
+                .Join(_context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, RoleName = r.Name })
+                .Where(x => x.RoleName == role)
+                .Select(x => x.UserId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            if (!userIds.Any())
+                return new List<ApplicationUser>();
+
+            // Return users with those IDs
             return await _dbSet
-                .Where(u => u.IsActive)
+                .Where(u => userIds.Contains(u.Id) && u.IsActive)
                 .ToListAsync(cancellationToken);
         }
 
