@@ -88,6 +88,7 @@ namespace SoitMed.Models
         
         // Products catalog
         public DbSet<Product> Products { get; set; }
+        public DbSet<ProductCategory> ProductCategories { get; set; }
         
         public Context(DbContextOptions options) : base(options)
         {
@@ -736,6 +737,29 @@ namespace SoitMed.Models
 
             modelBuilder.Entity<Payment.Payment>()
                 .HasIndex(p => new { p.Status, p.CreatedAt });
+
+            // ProductCategory relationships
+            modelBuilder.Entity<ProductCategory>()
+                .HasOne(pc => pc.ParentCategory)
+                .WithMany(pc => pc.SubCategories)
+                .HasForeignKey(pc => pc.ParentCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ProductCategory>()
+                .HasIndex(pc => pc.ParentCategoryId);
+
+            modelBuilder.Entity<ProductCategory>()
+                .HasIndex(pc => new { pc.IsActive, pc.DisplayOrder });
+
+            // Product-Category relationship
+            modelBuilder.Entity<Product>()
+                .HasOne(p => p.ProductCategory)
+                .WithMany(pc => pc.Products)
+                .HasForeignKey(p => p.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Product>()
+                .HasIndex(p => p.CategoryId);
         }
     }
 }

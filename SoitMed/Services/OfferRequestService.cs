@@ -52,18 +52,36 @@ namespace SoitMed.Services
                 // For customer roles, find their client record by email if ClientId is not provided
                 if (isCustomerRole && !createDto.ClientId.HasValue)
                 {
-                    // Try to find client by customer's email
+                    // Try to find client by customer's email (case-insensitive)
                     var context = _unitOfWork.GetContext();
-                    client = await context.Clients
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.Email) && 
-                                                  c.Email.Equals(currentUser.Email, StringComparison.OrdinalIgnoreCase));
+                    if (!string.IsNullOrEmpty(currentUser.Email))
+                    {
+                        var userEmailLower = currentUser.Email.ToLower();
+                        _logger.LogInformation("Searching for client record for customer user {UserId} with email {Email}", 
+                            userId, currentUser.Email);
+                        
+                        // Try to find by Client.Email first
+                        client = await context.Clients
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.Email) && 
+                                                      c.Email.ToLower() == userEmailLower);
+
+                        // If not found, try ContactPersonEmail
+                        if (client == null)
+                        {
+                            _logger.LogInformation("Client not found by Email, trying ContactPersonEmail for {Email}", currentUser.Email);
+                            client = await context.Clients
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.ContactPersonEmail) && 
+                                                          c.ContactPersonEmail.ToLower() == userEmailLower);
+                        }
+                    }
 
                     if (client != null)
                     {
                         clientId = client.Id;
-                        _logger.LogInformation("Found client record for customer user {UserId} by email {Email}. ClientId: {ClientId}", 
-                            userId, currentUser.Email, clientId);
+                        _logger.LogInformation("Found client record for customer user {UserId} by email {Email}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                            userId, currentUser.Email, clientId, client.Name);
                     }
                     else
                     {
@@ -71,24 +89,58 @@ namespace SoitMed.Services
                         var userFullName = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
                         if (!string.IsNullOrEmpty(userFullName))
                         {
+                            _logger.LogInformation("Client not found by email, trying to find by name: {Name}", userFullName);
+                            var namePattern = $"%{userFullName}%";
                             client = await context.Clients
                                 .AsNoTracking()
-                                .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, userFullName) ||
-                                                          (c.ContactPerson != null && EF.Functions.Like(c.ContactPerson, userFullName)));
+                                .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, namePattern) ||
+                                                          (c.ContactPerson != null && EF.Functions.Like(c.ContactPerson, namePattern)));
 
                             if (client != null)
                             {
                                 clientId = client.Id;
-                                _logger.LogInformation("Found client record for customer user {UserId} by name {Name}. ClientId: {ClientId}", 
-                                    userId, userFullName, clientId);
+                                _logger.LogInformation("Found client record for customer user {UserId} by name {Name}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                                    userId, userFullName, clientId, client.Name);
                             }
                         }
                     }
 
-                    // If still not found, throw error
+                    // If still not found, auto-create client record for customer user
                     if (client == null || clientId == 0)
                     {
-                        throw new ArgumentException("Customer client record not found. Please contact support to link your account to a client record.", nameof(createDto.ClientId));
+                        var userFullName = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
+                        if (string.IsNullOrEmpty(userFullName))
+                        {
+                            userFullName = currentUser.UserName ?? currentUser.Email ?? "Customer";
+                        }
+
+                        _logger.LogInformation("Client record not found for customer user {UserId}. Auto-creating client record. Email: {Email}, Name: {Name}", 
+                            userId, currentUser.Email, userFullName);
+
+                        // Auto-create client record for customer user
+                        var newClient = new Client
+                        {
+                            Name = userFullName,
+                            Type = userRoles.Contains("Doctor", StringComparer.OrdinalIgnoreCase) ? "Doctor" : 
+                                   userRoles.Contains("Technician", StringComparer.OrdinalIgnoreCase) ? "Technician" : "Customer",
+                            Email = currentUser.Email,
+                            ContactPerson = userFullName,
+                            ContactPersonEmail = currentUser.Email,
+                            Status = "Active",
+                            Priority = "Medium",
+                            CreatedBy = userId,
+                            AssignedTo = userId,
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        await _unitOfWork.Clients.CreateAsync(newClient);
+                        await _unitOfWork.SaveChangesAsync();
+
+                        client = newClient;
+                        clientId = newClient.Id;
+
+                        _logger.LogInformation("Auto-created client record for customer user {UserId}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                            userId, clientId, newClient.Name);
                     }
                 }
                 else
@@ -187,7 +239,7 @@ namespace SoitMed.Services
                                     CancellationToken.None
                                 );
                                 
-                                _logger.LogInformation("✅ Notification successfully created and sent to assigned SalesSupport: {SupportUserId} (NotificationId: {NotificationId}) for OfferRequest: {RequestId}", 
+                                _logger.LogInformation("  Notification successfully created and sent to assigned SalesSupport: {SupportUserId} (NotificationId: {NotificationId}) for OfferRequest: {RequestId}", 
                                     assignedUser.Id, notification.Id, offerRequest.Id);
                             }
                             catch (Exception notificationEx)
@@ -573,5 +625,6 @@ namespace SoitMed.Services
         #endregion
     }
 }
+
 
 

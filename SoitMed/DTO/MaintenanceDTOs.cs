@@ -216,5 +216,34 @@ namespace SoitMed.DTO
         [MaxLength(450)]
         public string EngineerId { get; set; } = string.Empty;
     }
+
+    // Status Update DTOs
+    public class UpdateMaintenanceRequestStatusDTO
+    {
+        [Required]
+        public MaintenanceRequestStatus Status { get; set; }
+
+        [MaxLength(2000)]
+        public string? Notes { get; set; }
+    }
+
+    // Cancel Request DTOs
+    public class CancelMaintenanceRequestDTO
+    {
+        [MaxLength(1000)]
+        public string? Reason { get; set; }
+    }
+
+    // Filter DTOs
+    public class MaintenanceRequestFilterDTO
+    {
+        public MaintenanceRequestStatus? Status { get; set; }
+        public string? CustomerId { get; set; }
+        public string? EngineerId { get; set; }
+        public int? EquipmentId { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public string? SearchQuery { get; set; }
+    }
 }
 

@@ -140,6 +140,46 @@ namespace SoitMed.Controllers
                 return ErrorResponse(ex.Message);
             }
         }
+
+        [HttpPut("{id}/status")]
+        [Authorize(Roles = "MaintenanceSupport,MaintenanceManager,Engineer,SuperAdmin")]
+        public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateMaintenanceRequestStatusDTO dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized();
+
+                var result = await _maintenanceRequestService.UpdateStatusAsync(id, dto.Status, dto.Notes);
+                return SuccessResponse(result, "Status updated successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating status for request {RequestId}", id);
+                return ErrorResponse(ex.Message);
+            }
+        }
+
+        [HttpPost("{id}/cancel")]
+        [Authorize(Roles = "MaintenanceSupport,MaintenanceManager,Doctor,Technician,Manager,SuperAdmin")]
+        public async Task<IActionResult> CancelRequest(int id, [FromBody] CancelMaintenanceRequestDTO dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized();
+
+                var result = await _maintenanceRequestService.CancelRequestAsync(id, userId, dto.Reason);
+                return SuccessResponse(result, "Request cancelled successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cancelling request {RequestId}", id);
+                return ErrorResponse(ex.Message);
+            }
+        }
     }
 }
 

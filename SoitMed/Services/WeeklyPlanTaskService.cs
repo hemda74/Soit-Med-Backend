@@ -20,7 +20,7 @@ namespace SoitMed.Services
         {
             try
             {
-                Logger.LogInformation("📝 Creating Task - WeeklyPlanId: {WeeklyPlanId}, UserId: {UserId}, Title: {Title}", 
+                Logger.LogInformation("  Creating Task - WeeklyPlanId: {WeeklyPlanId}, UserId: {UserId}, Title: {Title}", 
                     createDto.WeeklyPlanId, userId, createDto.Title);
                 
                 // Validate weekly plan exists and belongs to user
@@ -28,7 +28,7 @@ namespace SoitMed.Services
                 if (weeklyPlan == null)
                     throw new ArgumentException("Weekly plan not found", nameof(createDto.WeeklyPlanId));
 
-                Logger.LogInformation("🔍 Task Authorization Check - WeeklyPlanId: {WeeklyPlanId}, WeeklyPlan.EmployeeId: {PlanEmployeeId}, CurrentUserId: {CurrentUserId}", 
+                Logger.LogInformation("  Task Authorization Check - WeeklyPlanId: {WeeklyPlanId}, WeeklyPlan.EmployeeId: {PlanEmployeeId}, CurrentUserId: {CurrentUserId}", 
                     createDto.WeeklyPlanId, weeklyPlan.EmployeeId, userId);
 
                 if (weeklyPlan.EmployeeId != userId)
@@ -95,7 +95,7 @@ namespace SoitMed.Services
                 await UnitOfWork.WeeklyPlanTasks.CreateAsync(task);
                 await UnitOfWork.SaveChangesAsync();
 
-                Logger.LogInformation("✅ Task Created Successfully - TaskId: {TaskId}, WeeklyPlanId: {WeeklyPlanId}, Task belongs to plan owned by: {PlanEmployeeId}", 
+                Logger.LogInformation("  Task Created Successfully - TaskId: {TaskId}, WeeklyPlanId: {WeeklyPlanId}, Task belongs to plan owned by: {PlanEmployeeId}", 
                     task.Id, task.WeeklyPlanId, weeklyPlan.EmployeeId);
 
                 // Reload task to get generated ID and timestamps

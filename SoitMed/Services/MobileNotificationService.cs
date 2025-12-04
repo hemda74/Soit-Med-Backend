@@ -82,7 +82,7 @@ namespace SoitMed.Services
                 if (response.IsSuccessStatusCode)
                 {
                     var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                    _logger.LogInformation("✅ Push notification sent successfully. Response: {Response}", responseContent);
+                    _logger.LogInformation("  Push notification sent successfully. Response: {Response}", responseContent);
                     
                     // Update LastUsedAt for all tokens
                     foreach (var token in deviceTokens)
@@ -139,7 +139,7 @@ namespace SoitMed.Services
                     existingToken.LastUsedAt = DateTime.UtcNow;
                     existingToken.IsActive = true;
                     _unitOfWork.GetContext().DeviceTokens.Update(existingToken);
-                    _logger.LogInformation("✅ Updated existing device token for user {UserId}", userId);
+                    _logger.LogInformation("  Updated existing device token for user {UserId}", userId);
                 }
                 else
                 {
@@ -153,7 +153,7 @@ namespace SoitMed.Services
                         IsActive = true
                     };
                     await _unitOfWork.GetContext().DeviceTokens.AddAsync(newToken, cancellationToken);
-                    _logger.LogInformation("✅ Created new device token for user {UserId}", userId);
+                    _logger.LogInformation("  Created new device token for user {UserId}", userId);
                 }
 
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -179,7 +179,7 @@ namespace SoitMed.Services
                     token.IsActive = false;
                     _unitOfWork.GetContext().DeviceTokens.Update(token);
                     await _unitOfWork.SaveChangesAsync(cancellationToken);
-                    _logger.LogInformation("✅ Device token unregistered for user {UserId}", userId);
+                    _logger.LogInformation("  Device token unregistered for user {UserId}", userId);
                 }
                 else
                 {
