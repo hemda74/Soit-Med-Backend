@@ -67,12 +67,23 @@ namespace SoitMed.Middleware
 
         private static void SetCorsHeaders(HttpResponse response)
         {
-            response.Headers["Access-Control-Allow-Origin"] = response.Headers.ContainsKey("Access-Control-Allow-Origin")
-                ? response.Headers["Access-Control-Allow-Origin"].ToString()
-                : "*";
+            // Get the origin from the request to allow any origin
+            var request = response.HttpContext.Request;
+            var origin = request.Headers["Origin"].ToString();
+            
+            // Allow any origin - set to request origin if present, otherwise allow all
+            if (!string.IsNullOrEmpty(origin))
+            {
+                response.Headers["Access-Control-Allow-Origin"] = origin;
+            }
+            else
+            {
+                response.Headers["Access-Control-Allow-Origin"] = "*";
+            }
 
-            response.Headers["Access-Control-Allow-Methods"] = "GET,HEAD,OPTIONS";
+            response.Headers["Access-Control-Allow-Methods"] = "GET,HEAD,OPTIONS,POST,PUT,DELETE,PATCH";
             response.Headers["Access-Control-Allow-Headers"] = "Origin, X-Requested-With, Content-Type, Accept, Authorization";
+            response.Headers["Access-Control-Allow-Credentials"] = "true";
             response.Headers["Access-Control-Expose-Headers"] = "Content-Length, Content-Type";
         }
     }

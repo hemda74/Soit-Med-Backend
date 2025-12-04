@@ -52,6 +52,7 @@ namespace SoitMed.Controllers
                 }
 
                 var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
+                             await UserManager.IsInRoleAsync(user, "Admin") ||
                              await UserManager.IsInRoleAsync(user, "SalesManager") ||
                              await UserManager.IsInRoleAsync(user, "SalesSupport");
 
@@ -87,6 +88,7 @@ namespace SoitMed.Controllers
                 }
 
                 var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
+                             await UserManager.IsInRoleAsync(user, "Admin") ||
                              await UserManager.IsInRoleAsync(user, "SalesManager") ||
                              await UserManager.IsInRoleAsync(user, "SalesSupport");
 
@@ -124,6 +126,7 @@ namespace SoitMed.Controllers
                 }
 
                 var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
+                             await UserManager.IsInRoleAsync(user, "Admin") ||
                              await UserManager.IsInRoleAsync(user, "SalesManager") ||
                              await UserManager.IsInRoleAsync(user, "SalesSupport");
 
@@ -192,6 +195,7 @@ namespace SoitMed.Controllers
                 }
 
                 var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
+                             await UserManager.IsInRoleAsync(user, "Admin") ||
                              await UserManager.IsInRoleAsync(user, "SalesManager") ||
                              await UserManager.IsInRoleAsync(user, "SalesSupport");
 
@@ -224,7 +228,19 @@ namespace SoitMed.Controllers
                     return Unauthorized();
                 }
 
-                var message = await _chatService.SendTextMessageAsync(dto.ConversationId, userId, dto.Content, cancellationToken);
+                var user = await UserManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    return Unauthorized();
+                }
+
+                // Check if user is admin
+                var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
+                             await UserManager.IsInRoleAsync(user, "Admin") ||
+                             await UserManager.IsInRoleAsync(user, "SalesManager") ||
+                             await UserManager.IsInRoleAsync(user, "SalesSupport");
+
+                var message = await _chatService.SendTextMessageAsync(dto.ConversationId, userId, dto.Content, isAdmin, cancellationToken);
                 return SuccessResponse(message);
             }
             catch (UnauthorizedAccessException ex)
@@ -282,6 +298,18 @@ namespace SoitMed.Controllers
                     return Unauthorized();
                 }
 
+                var user = await UserManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    return Unauthorized();
+                }
+
+                // Check if user is admin
+                var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
+                             await UserManager.IsInRoleAsync(user, "Admin") ||
+                             await UserManager.IsInRoleAsync(user, "SalesManager") ||
+                             await UserManager.IsInRoleAsync(user, "SalesSupport");
+
                 // Save voice file
                 var conversationFolder = Path.Combine(_environment.WebRootPath, "chat", "voice", conversationId.ToString());
                 Directory.CreateDirectory(conversationFolder);
@@ -296,7 +324,7 @@ namespace SoitMed.Controllers
                 }
 
                 // Create message
-                var message = await _chatService.SendVoiceMessageAsync(conversationId, userId, relativePath, voiceDuration, cancellationToken);
+                var message = await _chatService.SendVoiceMessageAsync(conversationId, userId, relativePath, voiceDuration, isAdmin, cancellationToken);
                 
                 return SuccessResponse(message);
             }

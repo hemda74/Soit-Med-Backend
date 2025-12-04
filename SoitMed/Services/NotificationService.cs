@@ -44,14 +44,14 @@ namespace SoitMed.Services
             await _unitOfWork.Notifications.CreateAsync(notification, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("📝 Notification saved to database. NotificationId: {NotificationId}, UserId: {UserId}, Type: {Type}, Title: {Title}", 
+            _logger.LogInformation("  Notification saved to database. NotificationId: {NotificationId}, UserId: {UserId}, Type: {Type}, Title: {Title}", 
                 notification.Id, userId, type, title);
 
             // Send real-time notification via SignalR
             try
             {
                 var signalRGroup = $"User_{userId}";
-                _logger.LogInformation("📡 Attempting to send SignalR notification to group: {Group}", signalRGroup);
+                _logger.LogInformation("  Attempting to send SignalR notification to group: {Group}", signalRGroup);
                 
                 // Build SignalR payload with metadata
                 var signalRPayload = new Dictionary<string, object>
@@ -81,7 +81,7 @@ namespace SoitMed.Services
                 
                 // Send to user's personal group
                 await _hubContext.Clients.Group(signalRGroup).SendAsync("ReceiveNotification", signalRPayload);
-                _logger.LogInformation("✅ SignalR notification sent successfully to personal group {Group} for user {UserId}: {Title}", 
+                _logger.LogInformation("  SignalR notification sent successfully to personal group {Group} for user {UserId}: {Title}", 
                     signalRGroup, userId, title);
 
                 // Also try to get user's roles and send to role groups as backup
@@ -136,7 +136,7 @@ namespace SoitMed.Services
                         pushData, 
                         cancellationToken);
                     
-                    _logger.LogInformation("✅ Push notification sent to user {UserId}: {Title}", userId, title);
+                    _logger.LogInformation("  Push notification sent to user {UserId}: {Title}", userId, title);
                 }
                 catch (Exception pushEx)
                 {
@@ -155,7 +155,7 @@ namespace SoitMed.Services
             try
             {
                 var roleGroup = $"Role_{role}";
-                _logger.LogInformation("📡 Attempting to send SignalR notification to role group: {Group}", roleGroup);
+                _logger.LogInformation("  Attempting to send SignalR notification to role group: {Group}", roleGroup);
                 
                 // Build SignalR payload
                 var signalRPayload = new Dictionary<string, object>
@@ -180,7 +180,7 @@ namespace SoitMed.Services
                 
                 // Send to role group
                 await _hubContext.Clients.Group(roleGroup).SendAsync("ReceiveNotification", signalRPayload);
-                _logger.LogInformation("✅ SignalR notification sent successfully to role group {Group}: {Title}", 
+                _logger.LogInformation("  SignalR notification sent successfully to role group {Group}: {Title}", 
                     roleGroup, title);
             }
             catch (Exception signalREx)

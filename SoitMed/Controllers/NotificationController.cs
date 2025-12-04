@@ -151,7 +151,7 @@ namespace SoitMed.Controllers
                 }
 
                 await _mobileNotificationService.RegisterDeviceTokenAsync(userId, dto.Token, platform, cancellationToken);
-                _logger.LogInformation("✅ Push token registered for user {UserId}", userId);
+                _logger.LogInformation("  Push token registered for user {UserId}", userId);
                 
                 return SuccessResponse("Push token registered successfully");
             }
@@ -182,7 +182,7 @@ namespace SoitMed.Controllers
                 }
 
                 await _mobileNotificationService.UnregisterDeviceTokenAsync(userId, dto.Token, cancellationToken);
-                _logger.LogInformation("✅ Push token unregistered for user {UserId}", userId);
+                _logger.LogInformation("  Push token unregistered for user {UserId}", userId);
                 
                 return SuccessResponse("Push token unregistered successfully");
             }

@@ -530,6 +530,10 @@ namespace SoitMed.DTO
         public DateTime? ExpectedDeliveryDate { get; set; }
         public string? CompletionNotes { get; set; }
         public string? FailureNotes { get; set; }
+        public string? ReportText { get; set; }
+        public string? ReportAttachments { get; set; }
+        public DateTime? ReportSubmittedAt { get; set; }
+        public DateTime? SentToLegalAt { get; set; }
     }
 
     public class DealSummaryDTO
@@ -626,6 +630,16 @@ namespace SoitMed.DTO
         [Required]
         [MaxLength(2000)]
         public string FailureNotes { get; set; } = string.Empty;
+    }
+
+    public class SubmitReportDTO
+    {
+        [Required(ErrorMessage = "Report text is required")]
+        [MaxLength(5000, ErrorMessage = "Report text cannot exceed 5000 characters")]
+        public string ReportText { get; set; } = string.Empty;
+
+        [MaxLength(2000, ErrorMessage = "Attachments JSON cannot exceed 2000 characters")]
+        public string? ReportAttachments { get; set; } // JSON array of file paths/URLs
     }
 
     public class RecordClientResponseDTO

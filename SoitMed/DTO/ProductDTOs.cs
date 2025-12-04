@@ -72,6 +72,8 @@ namespace SoitMed.DTO
         public bool? InStock { get; set; }
 
         public bool? IsActive { get; set; }
+
+        public int? InventoryQuantity { get; set; }
     }
 
     /// <summary>
@@ -89,13 +91,13 @@ namespace SoitMed.DTO
         public decimal BasePrice { get; set; }
         public string? Description { get; set; }
         public string? ImagePath { get; set; }
+        public string? DataSheetPath { get; set; }
+        public string? CatalogPath { get; set; }
         public int? Year { get; set; }
         public bool InStock { get; set; }
-        public bool IsActive { get; set; }
+        public int? InventoryQuantity { get; set; }
         public string? CreatedBy { get; set; }
         public string? CreatedByName { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
     }
 
     /// <summary>
@@ -109,9 +111,18 @@ namespace SoitMed.DTO
         public string? Provider { get; set; }
         public string? ProviderImagePath { get; set; }
         public string? Category { get; set; }
-        public decimal BasePrice { get; set; }
-        public bool InStock { get; set; }
+        public int? InventoryQuantity { get; set; }
         public string? ImagePath { get; set; }
+    }
+
+    /// <summary>
+    /// DTO for updating inventory quantity
+    /// </summary>
+    public class UpdateInventoryDTO
+    {
+        [Required]
+        [Range(0, int.MaxValue, ErrorMessage = "Inventory quantity must be 0 or greater")]
+        public int InventoryQuantity { get; set; }
     }
 }
 

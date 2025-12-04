@@ -24,6 +24,9 @@ namespace SoitMed.Services
         Task<DealResponseDTO> SuperAdminApprovalAsync(long dealId, ApproveDealDTO approvalDto, string superAdminId);
         Task<List<DealResponseDTO>> GetPendingManagerApprovalsAsync();
         Task<List<DealResponseDTO>> GetPendingSuperAdminApprovalsAsync();
+        Task<DealResponseDTO> MarkClientAccountCreatedAsync(long dealId, string adminId);
+        Task<DealResponseDTO> SubmitSalesmanReportAsync(long dealId, string reportText, string? reportAttachments, string salesmanId);
+        Task<List<DealResponseDTO>> GetDealsForLegalAsync();
         #endregion
 
         #region Deal Completion

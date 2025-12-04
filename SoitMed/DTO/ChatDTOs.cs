@@ -9,7 +9,10 @@ namespace SoitMed.DTO
         public long Id { get; set; }
         public string CustomerId { get; set; } = string.Empty;
         public string? CustomerName { get; set; }
+        public string? CustomerFirstName { get; set; }
+        public string? CustomerLastName { get; set; }
         public string? CustomerEmail { get; set; }
+        public string? CustomerImageUrl { get; set; }
         public string? AdminId { get; set; }
         public string? AdminName { get; set; }
         public DateTime LastMessageAt { get; set; }

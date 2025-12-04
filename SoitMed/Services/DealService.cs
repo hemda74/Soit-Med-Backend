@@ -340,9 +340,9 @@ namespace SoitMed.Services
                 if (approvalDto.Approved)
                 {
                     deal.ApproveBySuperAdmin(superAdminId, approvalDto.Comments);
-                    // Automatically send to legal department after super admin approval
-                    deal.SendToLegal();
-                    _logger.LogInformation("Deal approved by SuperAdmin and sent to Legal. DealId: {DealId}", dealId);
+                    // Status is now AwaitingClientAccountCreation - notify Admin users
+                    await SendClientAccountCreationNotificationAsync(deal);
+                    _logger.LogInformation("Deal approved by SuperAdmin. DealId: {DealId}, Status: {Status}", dealId, deal.Status);
                 }
                 else
                 {
@@ -548,7 +548,11 @@ namespace SoitMed.Services
                 CreatedAt = deal.CreatedAt,
                 ExpectedDeliveryDate = deal.ExpectedDeliveryDate,
                 CompletionNotes = deal.CompletionNotes,
-                FailureNotes = deal.Status == DealStatus.Failed ? deal.CompletionNotes : null
+                FailureNotes = deal.Status == DealStatus.Failed ? deal.CompletionNotes : null,
+                ReportText = deal.ReportText,
+                ReportAttachments = deal.ReportAttachments,
+                ReportSubmittedAt = deal.ReportSubmittedAt,
+                SentToLegalAt = deal.SentToLegalAt
             };
         }
 
@@ -604,7 +608,7 @@ namespace SoitMed.Services
                         metadata,
                         CancellationToken.None
                     );
-                    _logger.LogInformation("✅ Broadcast notification sent to Role_SalesManager group for Deal: {DealId}", deal.Id);
+                    _logger.LogInformation("  Broadcast notification sent to Role_SalesManager group for Deal: {DealId}", deal.Id);
                 }
                 catch (Exception broadcastEx)
                 {
@@ -631,7 +635,7 @@ namespace SoitMed.Services
                             CancellationToken.None
                         );
 
-                        _logger.LogInformation("✅ Notification created and sent to Sales Manager: {ManagerId} ({ManagerName}) for Deal: {DealId}. NotificationId: {NotificationId}", 
+                        _logger.LogInformation("  Notification created and sent to Sales Manager: {ManagerId} ({ManagerName}) for Deal: {DealId}. NotificationId: {NotificationId}", 
                             manager.Id, manager.UserName, deal.Id, notification.Id);
                     }
                     catch (Exception notifEx)
@@ -709,7 +713,7 @@ namespace SoitMed.Services
                         metadata,
                         CancellationToken.None
                     );
-                    _logger.LogInformation("✅ Broadcast notification sent to Role_SuperAdmin group for Deal: {DealId}", deal.Id);
+                    _logger.LogInformation("  Broadcast notification sent to Role_SuperAdmin group for Deal: {DealId}", deal.Id);
                 }
                 catch (Exception broadcastEx)
                 {
@@ -736,7 +740,7 @@ namespace SoitMed.Services
                             CancellationToken.None
                         );
 
-                        _logger.LogInformation("✅ Notification created and sent to Super Admin: {SuperAdminId} ({SuperAdminName}) for Deal: {DealId}. NotificationId: {NotificationId}", 
+                        _logger.LogInformation("  Notification created and sent to Super Admin: {SuperAdminId} ({SuperAdminName}) for Deal: {DealId}. NotificationId: {NotificationId}", 
                             superAdmin.Id, superAdmin.UserName, deal.Id, notification.Id);
                     }
                     catch (Exception notifEx)
@@ -753,6 +757,278 @@ namespace SoitMed.Services
             {
                 _logger.LogError(ex, "Error sending super admin approval notifications for Deal: {DealId}", deal.Id);
                 // Don't fail the whole operation if notification fails
+            }
+        }
+
+        public async Task<DealResponseDTO> MarkClientAccountCreatedAsync(long dealId, string adminId)
+        {
+            try
+            {
+                var deal = await _unitOfWork.SalesDeals.GetByIdAsync(dealId);
+                if (deal == null)
+                    throw new ArgumentException("Deal not found", nameof(dealId));
+
+                if (deal.Status != "AwaitingClientAccountCreation")
+                    throw new InvalidOperationException($"Deal is not awaiting client account creation. Current status: {deal.Status}");
+
+                deal.MarkClientAccountCreated();
+                await _unitOfWork.SalesDeals.UpdateAsync(deal);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Notify salesman to submit report
+                await SendSalesmanReportNotificationAsync(deal);
+
+                _logger.LogInformation("Client account marked as created for Deal: {DealId} by Admin: {AdminId}", dealId, adminId);
+                return await MapToDealResponseDTO(deal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking client account as created. DealId: {DealId}", dealId);
+                throw;
+            }
+        }
+
+        public async Task<DealResponseDTO> SubmitSalesmanReportAsync(long dealId, string reportText, string? reportAttachments, string salesmanId)
+        {
+            try
+            {
+                var deal = await _unitOfWork.SalesDeals.GetByIdAsync(dealId);
+                if (deal == null)
+                    throw new ArgumentException("Deal not found", nameof(dealId));
+
+                if (deal.Status != "AwaitingSalesmanReport")
+                    throw new InvalidOperationException($"Deal is not awaiting salesman report. Current status: {deal.Status}");
+
+                if (deal.SalesmanId != salesmanId)
+                    throw new UnauthorizedAccessException("Only the assigned salesman can submit the report");
+
+                if (string.IsNullOrWhiteSpace(reportText))
+                    throw new ArgumentException("Report text is required");
+
+                deal.SubmitReportAndSendToLegal(reportText, reportAttachments);
+                await _unitOfWork.SalesDeals.UpdateAsync(deal);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Notify legal managers
+                await SendLegalNotificationAsync(deal);
+
+                _logger.LogInformation("Salesman report submitted for Deal: {DealId} by Salesman: {SalesmanId}", dealId, salesmanId);
+                return await MapToDealResponseDTO(deal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting salesman report. DealId: {DealId}", dealId);
+                throw;
+            }
+        }
+
+        public async Task<List<DealResponseDTO>> GetDealsForLegalAsync()
+        {
+            try
+            {
+                var deals = await _unitOfWork.SalesDeals.GetDealsByStatusAsync("SentToLegal");
+                var result = new List<DealResponseDTO>();
+
+                foreach (var deal in deals)
+                {
+                    result.Add(await MapToDealResponseDTO(deal));
+                }
+
+                return result.OrderByDescending(d => d.SentToLegalAt).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting deals for legal");
+                throw;
+            }
+        }
+
+        private async Task SendClientAccountCreationNotificationAsync(SalesDeal deal)
+        {
+            try
+            {
+                var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
+                var clientName = client?.Name ?? "Unknown Client";
+
+                var admins = await _userManager.GetUsersInRoleAsync("Admin");
+                var activeAdmins = admins.Where(a => a.IsActive).ToList();
+
+                if (!activeAdmins.Any())
+                {
+                    _logger.LogWarning("No active Admins found to notify for Deal: {DealId}", deal.Id);
+                    return;
+                }
+
+                var notificationTitle = "Client Account Creation Required";
+                var notificationMessage = $"Deal #{deal.Id} for client {clientName} (Value: {deal.DealValue:C}) has been approved. Please create an account for this client.";
+
+                var metadata = new Dictionary<string, object>
+                {
+                    ["dealId"] = deal.Id,
+                    ["clientId"] = deal.ClientId,
+                    ["clientName"] = clientName,
+                    ["dealValue"] = deal.DealValue,
+                    ["status"] = deal.Status
+                };
+
+                foreach (var admin in activeAdmins)
+                {
+                    try
+                    {
+                        await _notificationService.CreateNotificationAsync(
+                            admin.Id,
+                            notificationTitle,
+                            notificationMessage,
+                            "Deal",
+                            "High",
+                            null,
+                            null,
+                            true,
+                            metadata,
+                            CancellationToken.None
+                        );
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to send notification to Admin {AdminId} for Deal: {DealId}", admin.Id, deal.Id);
+                    }
+                }
+
+                // Also send to role group
+                try
+                {
+                    await _notificationService.SendNotificationToRoleGroupAsync(
+                        "Admin",
+                        notificationTitle,
+                        notificationMessage,
+                        metadata,
+                        CancellationToken.None
+                    );
+                }
+                catch (Exception broadcastEx)
+                {
+                    _logger.LogWarning(broadcastEx, "Failed to send broadcast to Admin role group");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending client account creation notification for Deal: {DealId}", deal.Id);
+            }
+        }
+
+        private async Task SendSalesmanReportNotificationAsync(SalesDeal deal)
+        {
+            try
+            {
+                var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
+                var clientName = client?.Name ?? "Unknown Client";
+
+                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
+                if (salesman == null || !salesman.IsActive)
+                {
+                    _logger.LogWarning("Salesman {SalesmanId} not found or inactive for Deal: {DealId}", deal.SalesmanId, deal.Id);
+                    return;
+                }
+
+                var notificationTitle = "Report Submission Required";
+                var notificationMessage = $"Deal #{deal.Id} for client {clientName} is ready. Please submit your report with the offer.";
+
+                var metadata = new Dictionary<string, object>
+                {
+                    ["dealId"] = deal.Id,
+                    ["clientName"] = clientName,
+                    ["dealValue"] = deal.DealValue,
+                    ["status"] = deal.Status
+                };
+
+                await _notificationService.CreateNotificationAsync(
+                    deal.SalesmanId,
+                    notificationTitle,
+                    notificationMessage,
+                    "Deal",
+                    "High",
+                    null,
+                    null,
+                    true,
+                    metadata,
+                    CancellationToken.None
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending salesman report notification for Deal: {DealId}", deal.Id);
+            }
+        }
+
+        private async Task SendLegalNotificationAsync(SalesDeal deal)
+        {
+            try
+            {
+                var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
+                var clientName = client?.Name ?? "Unknown Client";
+
+                var legalManagers = await _userManager.GetUsersInRoleAsync("LegalManager");
+                var activeLegalManagers = legalManagers.Where(lm => lm.IsActive).ToList();
+
+                if (!activeLegalManagers.Any())
+                {
+                    _logger.LogWarning("No active Legal Managers found to notify for Deal: {DealId}", deal.Id);
+                    return;
+                }
+
+                var notificationTitle = "New Deal Received";
+                var notificationMessage = $"Deal #{deal.Id} for client {clientName} (Value: {deal.DealValue:C}) with report has been sent to legal department.";
+
+                var metadata = new Dictionary<string, object>
+                {
+                    ["dealId"] = deal.Id,
+                    ["clientName"] = clientName,
+                    ["dealValue"] = deal.DealValue,
+                    ["status"] = deal.Status
+                };
+
+                foreach (var legalManager in activeLegalManagers)
+                {
+                    try
+                    {
+                        await _notificationService.CreateNotificationAsync(
+                            legalManager.Id,
+                            notificationTitle,
+                            notificationMessage,
+                            "Deal",
+                            "High",
+                            null,
+                            null,
+                            true,
+                            metadata,
+                            CancellationToken.None
+                        );
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to send notification to Legal Manager {LegalManagerId} for Deal: {DealId}", legalManager.Id, deal.Id);
+                    }
+                }
+
+                // Also send to role group
+                try
+                {
+                    await _notificationService.SendNotificationToRoleGroupAsync(
+                        "LegalManager",
+                        notificationTitle,
+                        notificationMessage,
+                        metadata,
+                        CancellationToken.None
+                    );
+                }
+                catch (Exception broadcastEx)
+                {
+                    _logger.LogWarning(broadcastEx, "Failed to send broadcast to LegalManager role group");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending legal notification for Deal: {DealId}", deal.Id);
             }
         }
 

@@ -77,8 +77,9 @@ namespace SoitMed.Repositories
         // Salesman targets repository
         private ISalesmanTargetRepository? _salesmanTargets;
 
-        // Products catalog repository
+        // Products catalog repositories
         private IProductRepository? _products;
+        private IProductCategoryRepository? _productCategories;
 
 
         public UnitOfWork(Context context)
@@ -219,6 +220,9 @@ namespace SoitMed.Repositories
 
         public IProductRepository Products => 
             _products ??= new ProductRepository(_context);
+
+        public IProductCategoryRepository ProductCategories =>
+            _productCategories ??= new ProductCategoryRepository(_context);
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

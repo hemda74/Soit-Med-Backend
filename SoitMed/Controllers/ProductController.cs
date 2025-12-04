@@ -20,12 +20,14 @@ namespace SoitMed.Controllers
     {
         private readonly IProductService _productService;
         private readonly IImageUploadService _imageUploadService;
+        private readonly IPdfUploadService _pdfUploadService;
         private readonly ILogger<ProductController> _logger;
         private readonly IWebHostEnvironment _environment;
 
         public ProductController(
             IProductService productService,
             IImageUploadService imageUploadService,
+            IPdfUploadService pdfUploadService,
             ILogger<ProductController> logger,
             UserManager<ApplicationUser> userManager,
             IWebHostEnvironment environment) 
@@ -33,6 +35,7 @@ namespace SoitMed.Controllers
         {
             _productService = productService;
             _imageUploadService = imageUploadService;
+            _pdfUploadService = pdfUploadService;
             _logger = logger;
             _environment = environment;
         }
@@ -41,7 +44,7 @@ namespace SoitMed.Controllers
         /// Get all products with optional filters
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin,Doctor")]
         public async Task<IActionResult> GetAllProducts(
             [FromQuery] string? category = null,
             [FromQuery] bool? inStock = null)
@@ -62,7 +65,7 @@ namespace SoitMed.Controllers
         /// Get product by ID
         /// </summary>
         [HttpGet("{id}")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin,Doctor")]
         public async Task<IActionResult> GetProduct(long id)
         {
             try
@@ -85,7 +88,7 @@ namespace SoitMed.Controllers
         /// Get products by category
         /// </summary>
         [HttpGet("category/{category}")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin,Doctor")]
         public async Task<IActionResult> GetProductsByCategory(string category)
         {
             try
@@ -104,7 +107,7 @@ namespace SoitMed.Controllers
         /// Search products by name, model, provider, or description
         /// </summary>
         [HttpGet("search")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin,Doctor")]
         public async Task<IActionResult> SearchProducts([FromQuery] string q)
         {
             try
@@ -384,6 +387,205 @@ namespace SoitMed.Controllers
             {
                 _logger.LogError(ex, "Error retrieving provider image file. ProductId: {ProductId}", id);
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving the provider image file"));
+            }
+        }
+
+        /// <summary>
+        /// Update inventory quantity for a product
+        /// </summary>
+        [HttpPut("{id}/inventory")]
+        [Authorize(Roles = "InventoryManager,SuperAdmin")]
+        public async Task<IActionResult> UpdateInventoryQuantity(long id, [FromBody] UpdateInventoryDTO updateDto)
+        {
+            try
+            {
+                if (updateDto == null)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("Inventory update data is required"));
+                }
+
+                var result = await _productService.UpdateInventoryQuantityAsync(id, updateDto.InventoryQuantity);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Inventory quantity updated successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for updating inventory. ProductId: {ProductId}", id);
+                return NotFound(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating inventory quantity. ProductId: {ProductId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while updating inventory quantity"));
+            }
+        }
+
+        /// <summary>
+        /// Upload data sheet PDF for a product
+        /// </summary>
+        [HttpPost("{id}/upload-data-sheet")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
+        public async Task<IActionResult> UploadDataSheet(long id, IFormFile file)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("File is required"));
+                }
+
+                if (!_pdfUploadService.IsValidPdfFile(file))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("Invalid file type. Only PDF files are allowed (max 5MB)"));
+                }
+
+                var uploadResult = await _pdfUploadService.UploadPdfAsync(file, "product-documents");
+                if (!uploadResult.Success || string.IsNullOrWhiteSpace(uploadResult.FilePath))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse(uploadResult.ErrorMessage ?? "Failed to upload data sheet"));
+                }
+
+                var result = await _productService.UpdateDataSheetAsync(id, uploadResult.FilePath);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Data sheet uploaded successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for uploading data sheet. ProductId: {ProductId}", id);
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error uploading data sheet. ProductId: {ProductId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while uploading data sheet"));
+            }
+        }
+
+        /// <summary>
+        /// Upload catalog PDF for a product
+        /// </summary>
+        [HttpPost("{id}/upload-catalog")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
+        public async Task<IActionResult> UploadCatalog(long id, IFormFile file)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("File is required"));
+                }
+
+                if (!_pdfUploadService.IsValidPdfFile(file))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("Invalid file type. Only PDF files are allowed (max 5MB)"));
+                }
+
+                var uploadResult = await _pdfUploadService.UploadPdfAsync(file, "product-documents");
+                if (!uploadResult.Success || string.IsNullOrWhiteSpace(uploadResult.FilePath))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse(uploadResult.ErrorMessage ?? "Failed to upload catalog"));
+                }
+
+                var result = await _productService.UpdateCatalogAsync(id, uploadResult.FilePath);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Catalog uploaded successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for uploading catalog. ProductId: {ProductId}", id);
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error uploading catalog. ProductId: {ProductId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while uploading catalog"));
+            }
+        }
+
+        /// <summary>
+        /// Get data sheet PDF file
+        /// </summary>
+        [HttpGet("{id}/data-sheet-file")]
+        [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+        public async Task<IActionResult> GetDataSheetFile(long id)
+        {
+            try
+            {
+                var product = await _productService.GetProductByIdAsync(id);
+                
+                if (product == null)
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("Product not found"));
+                }
+
+                if (string.IsNullOrWhiteSpace(product.DataSheetPath))
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("Data sheet not found for this product"));
+                }
+
+                var fullPath = Path.Combine(_environment.WebRootPath, product.DataSheetPath.Replace('/', Path.DirectorySeparatorChar));
+
+                if (!System.IO.File.Exists(fullPath))
+                {
+                    _logger.LogWarning("Data sheet file not found at path: {FullPath}", fullPath);
+                    return NotFound(ResponseHelper.CreateErrorResponse("Data sheet file not found on server"));
+                }
+
+                Response.Headers.Append("Access-Control-Allow-Origin", "*");
+                Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+                Response.Headers.Append("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+                Response.Headers.Append("Access-Control-Expose-Headers", "Content-Length, Content-Type");
+                Response.Headers.Append("Content-Disposition", "inline");
+                
+                var fileBytes = await System.IO.File.ReadAllBytesAsync(fullPath);
+                return File(fileBytes, "application/pdf");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving data sheet file. ProductId: {ProductId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving the data sheet file"));
+            }
+        }
+
+        /// <summary>
+        /// Get catalog PDF file
+        /// </summary>
+        [HttpGet("{id}/catalog-file")]
+        [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+        public async Task<IActionResult> GetCatalogFile(long id)
+        {
+            try
+            {
+                var product = await _productService.GetProductByIdAsync(id);
+                
+                if (product == null)
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("Product not found"));
+                }
+
+                if (string.IsNullOrWhiteSpace(product.CatalogPath))
+                {
+                    return NotFound(ResponseHelper.CreateErrorResponse("Catalog not found for this product"));
+                }
+
+                var fullPath = Path.Combine(_environment.WebRootPath, product.CatalogPath.Replace('/', Path.DirectorySeparatorChar));
+
+                if (!System.IO.File.Exists(fullPath))
+                {
+                    _logger.LogWarning("Catalog file not found at path: {FullPath}", fullPath);
+                    return NotFound(ResponseHelper.CreateErrorResponse("Catalog file not found on server"));
+                }
+
+                Response.Headers.Append("Access-Control-Allow-Origin", "*");
+                Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+                Response.Headers.Append("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+                Response.Headers.Append("Access-Control-Expose-Headers", "Content-Length, Content-Type");
+                Response.Headers.Append("Content-Disposition", "inline");
+                
+                var fileBytes = await System.IO.File.ReadAllBytesAsync(fullPath);
+                return File(fileBytes, "application/pdf");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving catalog file. ProductId: {ProductId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving the catalog file"));
             }
         }
     }

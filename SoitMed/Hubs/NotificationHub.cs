@@ -24,7 +24,7 @@ namespace SoitMed.Hubs
             {
                 // Add user to their personal group for targeted notifications
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"User_{userId}");
-                _logger.LogInformation("✅ User {UserId} added to personal group: User_{UserId}", userId, userId);
+                _logger.LogInformation("  User {UserId} added to personal group: User_{UserId}", userId, userId);
                 
                 // Add user to ALL their role-based groups for broadcast notifications
                 var userRoles = GetUserRoles();
@@ -33,11 +33,11 @@ namespace SoitMed.Hubs
                     foreach (var role in userRoles)
                     {
                         await Groups.AddToGroupAsync(Context.ConnectionId, $"Role_{role}");
-                        _logger.LogInformation("✅ User {UserId} added to role group: Role_{Role}", userId, role);
+                        _logger.LogInformation("  User {UserId} added to role group: Role_{Role}", userId, role);
                     }
                 }
 
-                _logger.LogInformation("📡 User {UserId} connected to notification hub with roles: {Roles}", 
+                _logger.LogInformation("  User {UserId} connected to notification hub with roles: {Roles}", 
                     userId, userRoles != null ? string.Join(", ", userRoles) : "None");
             }
 

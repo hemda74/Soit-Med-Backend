@@ -684,7 +684,7 @@ namespace SoitMed.Services
                             );
 
                             var userType = isCustomer ? "Customer" : "Salesman";
-                            _logger.LogInformation("✅ Notification sent to {UserType}: {UserId} for Offer: {OfferId}", userType, offer.AssignedTo, offerId);
+                            _logger.LogInformation("  Notification sent to {UserType}: {UserId} for Offer: {OfferId}", userType, offer.AssignedTo, offerId);
                         }
                         else
                         {
@@ -743,6 +743,97 @@ namespace SoitMed.Services
 
                 _logger.LogInformation("SalesManager approval processed for offer. OfferId: {OfferId}, Approved: {Approved}", 
                     offerId, approvalDto.Approved);
+
+                // FIX 1: Auto-send notification to customer after approval
+                if (approvalDto.Approved && offer.Status == OfferStatus.Sent)
+                {
+                    try
+                    {
+                        var assignedUser = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
+                        if (assignedUser != null && assignedUser.IsActive)
+                        {
+                            var assignedUserRoles = await _userManager.GetRolesAsync(assignedUser);
+                            bool isCustomer = assignedUserRoles.Contains("Customer");
+                            
+                            var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                            var clientName = client?.Name ?? "Unknown Client";
+                            
+                            var notificationTitle = isCustomer ? "New Offer Received" : "New Offer Available";
+                            var notificationMessage = isCustomer
+                                ? $"You have received a new offer for {clientName}. Total: {offer.TotalAmount:C}"
+                                : $"A new offer for {clientName} has been approved. Total: {offer.TotalAmount:C}";
+                            
+                            var metadata = new Dictionary<string, object>
+                            {
+                                ["offerId"] = offerId,
+                                ["clientName"] = clientName,
+                                ["totalAmount"] = offer.TotalAmount
+                            };
+                            
+                            await _notificationService.CreateNotificationAsync(
+                                offer.AssignedTo,
+                                notificationTitle,
+                                notificationMessage,
+                                "Offer",
+                                "High",
+                                null,
+                                null,
+                                true, // Mobile push
+                                metadata,
+                                CancellationToken.None
+                            );
+                            
+                            // Update SentToClientAt timestamp
+                            offer.SentToClientAt = DateTime.UtcNow;
+                            await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                            await _unitOfWork.SaveChangesAsync();
+                            
+                            _logger.LogInformation("✅ Offer automatically sent to customer after approval. OfferId: {OfferId}", offerId);
+                        }
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "❌ Failed to send notification after approval. OfferId: {OfferId}", offerId);
+                    }
+                }
+                
+                // FIX 4: Notify customer of rejection
+                if (!approvalDto.Approved && offer.Status == OfferStatus.Rejected)
+                {
+                    try
+                    {
+                        var assignedUser = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
+                        if (assignedUser != null && assignedUser.IsActive)
+                        {
+                            var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                            var clientName = client?.Name ?? "Unknown Client";
+                            
+                            await _notificationService.CreateNotificationAsync(
+                                offer.AssignedTo,
+                                "Offer Rejected",
+                                $"Your offer request for {clientName} has been rejected. Reason: {approvalDto.RejectionReason}",
+                                "Offer",
+                                "High",
+                                null,
+                                null,
+                                true,
+                                new Dictionary<string, object>
+                                {
+                                    ["offerId"] = offerId,
+                                    ["clientName"] = clientName,
+                                    ["rejectionReason"] = approvalDto.RejectionReason ?? ""
+                                },
+                                CancellationToken.None
+                            );
+                            
+                            _logger.LogInformation("✅ Customer notified of offer rejection. OfferId: {OfferId}", offerId);
+                        }
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "❌ Failed to notify customer of rejection. OfferId: {OfferId}", offerId);
+                    }
+                }
 
                 return await MapToOfferResponseDTO(offer);
             }
@@ -835,6 +926,41 @@ namespace SoitMed.Services
 
                             await _dealService.CreateDealAsync(createDealDto, userId);
                             _logger.LogInformation("Deal automatically created from accepted offer. OfferId: {OfferId}", offerId);
+                            
+                            // FIX 3: Notify SuperAdmin of new deal
+                            try
+                            {
+                                var superAdmins = await _userManager.GetUsersInRoleAsync("SuperAdmin");
+                                var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                                var clientName = client?.Name ?? "Unknown Client";
+                                
+                                foreach (var admin in superAdmins.Where(a => a.IsActive))
+                                {
+                                    await _notificationService.CreateNotificationAsync(
+                                        admin.Id,
+                                        "New Deal Pending Approval",
+                                        $"A new deal has been created from accepted offer #{offerId} for {clientName}. Value: {offer.TotalAmount:C}",
+                                        "Deal",
+                                        "High",
+                                        null,
+                                        null,
+                                        true,
+                                        new Dictionary<string, object>
+                                        {
+                                            ["offerId"] = offerId,
+                                            ["clientName"] = clientName,
+                                            ["dealValue"] = offer.TotalAmount
+                                        },
+                                        CancellationToken.None
+                                    );
+                                }
+                                
+                                _logger.LogInformation("✅ SuperAdmin notified of new deal from accepted offer. OfferId: {OfferId}", offerId);
+                            }
+                            catch (Exception notifEx)
+                            {
+                                _logger.LogError(notifEx, "❌ Failed to notify SuperAdmin of new deal. OfferId: {OfferId}", offerId);
+                            }
                         }
                         else
                         {
@@ -846,6 +972,70 @@ namespace SoitMed.Services
                         // Log error but don't fail the offer update
                         _logger.LogError(dealEx, "Failed to auto-create deal for accepted offer. OfferId: {OfferId}", offerId);
                     }
+                }
+
+                // FIX 2: Notify SalesSupport and original requester after customer response
+                try
+                {
+                    var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                    var clientName = client?.Name ?? "Unknown Client";
+                    
+                    var responseStatus = accepted ? "accepted" : "rejected";
+                    var notificationTitle = $"Offer {responseStatus.ToUpper()}";
+                    var notificationMessage = $"Customer has {responseStatus} offer #{offerId} for {clientName}. Response: {response}";
+                    
+                    var metadata = new Dictionary<string, object>
+                    {
+                        ["offerId"] = offerId,
+                        ["clientName"] = clientName,
+                        ["accepted"] = accepted,
+                        ["response"] = response ?? ""
+                    };
+                    
+                    // Notify SalesSupport users
+                    var salesSupportUsers = await _userManager.GetUsersInRoleAsync("SalesSupport");
+                    foreach (var supportUser in salesSupportUsers.Where(u => u.IsActive))
+                    {
+                        await _notificationService.CreateNotificationAsync(
+                            supportUser.Id,
+                            notificationTitle,
+                            notificationMessage,
+                            "Offer",
+                            "High",
+                            null,
+                            null,
+                            true,
+                            metadata,
+                            CancellationToken.None
+                        );
+                    }
+                    
+                    // Notify original requester if different from customer
+                    if (offer.OfferRequestId.HasValue)
+                    {
+                        var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId.Value);
+                        if (offerRequest != null && offerRequest.RequestedBy != userId)
+                        {
+                            await _notificationService.CreateNotificationAsync(
+                                offerRequest.RequestedBy,
+                                notificationTitle,
+                                notificationMessage,
+                                "Offer",
+                                "High",
+                                null,
+                                null,
+                                true,
+                                metadata,
+                                CancellationToken.None
+                            );
+                        }
+                    }
+                    
+                    _logger.LogInformation("✅ Customer response notifications sent. OfferId: {OfferId}", offerId);
+                }
+                catch (Exception notifEx)
+                {
+                    _logger.LogError(notifEx, "❌ Failed to send customer response notifications. OfferId: {OfferId}", offerId);
                 }
 
                 _logger.LogInformation("Client response recorded for offer. OfferId: {OfferId}, Accepted: {Accepted}", offerId, accepted);
@@ -2333,7 +2523,7 @@ namespace SoitMed.Services
                         metadata,
                         CancellationToken.None
                     );
-                    _logger.LogInformation("✅ Broadcast notification sent to Role_SalesManager group for Offer: {OfferId}", offer.Id);
+                    _logger.LogInformation("  Broadcast notification sent to Role_SalesManager group for Offer: {OfferId}", offer.Id);
                 }
                 catch (Exception broadcastEx)
                 {
@@ -2360,7 +2550,7 @@ namespace SoitMed.Services
                             CancellationToken.None
                         );
 
-                        _logger.LogInformation("✅ Notification created successfully for SalesManager: {SalesManagerId}, NotificationId: {NotificationId}", 
+                        _logger.LogInformation("  Notification created successfully for SalesManager: {SalesManagerId}, NotificationId: {NotificationId}", 
                             salesManager.Id, notification?.Id);
                     }
                     catch (Exception notifEx)
@@ -2370,7 +2560,7 @@ namespace SoitMed.Services
                     }
                 }
 
-                _logger.LogInformation("✅ Completed sending SalesManager approval notifications for Offer: {OfferId}", offer.Id);
+                _logger.LogInformation("  Completed sending SalesManager approval notifications for Offer: {OfferId}", offer.Id);
             }
             catch (Exception ex)
             {

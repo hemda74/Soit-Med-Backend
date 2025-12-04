@@ -132,16 +132,27 @@ namespace SoitMed.Services
             return await MapToConversationDTOAsync(conversation, cancellationToken);
         }
 
-        public async Task<ChatMessageResponseDTO> SendTextMessageAsync(long conversationId, string senderId, string content, CancellationToken cancellationToken = default)
+        public async Task<ChatMessageResponseDTO> SendTextMessageAsync(long conversationId, string senderId, string content, bool isAdmin, CancellationToken cancellationToken = default)
         {
             var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
             if (conversation == null)
                 throw new ArgumentException("Conversation not found", nameof(conversationId));
 
-            // Security check
-            if (conversation.CustomerId != senderId && conversation.AdminId != senderId)
+            // Check if sender is customer
+            var isCustomer = conversation.CustomerId == senderId;
+
+            // Security check: sender must be either the customer or an admin
+            if (!isCustomer && !isAdmin)
             {
                 throw new UnauthorizedAccessException("You are not authorized to send messages in this conversation");
+            }
+
+            // If admin is sending and AdminId is null, assign this admin to the conversation
+            if (isAdmin && string.IsNullOrEmpty(conversation.AdminId))
+            {
+                conversation.AdminId = senderId;
+                conversation.UpdatedAt = DateTime.UtcNow;
+                await _unitOfWork.ChatConversations.UpdateAsync(conversation, cancellationToken);
             }
 
             var message = new ChatMessage
@@ -204,16 +215,27 @@ namespace SoitMed.Services
             return messageDTO;
         }
 
-        public async Task<ChatMessageResponseDTO> SendVoiceMessageAsync(long conversationId, string senderId, string voiceFilePath, int voiceDuration, CancellationToken cancellationToken = default)
+        public async Task<ChatMessageResponseDTO> SendVoiceMessageAsync(long conversationId, string senderId, string voiceFilePath, int voiceDuration, bool isAdmin, CancellationToken cancellationToken = default)
         {
             var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
             if (conversation == null)
                 throw new ArgumentException("Conversation not found", nameof(conversationId));
 
-            // Security check
-            if (conversation.CustomerId != senderId && conversation.AdminId != senderId)
+            // Check if sender is customer
+            var isCustomer = conversation.CustomerId == senderId;
+
+            // Security check: sender must be either the customer or an admin
+            if (!isCustomer && !isAdmin)
             {
                 throw new UnauthorizedAccessException("You are not authorized to send messages in this conversation");
+            }
+
+            // If admin is sending and AdminId is null, assign this admin to the conversation
+            if (isAdmin && string.IsNullOrEmpty(conversation.AdminId))
+            {
+                conversation.AdminId = senderId;
+                conversation.UpdatedAt = DateTime.UtcNow;
+                await _unitOfWork.ChatConversations.UpdateAsync(conversation, cancellationToken);
             }
 
             var message = new ChatMessage
@@ -372,12 +394,26 @@ namespace SoitMed.Services
                 unreadCount = await _unitOfWork.ChatMessages.GetUnreadCountAsync(conversation.Id, currentUserId, cancellationToken);
             }
 
+            // Get customer image URL
+            string? customerImageUrl = null;
+            if (customer?.ProfileImage != null && !string.IsNullOrEmpty(customer.ProfileImage.FilePath))
+            {
+                var request = _httpContextAccessor.HttpContext?.Request;
+                if (request != null)
+                {
+                    customerImageUrl = $"{request.Scheme}://{request.Host}/{customer.ProfileImage.FilePath.Replace('\\', '/')}";
+                }
+            }
+
             return new ChatConversationResponseDTO
             {
                 Id = conversation.Id,
                 CustomerId = conversation.CustomerId,
                 CustomerName = customer != null ? $"{customer.FirstName} {customer.LastName}".Trim() : null,
+                CustomerFirstName = customer?.FirstName,
+                CustomerLastName = customer?.LastName,
                 CustomerEmail = customer?.Email,
+                CustomerImageUrl = customerImageUrl,
                 AdminId = conversation.AdminId,
                 AdminName = admin != null ? $"{admin.FirstName} {admin.LastName}".Trim() : null,
                 LastMessageAt = conversation.LastMessageAt,

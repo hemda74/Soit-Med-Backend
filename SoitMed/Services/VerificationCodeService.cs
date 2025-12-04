@@ -28,7 +28,8 @@ namespace SoitMed.Services
                 var cacheOptions = new MemoryCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(CODE_EXPIRY_MINUTES),
-                    SlidingExpiration = TimeSpan.FromMinutes(5) // Reset expiry if accessed
+                    SlidingExpiration = TimeSpan.FromMinutes(5), // Reset expiry if accessed
+                    Size = 1 // Required when SizeLimit is set on MemoryCache
                 };
 
                 _cache.Set(cacheKey, code, cacheOptions);

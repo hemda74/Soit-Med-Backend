@@ -150,29 +150,13 @@ namespace SoitMed
                 {
                     options.AddPolicy("MyPolicy",
                                       policy => policy
-                                      .SetIsOriginAllowed(origin =>
-                                      {
-                                          var allowedOrigins = new[]
-                                          {
-                                          "http://localhost",
-                                          "https://localhost",
-                                          "http://127.0.0.1",
-                                          "https://127.0.0.1"
-                                          };
-
-                                          if (builder.Environment.IsDevelopment())
-                                          {
-                                              return origin != null && (
-                                                  origin.Contains("localhost") ||
-                                                  origin.Contains("127.0.0.1")
-                                              );
-                                          }
-
-                                          return allowedOrigins.Any(allowed => origin?.StartsWith(allowed) == true);
-                                      })
+                                      // Allow ALL origins - any device can call the API
+                                      .SetIsOriginAllowed(_ => true)
                                       .AllowAnyMethod()
                                       .AllowAnyHeader()
-                                      .AllowCredentials());
+                                      .AllowCredentials()
+                                      // Set preflight cache duration
+                                      .SetPreflightMaxAge(TimeSpan.FromDays(1)));
                 });
                 
                 builder.Services.AddAuthorization(options =>
@@ -190,6 +174,7 @@ namespace SoitMed
                 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
                 builder.Services.AddScoped<ISalesmanStatisticsService, SalesmanStatisticsService>();
                 builder.Services.AddScoped<IImageUploadService, ImageUploadService>();
+                builder.Services.AddScoped<IPdfUploadService, PdfUploadService>();
                 builder.Services.AddScoped<IRoleBasedImageUploadService, RoleBasedImageUploadService>();
                 builder.Services.AddScoped<IVoiceUploadService, VoiceUploadService>();
                 builder.Services.AddScoped<IEmailService, EmailService>();
@@ -197,6 +182,7 @@ namespace SoitMed
                 builder.Services.AddScoped<INotificationService, NotificationService>();
                 builder.Services.AddHttpClient<IMobileNotificationService, MobileNotificationService>();
                 builder.Services.AddScoped<IRequestWorkflowService, RequestWorkflowService>();
+                builder.Services.AddHttpContextAccessor(); // Required for ChatService
                 builder.Services.AddApplicationServices();
                 builder.Services.AddSignalR();
                 builder.Services.AddFluentValidationAutoValidation();
@@ -265,7 +251,7 @@ namespace SoitMed
                         OnMessageReceived = context =>
                         {
                             var path = context.HttpContext.Request.Path;
-                            if (path.StartsWithSegments("/notificationHub"))
+                            if (path.StartsWithSegments("/notificationHub") || path.StartsWithSegments("/chatHub"))
                             {
                                 var tokenFromHeader = context.Request.Headers["Authorization"].ToString();
                                 if (!string.IsNullOrEmpty(tokenFromHeader) && tokenFromHeader.StartsWith("Bearer "))
@@ -524,6 +510,7 @@ END";
 
                 app.MapControllers();
                 app.MapHub<SoitMed.Hubs.NotificationHub>("/notificationHub");
+                app.MapHub<SoitMed.Hubs.ChatHub>("/chatHub");
 
                 logger.LogInformation("Application configured successfully. Starting server...");
                 await app.RunAsync();

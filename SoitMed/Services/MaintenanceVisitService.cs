@@ -55,6 +55,16 @@ namespace SoitMed.Services
                 await _unitOfWork.MaintenanceVisits.CreateAsync(visit);
                 await _unitOfWork.SaveChangesAsync();
 
+                // Set request to InProgress when visit starts (if not already)
+                if (request.Status == MaintenanceRequestStatus.Assigned || request.Status == MaintenanceRequestStatus.Pending)
+                {
+                    request.Status = MaintenanceRequestStatus.InProgress;
+                    if (request.StartedAt == null)
+                    {
+                        request.StartedAt = DateTime.UtcNow;
+                    }
+                }
+
                 // Update request status based on outcome
                 if (dto.Outcome == MaintenanceVisitOutcome.Completed)
                 {
@@ -68,6 +78,15 @@ namespace SoitMed.Services
                 else if (dto.Outcome == MaintenanceVisitOutcome.NeedsSparePart)
                 {
                     request.Status = MaintenanceRequestStatus.NeedsSparePart;
+                }
+                else if (dto.Outcome == MaintenanceVisitOutcome.CannotComplete)
+                {
+                    // If cannot complete, set to OnHold for review
+                    request.Status = MaintenanceRequestStatus.OnHold;
+                    if (!string.IsNullOrEmpty(dto.Notes))
+                    {
+                        request.Notes = $"Cannot complete: {dto.Notes}";
+                    }
                 }
 
                 await _unitOfWork.MaintenanceRequests.UpdateAsync(request);
