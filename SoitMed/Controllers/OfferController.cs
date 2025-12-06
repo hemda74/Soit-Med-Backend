@@ -166,6 +166,47 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
+        /// Get offers for the current customer (customer-facing endpoint)
+        /// </summary>
+        [HttpGet("customer-offers")]
+        [Authorize(Roles = "Customer,Doctor,Technician")]
+        public async Task<IActionResult> GetCustomerOffers([FromQuery] string? status = null)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                
+                // Try to parse userId as clientId (for customers, their userId often maps to clientId)
+                if (!long.TryParse(userId, out var clientId))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("Invalid user ID format"));
+                }
+
+                var result = await _offerService.GetOffersByClientAsync(clientId);
+
+                // Filter by status if provided
+                if (!string.IsNullOrEmpty(status))
+                {
+                    result = result.Where(o => o.Status == status).ToList();
+                }
+
+                // Only return offers that have been sent to the client (status = "Sent" or later)
+                result = result.Where(o => 
+                    o.Status == "Sent" || 
+                    o.Status == "Accepted" || 
+                    o.Status == "Rejected" || 
+                    o.Status == "Completed").ToList();
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Customer offers retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving customer offers");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving offers"));
+            }
+        }
+
+        /// <summary>
         /// Get pending SalesManager approvals
         /// </summary>
         [HttpGet("pending-salesmanager-approvals")]
@@ -226,7 +267,7 @@ namespace SoitMed.Controllers
         /// Get offer by ID
         /// </summary>
         [HttpGet("{id}")]
-        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman,Customer")]
         public async Task<IActionResult> GetOffer(long id)
         {
             try

@@ -1,9 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SoitMed.Common;
-using SoitMed.DTO;
-using SoitMed.Models.Identity;
 using SoitMed.Services;
 
 namespace SoitMed.Controllers
@@ -14,42 +11,55 @@ namespace SoitMed.Controllers
     public class NotificationController : BaseController
     {
         private readonly INotificationService _notificationService;
-        private readonly IMobileNotificationService _mobileNotificationService;
         private readonly ILogger<NotificationController> _logger;
 
         public NotificationController(
-            INotificationService notificationService, 
-            IMobileNotificationService mobileNotificationService,
-            ILogger<NotificationController> logger, 
-            UserManager<ApplicationUser> userManager) 
+            INotificationService notificationService,
+            ILogger<NotificationController> logger,
+            Microsoft.AspNetCore.Identity.UserManager<Models.Identity.ApplicationUser> userManager)
             : base(userManager)
         {
             _notificationService = notificationService;
-            _mobileNotificationService = mobileNotificationService;
             _logger = logger;
         }
 
         /// <summary>
-        /// Get user notifications
+        /// Get all notifications for the current user (base endpoint for web app)
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetNotifications([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] bool unreadOnly = false, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> GetNotifications([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] bool unreadOnly = false)
         {
             try
             {
                 var userId = GetCurrentUserId();
-                if (string.IsNullOrEmpty(userId))
-                {
-                    return Unauthorized();
-                }
-
-                var notifications = await _notificationService.GetUserNotificationsAsync(userId, page, pageSize, unreadOnly, cancellationToken);
-                return SuccessResponse(notifications);
+                var notifications = await _notificationService.GetUserNotificationsAsync(userId, page, pageSize, unreadOnly);
+                
+                return Ok(ResponseHelper.CreateSuccessResponse(notifications));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving notifications");
-                return ErrorResponse("An error occurred while retrieving notifications", 500);
+                _logger.LogError(ex, "Error getting user notifications");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving notifications"));
+            }
+        }
+
+        /// <summary>
+        /// Get all notifications for the current user (mobile app endpoint)
+        /// </summary>
+        [HttpGet("my-notifications")]
+        public async Task<IActionResult> GetMyNotifications([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] bool unreadOnly = false)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var notifications = await _notificationService.GetUserNotificationsAsync(userId, page, pageSize, unreadOnly);
+                
+                return Ok(ResponseHelper.CreateSuccessResponse(notifications));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting user notifications");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving notifications"));
             }
         }
 
@@ -57,151 +67,62 @@ namespace SoitMed.Controllers
         /// Get unread notification count
         /// </summary>
         [HttpGet("unread-count")]
-        public async Task<IActionResult> GetUnreadCount(CancellationToken cancellationToken = default)
+        public async Task<IActionResult> GetUnreadCount()
         {
             try
             {
                 var userId = GetCurrentUserId();
-                if (string.IsNullOrEmpty(userId))
-                {
-                    return Unauthorized();
-                }
-
-                var count = await _notificationService.GetUnreadNotificationCountAsync(userId, cancellationToken);
-                return SuccessResponse(new { UnreadCount = count });
+                var count = await _notificationService.GetUnreadNotificationCountAsync(userId);
+                
+                return Ok(ResponseHelper.CreateSuccessResponse(count));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving unread notification count");
-                return ErrorResponse("An error occurred while retrieving unread notification count", 500);
+                _logger.LogError(ex, "Error getting unread notification count");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving unread count"));
             }
         }
 
         /// <summary>
-        /// Mark notification as read
+        /// Mark a notification as read
         /// </summary>
-        [HttpPut("{notificationId}/read")]
-        public async Task<IActionResult> MarkAsRead(long notificationId, CancellationToken cancellationToken = default)
+        [HttpPost("{id}/mark-read")]
+        [HttpPut("{id}/read")] // Web app uses PUT with /read endpoint
+        public async Task<IActionResult> MarkAsRead(long id)
         {
             try
             {
                 var userId = GetCurrentUserId();
-                if (string.IsNullOrEmpty(userId))
-                {
-                    return Unauthorized();
-                }
-
-                await _notificationService.MarkNotificationAsReadAsync(notificationId, userId, cancellationToken);
-                return SuccessResponse("Notification marked as read");
+                await _notificationService.MarkNotificationAsReadAsync(id, userId);
+                
+                return Ok(ResponseHelper.CreateSuccessResponse(null, "Notification marked as read"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error marking notification as read");
-                return ErrorResponse("An error occurred while marking notification as read", 500);
+                _logger.LogError(ex, "Error marking notification as read. NotificationId: {NotificationId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while marking notification as read"));
             }
         }
 
         /// <summary>
-        /// Mark all notifications as read
+        /// Mark all notifications as read for the current user
         /// </summary>
-        [HttpPut("mark-all-read")]
-        public async Task<IActionResult> MarkAllAsRead(CancellationToken cancellationToken = default)
+        [HttpPost("mark-all-read")]
+        [HttpPut("mark-all-read")] // Support both POST and PUT
+        public async Task<IActionResult> MarkAllAsRead()
         {
             try
             {
                 var userId = GetCurrentUserId();
-                if (string.IsNullOrEmpty(userId))
-                {
-                    return Unauthorized();
-                }
-
-                await _notificationService.MarkAllNotificationsAsReadAsync(userId, cancellationToken);
-                return SuccessResponse("All notifications marked as read");
+                await _notificationService.MarkAllNotificationsAsReadAsync(userId);
+                
+                return Ok(ResponseHelper.CreateSuccessResponse(null, "All notifications marked as read"));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error marking all notifications as read");
-                return ErrorResponse("An error occurred while marking all notifications as read", 500);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while marking all notifications as read"));
             }
         }
-
-        /// <summary>
-        /// Register push notification token for the current user
-        /// </summary>
-        [HttpPost("register-push-token")]
-        public async Task<IActionResult> RegisterPushToken([FromBody] RegisterPushTokenDTO dto, CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (string.IsNullOrEmpty(userId))
-                {
-                    return Unauthorized();
-                }
-
-                if (string.IsNullOrEmpty(dto.Token))
-                {
-                    return ErrorResponse("Push token is required", 400);
-                }
-
-                var platform = dto.Platform?.ToLower() ?? "android";
-                if (platform != "android" && platform != "ios")
-                {
-                    return ErrorResponse("Platform must be 'android' or 'ios'", 400);
-                }
-
-                await _mobileNotificationService.RegisterDeviceTokenAsync(userId, dto.Token, platform, cancellationToken);
-                _logger.LogInformation("  Push token registered for user {UserId}", userId);
-                
-                return SuccessResponse("Push token registered successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error registering push token");
-                return ErrorResponse("An error occurred while registering push token", 500);
-            }
-        }
-
-        /// <summary>
-        /// Unregister push notification token for the current user
-        /// </summary>
-        [HttpPost("unregister-push-token")]
-        public async Task<IActionResult> UnregisterPushToken([FromBody] UnregisterPushTokenDTO dto, CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (string.IsNullOrEmpty(userId))
-                {
-                    return Unauthorized();
-                }
-
-                if (string.IsNullOrEmpty(dto.Token))
-                {
-                    return ErrorResponse("Push token is required", 400);
-                }
-
-                await _mobileNotificationService.UnregisterDeviceTokenAsync(userId, dto.Token, cancellationToken);
-                _logger.LogInformation("  Push token unregistered for user {UserId}", userId);
-                
-                return SuccessResponse("Push token unregistered successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error unregistering push token");
-                return ErrorResponse("An error occurred while unregistering push token", 500);
-            }
-        }
-    }
-
-    public class RegisterPushTokenDTO
-    {
-        public string Token { get; set; } = string.Empty;
-        public string? Platform { get; set; } = "android";
-    }
-
-    public class UnregisterPushTokenDTO
-    {
-        public string Token { get; set; } = string.Empty;
     }
 }
