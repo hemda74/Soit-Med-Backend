@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "857137383285",
+    "project_id": "soitmed",
+    "storage_bucket": "soitmed.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:857137383285:android:c0859aaa1af9a0e504f53c",
+        "android_client_info": {
+          "package_name": "com.soitmed.engineer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdI3cfubAl513Pq5GAnkz_WyOfrJVtVe8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
