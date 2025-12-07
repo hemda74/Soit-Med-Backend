@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace SoitMed.DTO
 {
@@ -38,6 +39,9 @@ namespace SoitMed.DTO
         [MaxLength(2000)]
         public string? Notes { get; set; }
 
+        [MaxLength(2000)]
+        public string? VoiceDescriptionUrl { get; set; }
+
         // Visit Result
         [MaxLength(20)]
         public string? VisitResult { get; set; } // Interested, NotInterested
@@ -75,6 +79,7 @@ namespace SoitMed.DTO
         public string ProgressType { get; set; } = string.Empty;
         public string? Description { get; set; }
         public string? VisitResult { get; set; }
+        public string? VoiceDescriptionUrl { get; set; }
         public string? NotInterestedComment { get; set; }
         public string? NextStep { get; set; }
         public long? OfferRequestId { get; set; }
@@ -98,8 +103,7 @@ namespace SoitMed.DTO
     // ==================== OfferRequest DTOs ====================
     public class CreateOfferRequestDTO
     {
-        [Required]
-        public long ClientId { get; set; }
+        public long? ClientId { get; set; } // Optional - will be auto-resolved for customer roles
 
         public long? TaskProgressId { get; set; }
 
@@ -192,12 +196,65 @@ namespace SoitMed.DTO
         public decimal Price { get; set; }
 
         [MaxLength(500)]
+        public string? ProviderImagePath { get; set; } // Provider logo/image path
+
+        [MaxLength(500)]
         public string? Description { get; set; }
 
         public bool InStock { get; set; } = true;
 
         [MaxLength(500)]
         public string? ImageUrl { get; set; }
+    }
+
+    public class ApproveOfferDTO
+    {
+        public bool Approved { get; set; }
+
+        [MaxLength(2000)]
+        public string? RejectionReason { get; set; }
+
+        [MaxLength(2000)]
+        public string? Comments { get; set; }
+    }
+
+    /// <summary>
+    /// DTO for updating offers (PATCH) - all fields are optional
+    /// </summary>
+    public class UpdateOfferDTO
+    {
+        public long? ClientId { get; set; }
+
+        public string? AssignedTo { get; set; }
+
+        [MaxLength(2000)]
+        public string? Products { get; set; }
+
+        [Range(0.01, double.MaxValue)]
+        public decimal? TotalAmount { get; set; }
+
+        // Payment Terms, Delivery Terms, Warranty Terms as arrays (lists)
+        public List<string>? PaymentTerms { get; set; }
+
+        public List<string>? DeliveryTerms { get; set; }
+
+        public List<string>? WarrantyTerms { get; set; }
+
+        // ValidUntil as array of date strings (ISO format: "YYYY-MM-DD")
+        public List<string>? ValidUntil { get; set; }
+
+        [MaxLength(2000)]
+        public string? Notes { get; set; }
+        
+        // Optional fields for enhanced offer features
+        [MaxLength(50)]
+        public string? PaymentType { get; set; } // Cash, Installments, Other
+        
+        [Range(0.01, double.MaxValue)]
+        public decimal? FinalPrice { get; set; }
+        
+        [MaxLength(200)]
+        public string? OfferDuration { get; set; }
     }
 
     public class CreateOfferWithItemsDTO
@@ -243,6 +300,7 @@ namespace SoitMed.DTO
 
     public class OfferResponseDTO
     {
+        public List<OfferEquipmentDTO> Equipment { get; set; } = new();
         public long Id { get; set; }
         public long? OfferRequestId { get; set; }
         public long ClientId { get; set; }
@@ -260,7 +318,16 @@ namespace SoitMed.DTO
         public string Status { get; set; } = string.Empty;
         public DateTime? SentToClientAt { get; set; }
         public string? ClientResponse { get; set; }
+        public string? OfferRequestRequesterId { get; set; }
+        public string? OfferRequestRequesterName { get; set; }
+        // SalesManager Approval/Rejection fields
+        public string? SalesManagerApprovedBy { get; set; }
+        public DateTime? SalesManagerApprovedAt { get; set; }
+        public string? SalesManagerComments { get; set; }
+        public string? SalesManagerRejectionReason { get; set; }
         public DateTime CreatedAt { get; set; }
+        public bool IsSalesManagerApproved { get; set; }
+        public bool CanSendToSalesman { get; set; }
     }
 
     public class OfferSummaryDTO
@@ -288,16 +355,29 @@ namespace SoitMed.DTO
     // Equipment DTOs
     public class OfferEquipmentDTO
     {
+        [JsonPropertyName("id")]
         public long Id { get; set; }
+        [JsonPropertyName("offerId")]
         public long OfferId { get; set; }
+        [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
+        [JsonPropertyName("model")]
         public string? Model { get; set; }
+        [JsonPropertyName("provider")]
         public string? Provider { get; set; }
+        [JsonPropertyName("country")]
         public string? Country { get; set; }
+        [JsonPropertyName("year")]
         public int? Year { get; set; }
+        [JsonPropertyName("imagePath")]
         public string? ImagePath { get; set; }
+        [JsonPropertyName("providerImagePath")]
+        public string? ProviderImagePath { get; set; }
+        [JsonPropertyName("price")]
         public decimal Price { get; set; }
+        [JsonPropertyName("description")]
         public string? Description { get; set; }
+        [JsonPropertyName("inStock")]
         public bool InStock { get; set; } = true;
     }
 
@@ -316,6 +396,8 @@ namespace SoitMed.DTO
         [MaxLength(100)]
         public string? Country { get; set; }
         
+        public int? Year { get; set; }
+
         [Required]
         [Range(0.01, double.MaxValue)]
         public decimal Price { get; set; }
@@ -324,6 +406,16 @@ namespace SoitMed.DTO
         public string? Description { get; set; }
         
         public bool InStock { get; set; } = true;
+
+        [MaxLength(500)]
+        public string? ImagePath { get; set; }
+
+        [MaxLength(500)]
+        public string? ProviderImagePath { get; set; }
+    }
+
+    public class UpdateOfferEquipmentDTO : CreateOfferEquipmentDTO
+    {
     }
 
     // Terms DTOs
@@ -438,6 +530,10 @@ namespace SoitMed.DTO
         public DateTime? ExpectedDeliveryDate { get; set; }
         public string? CompletionNotes { get; set; }
         public string? FailureNotes { get; set; }
+        public string? ReportText { get; set; }
+        public string? ReportAttachments { get; set; }
+        public DateTime? ReportSubmittedAt { get; set; }
+        public DateTime? SentToLegalAt { get; set; }
     }
 
     public class DealSummaryDTO
@@ -534,6 +630,16 @@ namespace SoitMed.DTO
         [Required]
         [MaxLength(2000)]
         public string FailureNotes { get; set; } = string.Empty;
+    }
+
+    public class SubmitReportDTO
+    {
+        [Required(ErrorMessage = "Report text is required")]
+        [MaxLength(5000, ErrorMessage = "Report text cannot exceed 5000 characters")]
+        public string ReportText { get; set; } = string.Empty;
+
+        [MaxLength(2000, ErrorMessage = "Attachments JSON cannot exceed 2000 characters")]
+        public string? ReportAttachments { get; set; } // JSON array of file paths/URLs
     }
 
     public class RecordClientResponseDTO

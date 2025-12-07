@@ -160,6 +160,7 @@ namespace SoitMed.Services
                     Name = createDto.Name,
                     Model = createDto.Model,
                     Provider = createDto.Provider,
+                    ProviderImagePath = createDto.ProviderImagePath,
                     Country = createDto.Country,
                     Category = createDto.Category,
                     BasePrice = createDto.BasePrice,
@@ -203,6 +204,9 @@ namespace SoitMed.Services
 
                 if (updateDto.Provider != null)
                     product.Provider = updateDto.Provider;
+
+                if (updateDto.ProviderImagePath != null)
+                    product.ProviderImagePath = updateDto.ProviderImagePath;
 
                 if (updateDto.Country != null)
                     product.Country = updateDto.Country;
@@ -292,6 +296,106 @@ namespace SoitMed.Services
             }
         }
 
+        public async Task<ProductResponseDTO> UpdateProviderImageAsync(long id, string imagePath)
+        {
+            try
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(id);
+                if (product == null)
+                    throw new ArgumentException("Product not found", nameof(id));
+
+                product.ProviderImagePath = imagePath;
+                product.UpdatedAt = DateTime.UtcNow;
+
+                await _unitOfWork.Products.UpdateAsync(product);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Product provider image updated. ProductId: {ProductId}, ImagePath: {ImagePath}", id, imagePath);
+
+                return await MapToProductResponseDTO(product);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating provider image. ProductId: {ProductId}", id);
+                throw;
+            }
+        }
+
+        public async Task<ProductResponseDTO> UpdateDataSheetAsync(long id, string pdfPath)
+        {
+            try
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(id);
+                if (product == null)
+                    throw new ArgumentException("Product not found", nameof(id));
+
+                product.DataSheetPath = pdfPath;
+                product.UpdatedAt = DateTime.UtcNow;
+
+                await _unitOfWork.Products.UpdateAsync(product);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Product data sheet updated. ProductId: {ProductId}, PdfPath: {PdfPath}", id, pdfPath);
+
+                return await MapToProductResponseDTO(product);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating data sheet. ProductId: {ProductId}", id);
+                throw;
+            }
+        }
+
+        public async Task<ProductResponseDTO> UpdateCatalogAsync(long id, string pdfPath)
+        {
+            try
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(id);
+                if (product == null)
+                    throw new ArgumentException("Product not found", nameof(id));
+
+                product.CatalogPath = pdfPath;
+                product.UpdatedAt = DateTime.UtcNow;
+
+                await _unitOfWork.Products.UpdateAsync(product);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Product catalog updated. ProductId: {ProductId}, PdfPath: {PdfPath}", id, pdfPath);
+
+                return await MapToProductResponseDTO(product);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating catalog. ProductId: {ProductId}", id);
+                throw;
+            }
+        }
+
+        public async Task<ProductResponseDTO> UpdateInventoryQuantityAsync(long id, int inventoryQuantity)
+        {
+            try
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(id);
+                if (product == null)
+                    throw new ArgumentException("Product not found", nameof(id));
+
+                product.InventoryQuantity = inventoryQuantity;
+                product.UpdatedAt = DateTime.UtcNow;
+
+                await _unitOfWork.Products.UpdateAsync(product);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Product inventory quantity updated. ProductId: {ProductId}, InventoryQuantity: {InventoryQuantity}", id, inventoryQuantity);
+
+                return await MapToProductResponseDTO(product);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating inventory quantity. ProductId: {ProductId}", id);
+                throw;
+            }
+        }
+
         #region Private Mapping Methods
 
         private async Task<ProductResponseDTO> MapToProductResponseDTO(Product product)
@@ -302,17 +406,18 @@ namespace SoitMed.Services
                 Name = product.Name,
                 Model = product.Model,
                 Provider = product.Provider,
+                ProviderImagePath = product.ProviderImagePath,
                 Country = product.Country,
                 Category = product.Category,
                 BasePrice = product.BasePrice,
                 Description = product.Description,
                 ImagePath = product.ImagePath,
+                DataSheetPath = product.DataSheetPath,
+                CatalogPath = product.CatalogPath,
                 Year = product.Year,
                 InStock = product.InStock,
-                IsActive = product.IsActive,
-                CreatedBy = product.CreatedBy,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
+                InventoryQuantity = product.InventoryQuantity,
+                CreatedBy = product.CreatedBy
             };
 
             // Get creator name if available
@@ -337,17 +442,18 @@ namespace SoitMed.Services
                 Name = product.Name,
                 Model = product.Model,
                 Provider = product.Provider,
+                ProviderImagePath = product.ProviderImagePath,
                 Country = product.Country,
                 Category = product.Category,
                 BasePrice = product.BasePrice,
                 Description = product.Description,
                 ImagePath = product.ImagePath,
+                DataSheetPath = product.DataSheetPath,
+                CatalogPath = product.CatalogPath,
                 Year = product.Year,
                 InStock = product.InStock,
-                IsActive = product.IsActive,
-                CreatedBy = product.CreatedBy,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
+                InventoryQuantity = product.InventoryQuantity,
+                CreatedBy = product.CreatedBy
             };
 
             // Get creator name from pre-loaded dictionary

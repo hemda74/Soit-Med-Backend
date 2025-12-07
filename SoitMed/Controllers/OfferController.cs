@@ -166,10 +166,108 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
+        /// Get offers for the current customer (customer-facing endpoint)
+        /// </summary>
+        [HttpGet("customer-offers")]
+        [Authorize(Roles = "Customer,Doctor,Technician")]
+        public async Task<IActionResult> GetCustomerOffers([FromQuery] string? status = null)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                
+                // Try to parse userId as clientId (for customers, their userId often maps to clientId)
+                if (!long.TryParse(userId, out var clientId))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("Invalid user ID format"));
+                }
+
+                var result = await _offerService.GetOffersByClientAsync(clientId);
+
+                // Filter by status if provided
+                if (!string.IsNullOrEmpty(status))
+                {
+                    result = result.Where(o => o.Status == status).ToList();
+                }
+
+                // Only return offers that have been sent to the client (status = "Sent" or later)
+                result = result.Where(o => 
+                    o.Status == "Sent" || 
+                    o.Status == "Accepted" || 
+                    o.Status == "Rejected" || 
+                    o.Status == "Completed").ToList();
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Customer offers retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving customer offers");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving offers"));
+            }
+        }
+
+        /// <summary>
+        /// Get pending SalesManager approvals
+        /// </summary>
+        [HttpGet("pending-salesmanager-approvals")]
+        [Authorize(Roles = "SalesManager,SuperAdmin")]
+        public async Task<IActionResult> GetPendingSalesManagerApprovals()
+        {
+            try
+            {
+                var result = await _offerService.GetPendingSalesManagerApprovalsAsync();
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Pending SalesManager approvals retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving pending SalesManager approvals");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving pending SalesManager approvals"));
+            }
+        }
+
+        /// <summary>
+        /// Approve or reject an offer by SalesManager
+        /// </summary>
+        [HttpPost("{id}/salesmanager-approval")]
+        [Authorize(Roles = "SalesManager,SuperAdmin")]
+        public async Task<IActionResult> SalesManagerApproval(long id, [FromBody] ApproveOfferDTO approvalDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                }
+
+                var userId = GetCurrentUserId();
+                var result = await _offerService.SalesManagerApprovalAsync(id, approvalDto, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, approvalDto.Approved 
+                    ? "Offer approved successfully" 
+                    : "Offer rejected successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for SalesManager approval. OfferId: {OfferId}", id);
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for SalesManager approval. OfferId: {OfferId}", id);
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing SalesManager approval. OfferId: {OfferId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while processing SalesManager approval"));
+            }
+        }
+
+        /// <summary>
         /// Get offer by ID
         /// </summary>
         [HttpGet("{id}")]
-        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman,Customer")]
         public async Task<IActionResult> GetOffer(long id)
         {
             try
@@ -216,6 +314,42 @@ namespace SoitMed.Controllers
             {
                 _logger.LogError(ex, "Error creating offer");
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while creating offer"));
+            }
+        }
+
+        /// <summary>
+        /// Update offer (PATCH) - SalesManager can modify offers regardless of status
+        /// </summary>
+        [HttpPatch("{id}")]
+        [Authorize(Roles = "SalesManager,SuperAdmin")]
+        public async Task<IActionResult> UpdateOffer(long id, [FromBody] UpdateOfferDTO updateDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                }
+
+                var userId = GetCurrentUserId();
+                var result = await _offerService.UpdateOfferBySalesManagerAsync(id, updateDto, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer updated successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for updating offer. OfferId: {OfferId}", id);
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized attempt to update offer. OfferId: {OfferId}", id);
+                return Unauthorized(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating offer. OfferId: {OfferId}", id);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while updating offer"));
             }
         }
 
@@ -691,6 +825,37 @@ namespace SoitMed.Controllers
             {
                 _logger.LogError(ex, "Error marking offer as under review. OfferId: {OfferId}", offerId);
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while marking offer as under review"));
+            }
+        }
+
+        /// <summary>
+        /// Resume offer from under review back to sent status
+        /// </summary>
+        [HttpPost("{offerId}/resume-from-review")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
+        public async Task<IActionResult> ResumeFromUnderReview(long offerId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await _offerService.ResumeFromUnderReviewAsync(offerId, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer resumed from under review successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for resuming offer from under review. OfferId: {OfferId}", offerId);
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for resuming offer from under review. OfferId: {OfferId}", offerId);
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error resuming offer from under review. OfferId: {OfferId}", offerId);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while resuming offer from under review"));
             }
         }
 

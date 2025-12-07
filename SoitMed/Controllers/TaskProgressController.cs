@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SoitMed.Common;
@@ -18,15 +19,18 @@ namespace SoitMed.Controllers
     {
         private readonly ITaskProgressService _taskProgressService;
         private readonly ILogger<TaskProgressController> _logger;
+        private readonly IVoiceUploadService _voiceUploadService;
 
         public TaskProgressController(
             ITaskProgressService taskProgressService,
             ILogger<TaskProgressController> logger,
-            UserManager<ApplicationUser> userManager) 
+            UserManager<ApplicationUser> userManager,
+            IVoiceUploadService voiceUploadService) 
             : base(userManager)
         {
             _taskProgressService = taskProgressService;
             _logger = logger;
+            _voiceUploadService = voiceUploadService;
         }
 
         /// <summary>
@@ -62,6 +66,38 @@ namespace SoitMed.Controllers
             {
                 _logger.LogError(ex, "Error creating task progress");
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while creating task progress"));
+            }
+        }
+
+        /// <summary>
+        /// Upload a voice description file for task progress
+        /// </summary>
+        [HttpPost("upload-voice")]
+        [Authorize(Roles = "Salesman,SalesManager")]
+        [RequestSizeLimit(20 * 1024 * 1024)]
+        public async Task<IActionResult> UploadVoiceDescription([FromForm] IFormFile voiceFile)
+        {
+            try
+            {
+                if (voiceFile == null || voiceFile.Length == 0)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("Voice file is required"));
+                }
+
+                var userId = GetCurrentUserId();
+                var uploadResult = await _voiceUploadService.UploadVoiceFileAsync(voiceFile, userId);
+
+                if (!uploadResult.Success)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse(uploadResult.ErrorMessage ?? "Failed to upload voice file"));
+                }
+
+                return Ok(ResponseHelper.CreateSuccessResponse(uploadResult, "Voice file uploaded successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error uploading voice description");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while uploading voice file"));
             }
         }
 

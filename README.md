@@ -1,4 +1,4 @@
-# SoitMed Backend - Main Branch
+# SoitMed Backend - Dev Branch
 
 ## Business Overview
 
@@ -102,4 +102,155 @@ Real-time notifications for all system activities:
 - **Mobile Support**: Mobile applications for customers and engineers
 - **Flexible Payment Options**: Multiple payment methods to accommodate different customer preferences
 - **Equipment Lifecycle Management**: Complete tracking from purchase to maintenance
+
+---
+
+## Technical Implementation
+
+### Technology Stack
+
+- **Framework**: ASP.NET Core 8.0
+- **Database**: SQL Server with Entity Framework Core
+- **Authentication**: ASP.NET Core Identity with JWT tokens
+- **Real-time Communication**: SignalR for notifications
+- **API Documentation**: Swagger/OpenAPI
+- **Architecture**: Repository Pattern with Unit of Work
+- **Dependency Injection**: Built-in ASP.NET Core DI container
+
+### Architecture
+
+#### Repository Pattern
+- **Base Repository**: Generic repository with common CRUD operations
+- **Specific Repositories**: Specialized repositories for each entity with custom query methods
+- **Unit of Work**: Centralized transaction management and repository access
+
+#### Service Layer
+- **Business Logic**: All business logic encapsulated in service classes
+- **DTOs**: Data Transfer Objects for API communication
+- **Validation**: Input validation using Data Annotations and custom validators
+- **Mapping**: Entity to DTO mapping using MappingService
+
+#### Controllers
+- **RESTful APIs**: RESTful endpoints following REST conventions
+- **Authorization**: Role-based authorization using [Authorize] attributes
+- **Response Format**: Consistent response format using BaseController helpers
+
+### Database Design
+
+#### Key Models
+
+**Maintenance Module:**
+- `MaintenanceRequest`: Core maintenance request entity
+- `MaintenanceVisit`: Engineer visit records
+- `MaintenanceRequestAttachment`: File attachments (images, videos, audio)
+- `SparePartRequest`: Spare part requests with availability tracking
+- `MaintenanceRequestRating`: Customer ratings for engineers
+
+**Payment Module:**
+- `Payment`: Payment records with multiple payment methods
+- `PaymentTransaction`: Transaction history for each payment
+- `PaymentGatewayConfig`: Configuration for payment gateways
+
+**Sales Module:**
+- `Client`: Client information
+- `Offer`: Sales offers with equipment and terms
+- `Deal`: Closed deals
+- `SalesOffer`: Enhanced offer management
+- `WeeklyPlan`: Salesman weekly planning
+- `TaskProgress`: Task tracking
+
+**Equipment:**
+- `Equipment`: Equipment information with QR codes
+- Supports linking to hospitals or customers directly
+
+### Key Features Implementation
+
+#### Auto-Assignment Logic
+- Engineers assigned automatically based on:
+  - Equipment location (hospital location)
+  - Engineer governorate assignments
+  - Current workload (round-robin with least active requests)
+- Falls back to manual assignment if no engineers available
+
+#### File Upload Service
+- `MaintenanceAttachmentService`: Handles file uploads for maintenance requests
+- Supports multiple file types: Images (JPG, PNG, GIF), Videos (MP4, AVI, MOV), Audio (MP3, WAV), Documents (PDF, DOC)
+- File size limits: Images (10MB), Videos (100MB), Audio (20MB), Documents (10MB)
+- Files stored in `wwwroot/maintenance-requests/{requestId}/attachments/`
+
+#### Payment Processing
+- `PaymentService`: Handles payment creation and processing
+- Supports multiple payment methods:
+  - Stripe integration (ready for API integration)
+  - PayPal integration (ready for API integration)
+  - Local payment gateways (Fawry, Paymob, etc.)
+  - Cash payments (requires accounting confirmation)
+  - Bank transfers (requires accounting confirmation)
+- `AccountingService`: Handles payment confirmation and rejection
+
+#### Notification System
+- `NotificationService`: Centralized notification management
+- `SignalR Hub`: Real-time notifications via WebSocket
+- `MobileNotificationService`: Push notifications for mobile apps
+- Notifications sent at each workflow step:
+  - Request creation → Maintenance Support
+  - Assignment → Engineer
+  - Visit completion → Maintenance Support
+  - Spare part requests → Coordinators
+  - Price setting → Customers
+  - Payment status → Customers and Accounting
+
+### API Endpoints
+
+#### Maintenance Module
+- `GET /api/MaintenanceRequest` - Get all requests (filtered by role)
+- `POST /api/MaintenanceRequest` - Create new request
+- `GET /api/MaintenanceRequest/{id}` - Get request details
+- `PUT /api/MaintenanceRequest/{id}/assign` - Assign to engineer
+- `POST /api/MaintenanceVisit` - Create visit
+- `GET /api/MaintenanceVisit/request/{requestId}` - Get visits for request
+- `POST /api/SparePartRequest` - Create spare part request
+- `PUT /api/SparePartRequest/{id}/set-price` - Set customer price
+- `POST /api/MaintenanceAttachment/upload` - Upload attachment
+- `GET /api/MaintenanceAttachment/request/{requestId}` - Get attachments
+
+#### Payment Module
+- `POST /api/Payment` - Create payment
+- `POST /api/Payment/{id}/stripe` - Process Stripe payment
+- `POST /api/Payment/{id}/paypal` - Process PayPal payment
+- `POST /api/Payment/{id}/cash` - Record cash payment
+- `POST /api/Payment/{id}/bank-transfer` - Record bank transfer
+- `POST /api/Accounting/{paymentId}/confirm` - Confirm payment
+- `POST /api/Accounting/{paymentId}/reject` - Reject payment
+- `GET /api/Accounting/dashboard` - Get accounting dashboard
+
+### Database Migrations
+
+- Migration: `MaintenanceAndPaymentModule`
+- Includes all new tables for maintenance and payment modules
+- Foreign key relationships configured with proper cascade behaviors
+- Check constraints for data integrity (e.g., Equipment must be linked to either hospital or customer, not both)
+
+### Security
+
+- **Authentication**: JWT token-based authentication
+- **Authorization**: Role-based authorization with [Authorize(Roles = "...")] attributes
+- **Input Validation**: Data annotations and custom validators
+- **SQL Injection Protection**: Entity Framework Core parameterized queries
+- **File Upload Security**: File type and size validation
+
+### Testing
+
+- All endpoints tested and verified
+- Migration tested and applied successfully
+- Auto-assignment logic tested
+- File upload functionality tested
+- Payment processing flow tested
+
+### Deployment Notes
+
+- Database migration must be applied before deployment
+- File upload directories must have write permissions
+- Payment gateway credentials must be configured in appsettings
+- SignalR requires WebSocket support on server
 

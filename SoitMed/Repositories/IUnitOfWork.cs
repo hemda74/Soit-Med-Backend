@@ -22,23 +22,59 @@ namespace SoitMed.Repositories
         // Equipment repositories
         IEquipmentRepository Equipment { get; }
         IRepairRequestRepository RepairRequests { get; }
+        
+        // Maintenance repositories
+        IMaintenanceRequestRepository MaintenanceRequests { get; }
+        IMaintenanceVisitRepository MaintenanceVisits { get; }
+        ISparePartRequestRepository SparePartRequests { get; }
+        IMaintenanceRequestAttachmentRepository MaintenanceRequestAttachments { get; }
+        
+        // Payment repositories
+        IPaymentRepository Payments { get; }
 
         // Identity repositories
         IApplicationUserRepository Users { get; }
         IUserImageRepository UserImages { get; }
 
-        // Sales report repository (Legacy)
-        ISalesReportRepository SalesReports { get; }
-
-        // Weekly plan repositories (New system)
-        IWeeklyPlanRepository WeeklyPlans { get; }
-        IWeeklyPlanTaskRepository WeeklyPlanTasks { get; }
-        IDailyProgressRepository DailyProgresses { get; }
-
         // Sales funnel repositories
         IActivityLogRepository ActivityLogs { get; }
         IDealRepository Deals { get; }
         IOfferRepository Offers { get; }
+
+        // Workflow and notification repositories
+        IRequestWorkflowRepository RequestWorkflows { get; }
+        INotificationRepository Notifications { get; }
+
+        // Client tracking repositories
+        IClientRepository Clients { get; }
+        IClientVisitRepository ClientVisits { get; }
+        IClientInteractionRepository ClientInteractions { get; }
+        IClientAnalyticsRepository ClientAnalytics { get; }
+
+        // Weekly planning repositories
+        IWeeklyPlanRepository WeeklyPlans { get; }
+        IWeeklyPlanTaskRepository WeeklyPlanTasks { get; }
+        ITaskProgressRepository TaskProgresses { get; }
+        IOfferRequestRepository OfferRequests { get; }
+        ISalesOfferRepository SalesOffers { get; }
+        ISalesDealRepository SalesDeals { get; }
+
+        // Chat repositories
+        IChatConversationRepository ChatConversations { get; }
+        IChatMessageRepository ChatMessages { get; }
+        
+        // Enhanced offer repositories
+        IOfferEquipmentRepository OfferEquipment { get; }
+        IOfferTermsRepository OfferTerms { get; }
+        IInstallmentPlanRepository InstallmentPlans { get; }
+        IRecentOfferActivityRepository RecentOfferActivities { get; }
+
+        // Salesman targets repository
+        ISalesmanTargetRepository SalesmanTargets { get; }
+
+        // Products catalog repositories
+        IProductRepository Products { get; }
+        IProductCategoryRepository ProductCategories { get; }
 
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -46,7 +82,7 @@ namespace SoitMed.Repositories
         Task CommitTransactionAsync(CancellationToken cancellationToken = default);
         Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
         
-        // Context access for execution strategy
+        // Context access
         Context GetContext();
     }
 }

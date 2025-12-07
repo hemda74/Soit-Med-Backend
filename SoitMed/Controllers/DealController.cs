@@ -64,7 +64,7 @@ namespace SoitMed.Controllers
         /// Get all deals
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin,Admin,admin")]
         public async Task<IActionResult> GetDeals([FromQuery] string? status = null, [FromQuery] string? salesmanId = null)
         {
             try
@@ -87,7 +87,7 @@ namespace SoitMed.Controllers
         /// Get deal by ID
         /// </summary>
         [HttpGet("{id}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin,Admin,admin")]
         public async Task<IActionResult> GetDeal(long id)
         {
             try
@@ -139,13 +139,13 @@ namespace SoitMed.Controllers
         /// Get deals by client
         /// </summary>
         [HttpGet("by-client/{clientId}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin,Admin,admin")]
         public async Task<IActionResult> GetDealsByClient(long clientId)
         {
             try
             {
                 var userId = GetCurrentUserId();
-                var userRole = "Salesman"; // This should be replaced with actual role checking
+                var userRole = GetCurrentUserRole();
                 
                 var result = await _dealService.GetDealsByClientAsync(clientId, userId, userRole);
 
@@ -344,6 +344,98 @@ namespace SoitMed.Controllers
             {
                 _logger.LogError(ex, "Error failing deal");
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while failing deal"));
+            }
+        }
+
+        /// <summary>
+        /// Mark client account as created (by Admin)
+        /// </summary>
+        [HttpPost("{id}/mark-account-created")]
+        [Authorize(Roles = "Admin,admin,SuperAdmin")]
+        public async Task<IActionResult> MarkClientAccountCreated(long id)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await _dealService.MarkClientAccountCreatedAsync(id, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Client account marked as created successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for marking account created");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for marking account created");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking account as created");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while marking account as created"));
+            }
+        }
+
+        /// <summary>
+        /// Submit salesman report
+        /// </summary>
+        [HttpPost("{id}/submit-report")]
+        [Authorize(Roles = "Salesman")]
+        public async Task<IActionResult> SubmitSalesmanReport(long id, [FromBody] SubmitReportDTO reportDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                }
+
+                var userId = GetCurrentUserId();
+                var result = await _dealService.SubmitSalesmanReportAsync(id, reportDto.ReportText, reportDto.ReportAttachments, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Report submitted successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for submitting report");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access for submitting report");
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for submitting report");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting report");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while submitting report"));
+            }
+        }
+
+        /// <summary>
+        /// Get deals for legal department
+        /// </summary>
+        [HttpGet("legal")]
+        [Authorize(Roles = "LegalManager,LegalEmployee")]
+        public async Task<IActionResult> GetDealsForLegal()
+        {
+            try
+            {
+                var result = await _dealService.GetDealsForLegalAsync();
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Legal deals retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving legal deals");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving legal deals"));
             }
         }
     }

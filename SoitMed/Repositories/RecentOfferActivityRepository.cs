@@ -17,6 +17,14 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
+        public async Task<IReadOnlyList<RecentOfferActivity>> GetActivitiesByOfferIdAsync(long offerId, CancellationToken cancellationToken = default)
+        {
+            return await _context.RecentOfferActivities
+                .Where(a => a.OfferId == offerId)
+                .OrderByDescending(a => a.ActivityTimestamp)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task MaintainMaxActivitiesAsync(int maxCount, CancellationToken cancellationToken = default)
         {
             var totalCount = await _context.RecentOfferActivities.CountAsync(cancellationToken);

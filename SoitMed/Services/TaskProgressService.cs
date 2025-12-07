@@ -54,6 +54,7 @@ namespace SoitMed.Services
                     ProgressType = createDto.ProgressType,
                     Description = createDto.Description,
                     Notes = createDto.Notes,
+					VoiceDescriptionUrl = createDto.VoiceDescriptionUrl,
                     VisitResult = createDto.VisitResult,
                     NotInterestedComment = createDto.NotInterestedComment,
                     NextStep = createDto.NextStep,
@@ -153,6 +154,7 @@ namespace SoitMed.Services
                     ProgressType = createDto.ProgressType,
                     Description = createDto.Description,
                     Notes = createDto.Notes,
+					VoiceDescriptionUrl = createDto.VoiceDescriptionUrl,
                     VisitResult = createDto.VisitResult,
                     NotInterestedComment = createDto.NotInterestedComment,
                     NextStep = createDto.NextStep,
@@ -291,8 +293,8 @@ namespace SoitMed.Services
 
                 foreach (var progress in progresses)
                 {
-                    // Check authorization - only show if user is the progress creator or has manager role
-                    if (userRole == "SuperAdmin" || progress.EmployeeId == userId)
+                    // Check authorization - SuperAdmin and SalesManager can see all progress, Salesman can only see their own
+                    if (userRole == "SuperAdmin" || userRole == "SalesManager" || progress.EmployeeId == userId)
                     {
                         result.Add(await MapToResponseDTO(progress));
                     }
@@ -365,6 +367,7 @@ namespace SoitMed.Services
                 progress.ProgressType = updateDto.ProgressType;
                 progress.Description = updateDto.Description;
                 progress.Notes = updateDto.Notes;
+				progress.VoiceDescriptionUrl = updateDto.VoiceDescriptionUrl;
                 progress.VisitResult = updateDto.VisitResult;
                 progress.NotInterestedComment = updateDto.NotInterestedComment;
                 progress.NextStep = updateDto.NextStep;
@@ -515,6 +518,7 @@ namespace SoitMed.Services
                 ProgressDate = progress.ProgressDate,
                 ProgressType = progress.ProgressType,
                 Description = progress.Description,
+				VoiceDescriptionUrl = progress.VoiceDescriptionUrl,
                 VisitResult = progress.VisitResult,
                 NotInterestedComment = progress.NotInterestedComment,
                 NextStep = progress.NextStep,

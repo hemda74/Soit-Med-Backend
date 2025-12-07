@@ -40,16 +40,39 @@ namespace SoitMed.Services
         {
             try
             {
-                var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId);
-                if (offerRequest == null)
-                    throw new ArgumentException("Offer request not found", nameof(createOfferDto.OfferRequestId));
+                // If OfferRequestId is provided, validate and link it
+                OfferRequest? offerRequest = null;
+                string assignedTo = createOfferDto.AssignedTo;
+
+                if (createOfferDto.OfferRequestId.HasValue)
+                {
+                    offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId.Value);
+                    if (offerRequest == null)
+                        throw new ArgumentException("Offer request not found", nameof(createOfferDto.OfferRequestId));
+
+                    // Determine who the offer should be assigned to:
+                    // - If AssignedTo is provided in DTO, use it (SalesSupport can assign to specific Salesman/Customer)
+                    // - Otherwise, assign to the requester (Salesman or Customer who created the request)
+                    if (string.IsNullOrEmpty(assignedTo))
+                    {
+                        assignedTo = offerRequest.RequestedBy;
+                    }
+                }
+                else
+                {
+                    // If no OfferRequestId, AssignedTo must be provided
+                    if (string.IsNullOrEmpty(createOfferDto.AssignedTo))
+                        throw new ArgumentException("AssignedTo is required when OfferRequestId is not provided", nameof(createOfferDto.AssignedTo));
+                    
+                    assignedTo = createOfferDto.AssignedTo;
+                }
 
                 var offer = new SalesOffer
                 {
                     OfferRequestId = createOfferDto.OfferRequestId,
                     ClientId = createOfferDto.ClientId,
-                    CreatedBy = userId,
-                    AssignedTo = createOfferDto.AssignedTo,
+                    CreatedBy = userId, // SalesSupport/SalesManager who creates the offer
+                    AssignedTo = assignedTo, // Salesman or Customer who requested it
                     Products = createOfferDto.Products,
                     TotalAmount = createOfferDto.TotalAmount,
                     PaymentTerms = createOfferDto.PaymentTerms != null && createOfferDto.PaymentTerms.Count > 0 
@@ -68,10 +91,15 @@ namespace SoitMed.Services
                     PaymentType = createOfferDto.PaymentType,
                     FinalPrice = createOfferDto.FinalPrice,
                     OfferDuration = createOfferDto.OfferDuration,
-                    Status = "Draft"
+                    Status = OfferStatus.PendingSalesManagerApproval // Require SalesManager approval before sending to Salesman
                 };
 
                 await _unitOfWork.SalesOffers.CreateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Mark offer as pending SalesManager approval
+                offer.MarkAsPendingSalesManagerApproval();
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
                 await _unitOfWork.SaveChangesAsync();
 
                 // Save recent activity for new offer creation (from request)
@@ -89,10 +117,25 @@ namespace SoitMed.Services
                     _logger.LogWarning(equipEx, "Failed to auto-add equipment to offer {OfferId}", offer.Id);
                 }
 
-                // Update offer request status and link the created offer
-                offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
-                await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
-                await _unitOfWork.SaveChangesAsync();
+                // Update offer request status and link the created offer (if linked to a request)
+                if (offerRequest != null)
+                {
+                    offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
+                    await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+
+                // Send notification to all SalesManager users for approval
+                try
+                {
+                    await SendSalesManagerApprovalNotificationAsync(offer);
+                    _logger.LogInformation("SalesManager approval notification sent for offer. OfferId: {OfferId}", offer.Id);
+                }
+                catch (Exception notifEx)
+                {
+                    // Log but don't fail offer creation
+                    _logger.LogWarning(notifEx, "Failed to send SalesManager approval notification for offer {OfferId}", offer.Id);
+                }
 
                 _logger.LogInformation("Offer created from request successfully. OfferId: {OfferId}, RequestId: {RequestId}", 
                     offer.Id, createOfferDto.OfferRequestId);
@@ -110,77 +153,8 @@ namespace SoitMed.Services
         {
             try
             {
-                var offer = new SalesOffer
-                {
-                    OfferRequestId = createOfferDto.OfferRequestId,
-                    ClientId = createOfferDto.ClientId,
-                    CreatedBy = userId,
-                    AssignedTo = createOfferDto.AssignedTo,
-                    Products = createOfferDto.Products,
-                    TotalAmount = createOfferDto.TotalAmount,
-                    PaymentTerms = createOfferDto.PaymentTerms != null && createOfferDto.PaymentTerms.Count > 0 
-                        ? JsonSerializer.Serialize(createOfferDto.PaymentTerms) 
-                        : null,
-                    DeliveryTerms = createOfferDto.DeliveryTerms != null && createOfferDto.DeliveryTerms.Count > 0 
-                        ? JsonSerializer.Serialize(createOfferDto.DeliveryTerms) 
-                        : null,
-                    WarrantyTerms = createOfferDto.WarrantyTerms != null && createOfferDto.WarrantyTerms.Count > 0 
-                        ? JsonSerializer.Serialize(createOfferDto.WarrantyTerms) 
-                        : null,
-                    ValidUntil = createOfferDto.ValidUntil != null && createOfferDto.ValidUntil.Count > 0 
-                        ? JsonSerializer.Serialize(createOfferDto.ValidUntil) 
-                        : null,
-                    Notes = createOfferDto.Notes,
-                    PaymentType = createOfferDto.PaymentType,
-                    FinalPrice = createOfferDto.FinalPrice,
-                    OfferDuration = createOfferDto.OfferDuration,
-                    Status = "Draft"
-                };
-
-                await _unitOfWork.SalesOffers.CreateAsync(offer);
-                await _unitOfWork.SaveChangesAsync();
-
-                // Save recent activity for new offer creation
-                await SaveRecentActivityAsync(offer, null);
-
-                // Auto-add equipment based on products
-                try
-                {
-                    await AutoAddEquipmentFromProductsAsync(offer.Id, createOfferDto.Products);
-                    _logger.LogInformation("Equipment auto-added to offer. OfferId: {OfferId}", offer.Id);
-                }
-                catch (Exception equipEx)
-                {
-                    // Log but don't fail offer creation
-                    _logger.LogWarning(equipEx, "Failed to auto-add equipment to offer {OfferId}", offer.Id);
-                }
-
-                // Update offer request if linked
-                if (createOfferDto.OfferRequestId.HasValue)
-                {
-                    try
-                    {
-                        var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId.Value);
-                        if (offerRequest != null)
-                        {
-                            offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
-                            await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
-                            await _unitOfWork.SaveChangesAsync();
-                            _logger.LogInformation("Offer request updated with created offer ID. RequestId: {RequestId}, OfferId: {OfferId}", 
-                                createOfferDto.OfferRequestId.Value, offer.Id);
-                        }
-                    }
-                    catch (Exception requestEx)
-                    {
-                        // Log but don't fail offer creation
-                        _logger.LogWarning(requestEx, "Failed to update offer request {RequestId} with created offer ID", 
-                            createOfferDto.OfferRequestId.Value);
-                    }
-                }
-
-                _logger.LogInformation("Offer created successfully. OfferId: {OfferId}", offer.Id);
-
-                return await MapToOfferResponseDTO(offer);
+                // Use CreateOfferFromRequestAsync - it handles both with and without OfferRequestId
+                return await CreateOfferFromRequestAsync(createOfferDto, userId);
             }
             catch (Exception ex)
             {
@@ -193,12 +167,30 @@ namespace SoitMed.Services
         {
             try
             {
+                // REQUIRE OfferRequestId - offers can only be created from requests
+                if (!createOfferDto.OfferRequestId.HasValue)
+                {
+                    throw new ArgumentException("OfferRequestId is required. Offers can only be created from offer requests initiated by Salesman or Customer.", nameof(createOfferDto.OfferRequestId));
+                }
+
+                // Get the offer request to link the offer properly
+                var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId.Value);
+                if (offerRequest == null)
+                    throw new ArgumentException("Offer request not found", nameof(createOfferDto.OfferRequestId));
+
+                // Determine who the offer should be assigned to:
+                // - If AssignedTo is provided in DTO, use it (SalesSupport can assign to specific Salesman/Customer)
+                // - Otherwise, assign to the requester (Salesman or Customer who created the request)
+                var assignedTo = !string.IsNullOrEmpty(createOfferDto.AssignedTo) 
+                    ? createOfferDto.AssignedTo 
+                    : offerRequest.RequestedBy;
+
                 var offer = new SalesOffer
                 {
-                    OfferRequestId = createOfferDto.OfferRequestId,
+                    OfferRequestId = createOfferDto.OfferRequestId, // REQUIRED - link to offer request
                     ClientId = createOfferDto.ClientId,
-                    CreatedBy = userId,
-                    AssignedTo = createOfferDto.AssignedTo,
+                    CreatedBy = userId, // SalesSupport/SalesManager who creates the offer
+                    AssignedTo = assignedTo, // Salesman or Customer who requested it
                     Products = string.Join(", ", createOfferDto.Products.Select(p => p.Name)),
                     TotalAmount = createOfferDto.TotalAmount,
                     PaymentTerms = createOfferDto.PaymentTerms != null && createOfferDto.PaymentTerms.Count > 0 
@@ -217,10 +209,15 @@ namespace SoitMed.Services
                     PaymentType = createOfferDto.PaymentType,
                     FinalPrice = createOfferDto.FinalPrice,
                     OfferDuration = createOfferDto.OfferDuration,
-                    Status = "Draft"
+                    Status = OfferStatus.PendingSalesManagerApproval // Require SalesManager approval before sending to Salesman
                 };
 
                 await _unitOfWork.SalesOffers.CreateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Mark offer as pending SalesManager approval
+                offer.MarkAsPendingSalesManagerApproval();
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
                 await _unitOfWork.SaveChangesAsync();
 
                 // Save recent activity for new offer creation
@@ -240,7 +237,8 @@ namespace SoitMed.Services
                         Price = item.Price,
                         Description = item.Description,
                         InStock = item.InStock,
-                        ImagePath = !string.IsNullOrWhiteSpace(item.ImageUrl) ? item.ImageUrl : $"offers/{offer.Id}/equipment-placeholder.png"
+                        ImagePath = !string.IsNullOrWhiteSpace(item.ImageUrl) ? item.ImageUrl : $"offers/{offer.Id}/equipment-placeholder.png",
+                        ProviderImagePath = item.ProviderImagePath
                     };
 
                     await _unitOfWork.OfferEquipment.CreateAsync(equipment);
@@ -248,17 +246,10 @@ namespace SoitMed.Services
 
                 await _unitOfWork.SaveChangesAsync();
 
-                // Update offer request if linked
-                if (createOfferDto.OfferRequestId.HasValue)
-                {
-                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(createOfferDto.OfferRequestId.Value);
-                    if (offerRequest != null)
-                    {
-                        offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
-                        await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
-                        await _unitOfWork.SaveChangesAsync();
-                    }
-                }
+                // Update offer request status and link the created offer (REQUIRED - always linked)
+                offerRequest.MarkAsCompleted($"Offer created with ID: {offer.Id}", offer.Id);
+                await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
+                await _unitOfWork.SaveChangesAsync();
 
                 _logger.LogInformation("Offer with items created successfully. OfferId: {OfferId}", offer.Id);
 
@@ -320,6 +311,29 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting offers by salesman. SalesmanId: {SalesmanId}", salesmanId);
+                throw;
+            }
+        }
+
+        public async Task<List<OfferResponseDTO>> GetOffersByCustomerAsync(string customerId)
+        {
+            try
+            {
+                if (!long.TryParse(customerId, out var clientId))
+                {
+                    throw new ArgumentException("CustomerId must be a numeric value that maps to ClientId.", nameof(customerId));
+                }
+
+                // OPTIMIZED: Single method call loads offers + related data in O(1) queries (3 queries total)
+                var (offers, clientsDict, usersDict) = await _unitOfWork.SalesOffers
+                    .GetOffersByClientIdWithRelatedDataAsync(clientId);
+
+                // Map synchronously using pre-loaded data - O(n) in-memory operation
+                return offers.Select(o => MapToOfferResponseDTO(o, clientsDict, usersDict)).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting offers by customer. CustomerId: {CustomerId}", customerId);
                 throw;
             }
         }
@@ -434,6 +448,10 @@ namespace SoitMed.Services
                 if (!offer.CanBeModified())
                     throw new InvalidOperationException("Only draft or needs-modification offers can be updated");
 
+                // If offer was in NeedsModification, automatically change to Draft after update
+                // This ensures the workflow: NeedsModification -> (SalesSupport edits) -> Draft -> PendingSalesManagerApproval -> Sent
+                bool wasNeedsModification = offer.Status == OfferStatus.NeedsModification;
+
                 offer.Products = updateOfferDto.Products;
                 offer.TotalAmount = updateOfferDto.TotalAmount;
                 offer.PaymentTerms = updateOfferDto.PaymentTerms != null && updateOfferDto.PaymentTerms.Count > 0 
@@ -450,6 +468,13 @@ namespace SoitMed.Services
                     : null;
                 offer.Notes = updateOfferDto.Notes;
                 offer.UpdatedAt = DateTime.UtcNow;
+
+                // Automatically change from NeedsModification to Draft when SalesSupport updates
+                if (wasNeedsModification)
+                {
+                    offer.Status = OfferStatus.Draft;
+                    _logger.LogInformation("Offer automatically changed from NeedsModification to Draft after update. OfferId: {OfferId}", offerId);
+                }
 
                 await _unitOfWork.SalesOffers.UpdateAsync(offer);
                 await _unitOfWork.SaveChangesAsync();
@@ -471,6 +496,95 @@ namespace SoitMed.Services
             }
         }
 
+        /// <summary>
+        /// Update offer by SalesManager - allows modification regardless of status
+        /// </summary>
+        public async Task<OfferResponseDTO> UpdateOfferBySalesManagerAsync(long offerId, UpdateOfferDTO updateDto, string userId)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    throw new ArgumentException("Offer not found", nameof(offerId));
+
+                // Verify user is SalesManager or SuperAdmin
+                var user = await _unitOfWork.Users.GetByIdAsync(userId);
+                if (user == null)
+                    throw new UnauthorizedAccessException("User not found");
+
+                var userRoles = await _userManager.GetRolesAsync(user);
+                bool isSalesManager = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin");
+                
+                if (!isSalesManager)
+                    throw new UnauthorizedAccessException("Only SalesManager or SuperAdmin can update offers using this method");
+
+                // Store old status to track changes
+                var oldStatus = offer.Status;
+
+                // Update only provided fields (PATCH semantics)
+                if (updateDto.ClientId.HasValue)
+                    offer.ClientId = updateDto.ClientId.Value;
+
+                if (!string.IsNullOrEmpty(updateDto.AssignedTo))
+                    offer.AssignedTo = updateDto.AssignedTo;
+
+                if (!string.IsNullOrEmpty(updateDto.Products))
+                    offer.Products = updateDto.Products;
+
+                if (updateDto.TotalAmount.HasValue)
+                    offer.TotalAmount = updateDto.TotalAmount.Value;
+
+                if (updateDto.PaymentTerms != null)
+                    offer.PaymentTerms = updateDto.PaymentTerms.Count > 0 
+                        ? JsonSerializer.Serialize(updateDto.PaymentTerms) 
+                        : null;
+
+                if (updateDto.DeliveryTerms != null)
+                    offer.DeliveryTerms = updateDto.DeliveryTerms.Count > 0 
+                        ? JsonSerializer.Serialize(updateDto.DeliveryTerms) 
+                        : null;
+
+                if (updateDto.WarrantyTerms != null)
+                    offer.WarrantyTerms = updateDto.WarrantyTerms.Count > 0 
+                        ? JsonSerializer.Serialize(updateDto.WarrantyTerms) 
+                        : null;
+
+                if (updateDto.ValidUntil != null)
+                    offer.ValidUntil = updateDto.ValidUntil.Count > 0 
+                        ? JsonSerializer.Serialize(updateDto.ValidUntil) 
+                        : null;
+
+                if (updateDto.Notes != null)
+                    offer.Notes = updateDto.Notes;
+
+                if (!string.IsNullOrEmpty(updateDto.PaymentType))
+                    offer.PaymentType = updateDto.PaymentType;
+
+                if (updateDto.FinalPrice.HasValue)
+                    offer.FinalPrice = updateDto.FinalPrice.Value;
+
+                if (!string.IsNullOrEmpty(updateDto.OfferDuration))
+                    offer.OfferDuration = updateDto.OfferDuration;
+
+                offer.UpdatedAt = DateTime.UtcNow;
+
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Save recent activity
+                await SaveRecentActivityAsync(offer, oldStatus);
+
+                _logger.LogInformation("Offer updated by SalesManager. OfferId: {OfferId}, UpdatedBy: {UserId}", offerId, userId);
+
+                return await MapToOfferResponseDTO(offer);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating offer by SalesManager. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
         public async Task<OfferResponseDTO> SendToSalesmanAsync(long offerId, string userId)
         {
             try
@@ -483,14 +597,37 @@ namespace SoitMed.Services
                 var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
                 var clientName = client?.Name ?? "Unknown Client";
 
-                offer.MarkAsSent();
-                await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                // Check if offer can be sent to salesman
+                // Only allow if offer has been approved by SalesManager (status is "Sent")
+                if (offer.Status != OfferStatus.Sent)
+                {
+                    var errorMessage = offer.Status == OfferStatus.PendingSalesManagerApproval
+                        ? "Offer must be approved by SalesManager before it can be sent to salesman. Current status: PendingSalesManagerApproval"
+                        : $"Only approved (Sent) offers can be sent to salesman. Current status: {offer.Status}";
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                // Check if assigned user is Customer or Salesman
+                var assignedUser = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
+                var assignedUserRoles = assignedUser != null ? await _userManager.GetRolesAsync(assignedUser) : new List<string>();
+                bool isCustomer = assignedUserRoles.Contains("Customer");
+                bool isSalesman = assignedUserRoles.Contains("Salesman");
+
+                // Store old status for activity tracking
+                var wasEverSent = offer.SentToClientAt.HasValue;
+                var previousStatusForActivity = wasEverSent
+                    ? offer.Status
+                    : OfferStatus.PendingSalesManagerApproval;
+
+                    offer.SentToClientAt = DateTime.UtcNow;
+                    offer.UpdatedAt = DateTime.UtcNow;
+                    await _unitOfWork.SalesOffers.UpdateAsync(offer);
                 
-                // Update OfferRequest status to Sent
+                // Update OfferRequest status to Sent (if linked to a request)
                 if (offer.OfferRequestId.HasValue)
                 {
                     var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId.Value);
-                    if (offerRequest != null)
+                    if (offerRequest != null && offerRequest.Status != "Sent")
                     {
                         offerRequest.MarkAsSent();
                         await _unitOfWork.OfferRequests.UpdateAsync(offerRequest);
@@ -499,24 +636,31 @@ namespace SoitMed.Services
                 
                 await _unitOfWork.SaveChangesAsync();
 
-                // Save recent activity (status changed to Sent)
-                await SaveRecentActivityAsync(offer, "Draft");
+                // Save recent activity (status changed to Sent, or resend if already Sent)
+                await SaveRecentActivityAsync(offer, previousStatusForActivity);
+
+                if (wasEverSent)
+                {
+                    _logger.LogInformation("Offer {OfferId} notification resent to salesman. Previous status was already Sent.", offerId);
+                }
 
                 _logger.LogInformation("Offer sent to salesman successfully. OfferId: {OfferId}", offerId);
 
-                // Send notification to salesman
+                // Send notification to assigned user (Salesman or Customer)
                 if (!string.IsNullOrEmpty(offer.AssignedTo))
                 {
                     try
                     {
-                        var salesman = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
-                        if (salesman != null && salesman.IsActive)
+                        // Reuse the assignedUser variable from above
+                        if (assignedUser != null && assignedUser.IsActive)
                         {
                             var creatorInfo = await _unitOfWork.Users.GetByIdAsync(userId);
                             var creatorName = creatorInfo != null ? $"{creatorInfo.FirstName} {creatorInfo.LastName}" : "Sales Support";
 
-                            var notificationTitle = "New Offer Available";
-                            var notificationMessage = $"{creatorName} has sent you an offer for {clientName}. Total: {offer.TotalAmount:C}";
+                            var notificationTitle = isCustomer ? "New Offer Received" : "New Offer Available";
+                            var notificationMessage = isCustomer
+                                ? $"You have received a new offer for {clientName}. Total: {offer.TotalAmount:C}"
+                                : $"{creatorName} has sent you an offer for {clientName}. Total: {offer.TotalAmount:C}";
 
                             // Add offerId to metadata for easy navigation
                             var metadata = new Dictionary<string, object>
@@ -539,22 +683,23 @@ namespace SoitMed.Services
                                 CancellationToken.None
                             );
 
-                            _logger.LogInformation("✅ Notification sent to Salesman: {SalesmanId} for Offer: {OfferId}", offer.AssignedTo, offerId);
+                            var userType = isCustomer ? "Customer" : "Salesman";
+                            _logger.LogInformation("  Notification sent to {UserType}: {UserId} for Offer: {OfferId}", userType, offer.AssignedTo, offerId);
                         }
                         else
                         {
-                            _logger.LogWarning("⚠️ Salesman {SalesmanId} not found or inactive. Notification not sent for Offer: {OfferId}", offer.AssignedTo, offerId);
+                            _logger.LogWarning("⚠️ Assigned user {UserId} not found or inactive. Notification not sent for Offer: {OfferId}", offer.AssignedTo, offerId);
                         }
                     }
                     catch (Exception notifEx)
                     {
-                        _logger.LogError(notifEx, "❌ Failed to send notification to Salesman {SalesmanId} for Offer: {OfferId}", offer.AssignedTo, offerId);
+                        _logger.LogError(notifEx, "❌ Failed to send notification to assigned user {UserId} for Offer: {OfferId}", offer.AssignedTo, offerId);
                         // Don't fail the whole operation if notification fails
                     }
                 }
                 else
                 {
-                    _logger.LogWarning("⚠️ Offer {OfferId} has no assigned salesman. Notification not sent.", offerId);
+                    _logger.LogWarning("⚠️ Offer {OfferId} has no assigned user. Notification not sent.", offerId);
                 }
 
                 return await MapToOfferResponseDTO(offer);
@@ -566,6 +711,160 @@ namespace SoitMed.Services
             }
         }
 
+        public async Task<OfferResponseDTO> SalesManagerApprovalAsync(long offerId, ApproveOfferDTO approvalDto, string salesManagerId)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    throw new ArgumentException("Offer not found", nameof(offerId));
+
+                if (offer.Status != OfferStatus.PendingSalesManagerApproval)
+                    throw new InvalidOperationException("Offer is not pending SalesManager approval");
+
+                if (approvalDto.Approved)
+                {
+                    // Approve and mark as Sent (ready to send to salesman)
+                    offer.ApproveBySalesManager(salesManagerId, approvalDto.Comments);
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(approvalDto.RejectionReason))
+                        throw new ArgumentException("Rejection reason is required when rejecting an offer");
+
+                    offer.RejectBySalesManager(salesManagerId, approvalDto.RejectionReason, approvalDto.Comments);
+                }
+
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Save activity
+                await SaveRecentActivityAsync(offer, OfferStatus.PendingSalesManagerApproval);
+
+                _logger.LogInformation("SalesManager approval processed for offer. OfferId: {OfferId}, Approved: {Approved}", 
+                    offerId, approvalDto.Approved);
+
+                // FIX 1: Auto-send notification to customer after approval
+                if (approvalDto.Approved && offer.Status == OfferStatus.Sent)
+                {
+                    try
+                    {
+                        var assignedUser = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
+                        if (assignedUser != null && assignedUser.IsActive)
+                        {
+                            var assignedUserRoles = await _userManager.GetRolesAsync(assignedUser);
+                            bool isCustomer = assignedUserRoles.Contains("Customer");
+                            
+                            var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                            var clientName = client?.Name ?? "Unknown Client";
+                            
+                            var notificationTitle = isCustomer ? "New Offer Received" : "New Offer Available";
+                            var notificationMessage = isCustomer
+                                ? $"You have received a new offer for {clientName}. Total: {offer.TotalAmount:C}"
+                                : $"A new offer for {clientName} has been approved. Total: {offer.TotalAmount:C}";
+                            
+                            var metadata = new Dictionary<string, object>
+                            {
+                                ["offerId"] = offerId,
+                                ["clientName"] = clientName,
+                                ["totalAmount"] = offer.TotalAmount
+                            };
+                            
+                            await _notificationService.CreateNotificationAsync(
+                                offer.AssignedTo,
+                                notificationTitle,
+                                notificationMessage,
+                                "Offer",
+                                "High",
+                                null,
+                                null,
+                                true, // Mobile push
+                                metadata,
+                                CancellationToken.None
+                            );
+                            
+                            // Update SentToClientAt timestamp
+                            offer.SentToClientAt = DateTime.UtcNow;
+                            await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                            await _unitOfWork.SaveChangesAsync();
+                            
+                            _logger.LogInformation("✅ Offer automatically sent to customer after approval. OfferId: {OfferId}", offerId);
+                        }
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "❌ Failed to send notification after approval. OfferId: {OfferId}", offerId);
+                    }
+                }
+                
+                // FIX 4: Notify customer of rejection
+                if (!approvalDto.Approved && offer.Status == OfferStatus.Rejected)
+                {
+                    try
+                    {
+                        var assignedUser = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
+                        if (assignedUser != null && assignedUser.IsActive)
+                        {
+                            var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                            var clientName = client?.Name ?? "Unknown Client";
+                            
+                            await _notificationService.CreateNotificationAsync(
+                                offer.AssignedTo,
+                                "Offer Rejected",
+                                $"Your offer request for {clientName} has been rejected. Reason: {approvalDto.RejectionReason}",
+                                "Offer",
+                                "High",
+                                null,
+                                null,
+                                true,
+                                new Dictionary<string, object>
+                                {
+                                    ["offerId"] = offerId,
+                                    ["clientName"] = clientName,
+                                    ["rejectionReason"] = approvalDto.RejectionReason ?? ""
+                                },
+                                CancellationToken.None
+                            );
+                            
+                            _logger.LogInformation("✅ Customer notified of offer rejection. OfferId: {OfferId}", offerId);
+                        }
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "❌ Failed to notify customer of rejection. OfferId: {OfferId}", offerId);
+                    }
+                }
+
+                return await MapToOfferResponseDTO(offer);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing SalesManager approval. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        public async Task<List<OfferResponseDTO>> GetPendingSalesManagerApprovalsAsync()
+        {
+            try
+            {
+                var offers = await _unitOfWork.SalesOffers.GetOffersByStatusAsync(OfferStatus.PendingSalesManagerApproval);
+                var result = new List<OfferResponseDTO>();
+
+                foreach (var offer in offers)
+                {
+                    result.Add(await MapToOfferResponseDTO(offer));
+                }
+
+                return result.OrderByDescending(o => o.CreatedAt).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting pending SalesManager approvals");
+                throw;
+            }
+        }
+
         public async Task<OfferResponseDTO> RecordClientResponseAsync(long offerId, string response, bool accepted, string userId)
         {
             try
@@ -573,6 +872,24 @@ namespace SoitMed.Services
                 var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
                 if (offer == null)
                     throw new ArgumentException("Offer not found", nameof(offerId));
+
+                // Verify user can respond to this offer (must be assigned to them if Customer or Salesman)
+                var user = await _unitOfWork.Users.GetByIdAsync(userId);
+                if (user != null)
+                {
+                    var userRoles = await _userManager.GetRolesAsync(user);
+                    bool isCustomerOrSalesman = userRoles.Contains("Customer") || userRoles.Contains("Salesman");
+                    bool isManagerOrAdmin = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin") || userRoles.Contains("SalesSupport");
+
+                    // If user is Customer or Salesman (and not a Manager/Admin), verify they are assigned to this offer
+                    if (isCustomerOrSalesman && !isManagerOrAdmin)
+                    {
+                        if (string.IsNullOrEmpty(offer.AssignedTo) || offer.AssignedTo != userId)
+                        {
+                            throw new UnauthorizedAccessException("You can only respond to offers assigned to you");
+                        }
+                    }
+                }
 
                 var oldStatus = offer.Status;
                 offer.RecordClientResponse(response, accepted);
@@ -588,8 +905,10 @@ namespace SoitMed.Services
                     try
                     {
                         // Check if deal already exists for this offer
-                        var existingDeal = await _unitOfWork.SalesDeals.GetQueryable()
-                            .FirstOrDefaultAsync(d => d.OfferId == offerId);
+                        var dealsQuery = _unitOfWork.SalesDeals.GetQueryable()
+                            .Where(d => d.OfferId == offerId);
+                        var existingDeals = dealsQuery.ToList();
+                        var existingDeal = existingDeals.FirstOrDefault();
 
                         if (existingDeal == null)
                         {
@@ -607,6 +926,41 @@ namespace SoitMed.Services
 
                             await _dealService.CreateDealAsync(createDealDto, userId);
                             _logger.LogInformation("Deal automatically created from accepted offer. OfferId: {OfferId}", offerId);
+                            
+                            // FIX 3: Notify SuperAdmin of new deal
+                            try
+                            {
+                                var superAdmins = await _userManager.GetUsersInRoleAsync("SuperAdmin");
+                                var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                                var clientName = client?.Name ?? "Unknown Client";
+                                
+                                foreach (var admin in superAdmins.Where(a => a.IsActive))
+                                {
+                                    await _notificationService.CreateNotificationAsync(
+                                        admin.Id,
+                                        "New Deal Pending Approval",
+                                        $"A new deal has been created from accepted offer #{offerId} for {clientName}. Value: {offer.TotalAmount:C}",
+                                        "Deal",
+                                        "High",
+                                        null,
+                                        null,
+                                        true,
+                                        new Dictionary<string, object>
+                                        {
+                                            ["offerId"] = offerId,
+                                            ["clientName"] = clientName,
+                                            ["dealValue"] = offer.TotalAmount
+                                        },
+                                        CancellationToken.None
+                                    );
+                                }
+                                
+                                _logger.LogInformation("✅ SuperAdmin notified of new deal from accepted offer. OfferId: {OfferId}", offerId);
+                            }
+                            catch (Exception notifEx)
+                            {
+                                _logger.LogError(notifEx, "❌ Failed to notify SuperAdmin of new deal. OfferId: {OfferId}", offerId);
+                            }
                         }
                         else
                         {
@@ -618,6 +972,70 @@ namespace SoitMed.Services
                         // Log error but don't fail the offer update
                         _logger.LogError(dealEx, "Failed to auto-create deal for accepted offer. OfferId: {OfferId}", offerId);
                     }
+                }
+
+                // FIX 2: Notify SalesSupport and original requester after customer response
+                try
+                {
+                    var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                    var clientName = client?.Name ?? "Unknown Client";
+                    
+                    var responseStatus = accepted ? "accepted" : "rejected";
+                    var notificationTitle = $"Offer {responseStatus.ToUpper()}";
+                    var notificationMessage = $"Customer has {responseStatus} offer #{offerId} for {clientName}. Response: {response}";
+                    
+                    var metadata = new Dictionary<string, object>
+                    {
+                        ["offerId"] = offerId,
+                        ["clientName"] = clientName,
+                        ["accepted"] = accepted,
+                        ["response"] = response ?? ""
+                    };
+                    
+                    // Notify SalesSupport users
+                    var salesSupportUsers = await _userManager.GetUsersInRoleAsync("SalesSupport");
+                    foreach (var supportUser in salesSupportUsers.Where(u => u.IsActive))
+                    {
+                        await _notificationService.CreateNotificationAsync(
+                            supportUser.Id,
+                            notificationTitle,
+                            notificationMessage,
+                            "Offer",
+                            "High",
+                            null,
+                            null,
+                            true,
+                            metadata,
+                            CancellationToken.None
+                        );
+                    }
+                    
+                    // Notify original requester if different from customer
+                    if (offer.OfferRequestId.HasValue)
+                    {
+                        var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId.Value);
+                        if (offerRequest != null && offerRequest.RequestedBy != userId)
+                        {
+                            await _notificationService.CreateNotificationAsync(
+                                offerRequest.RequestedBy,
+                                notificationTitle,
+                                notificationMessage,
+                                "Offer",
+                                "High",
+                                null,
+                                null,
+                                true,
+                                metadata,
+                                CancellationToken.None
+                            );
+                        }
+                    }
+                    
+                    _logger.LogInformation("✅ Customer response notifications sent. OfferId: {OfferId}", offerId);
+                }
+                catch (Exception notifEx)
+                {
+                    _logger.LogError(notifEx, "❌ Failed to send customer response notifications. OfferId: {OfferId}", offerId);
                 }
 
                 _logger.LogInformation("Client response recorded for offer. OfferId: {OfferId}, Accepted: {Accepted}", offerId, accepted);
@@ -682,16 +1100,16 @@ namespace SoitMed.Services
                 if (offer.Status != OfferStatus.Draft && offer.Status != OfferStatus.Sent)
                     throw new InvalidOperationException("Only draft or sent offers can be marked as needing modification");
 
-                // Check if user is a Salesman - if so, verify they are assigned to this offer
+                // Check if user is a Salesman or Customer - if so, verify they are assigned to this offer
                 var user = await _unitOfWork.Users.GetByIdAsync(userId);
                 if (user != null)
                 {
                     var userRoles = await _userManager.GetRolesAsync(user);
-                    bool isSalesman = userRoles.Contains("Salesman");
+                    bool isSalesmanOrCustomer = userRoles.Contains("Salesman") || userRoles.Contains("Customer");
                     bool isManagerOrAdmin = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin") || userRoles.Contains("SalesSupport");
 
-                    // If user is a Salesman (and not a Manager/Admin), verify they are assigned to this offer
-                    if (isSalesman && !isManagerOrAdmin)
+                    // If user is a Salesman or Customer (and not a Manager/Admin), verify they are assigned to this offer
+                    if (isSalesmanOrCustomer && !isManagerOrAdmin)
                     {
                         if (string.IsNullOrEmpty(offer.AssignedTo) || offer.AssignedTo != userId)
                         {
@@ -800,6 +1218,40 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error marking offer as under review. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Resume offer from UnderReview back to Sent status
+        /// </summary>
+        public async Task<OfferResponseDTO> ResumeFromUnderReviewAsync(long offerId, string userId)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    throw new ArgumentException("Offer not found", nameof(offerId));
+
+                // Only allow if offer is in UnderReview status
+                if (offer.Status != OfferStatus.UnderReview)
+                    throw new InvalidOperationException("Only offers under review can be resumed to sent status");
+
+                var oldStatus = offer.Status;
+                offer.MarkAsSent();
+                await _unitOfWork.SalesOffers.UpdateAsync(offer);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Save recent activity
+                await SaveRecentActivityAsync(offer, oldStatus);
+
+                _logger.LogInformation("Offer resumed from under review to sent. OfferId: {OfferId}", offerId);
+
+                return await MapToOfferResponseDTO(offer);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error resuming offer from under review. OfferId: {OfferId}", offerId);
                 throw;
             }
         }
@@ -969,6 +1421,34 @@ namespace SoitMed.Services
             }
         }
 
+        /// <summary>
+        /// Get full history of all actions performed on a specific offer
+        /// </summary>
+        public async Task<List<OfferActivityDTO>> GetOfferHistoryAsync(long offerId)
+        {
+            try
+            {
+                // Get all activities for this specific offer
+                var activities = await _unitOfWork.RecentOfferActivities.GetActivitiesByOfferIdAsync(offerId);
+                
+                return activities.Select(a => new OfferActivityDTO
+                {
+                    OfferId = a.OfferId,
+                    Type = a.Type,
+                    Description = a.Description,
+                    ClientName = a.ClientName,
+                    SalesmanName = a.SalesmanName,
+                    TotalAmount = a.TotalAmount,
+                    Timestamp = a.ActivityTimestamp
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting offer history. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
         public async Task<OfferResponseDTO> AssignOfferToSalesmanAsync(long offerId, string salesmanId, string userId)
         {
             try
@@ -1132,6 +1612,7 @@ namespace SoitMed.Services
                     Name = dto.Name,
                     Model = dto.Model,
                     Provider = dto.Provider,
+                    ProviderImagePath = dto.ProviderImagePath,
                     Country = dto.Country,
                     Price = dto.Price,
                     Description = dto.Description,
@@ -1152,6 +1633,7 @@ namespace SoitMed.Services
                     Provider = equipment.Provider,
                     Country = equipment.Country,
                     ImagePath = equipment.ImagePath,
+                    ProviderImagePath = equipment.ProviderImagePath,
                     Price = equipment.Price,
                     Description = equipment.Description,
                     InStock = equipment.InStock
@@ -1251,6 +1733,7 @@ namespace SoitMed.Services
                         Country = e.Country ?? matchedProduct?.Country,
                         Year = e.Year ?? matchedProduct?.Year,
                         ImagePath = e.ImagePath ?? matchedProduct?.ImagePath,
+                        ProviderImagePath = e.ProviderImagePath ?? matchedProduct?.ProviderImagePath,
                         // Use equipment price if set (> 0), otherwise use product base price
                         Price = e.Price > 0 ? e.Price : (matchedProduct?.BasePrice ?? 0),
                         Description = !string.IsNullOrWhiteSpace(e.Description) && !e.Description.StartsWith("Equipment item:") 
@@ -1288,6 +1771,60 @@ namespace SoitMed.Services
             }
         }
 
+        public async Task<OfferEquipmentDTO> UpdateEquipmentAsync(long offerId, long equipmentId, UpdateOfferEquipmentDTO dto)
+        {
+            try
+            {
+                var equipment = await _unitOfWork.OfferEquipment.GetByIdAsync(equipmentId);
+                if (equipment == null || equipment.OfferId != offerId)
+                    throw new ArgumentException("Equipment not found or doesn't belong to this offer");
+
+                // Update all fields - these changes are saved to OfferEquipment, NOT Product table
+                equipment.Name = dto.Name;
+                equipment.Model = dto.Model;
+                equipment.Provider = dto.Provider;
+                if (!string.IsNullOrWhiteSpace(dto.ProviderImagePath))
+                    equipment.ProviderImagePath = dto.ProviderImagePath;
+                equipment.Country = dto.Country;
+                equipment.Year = dto.Year;
+                equipment.Price = dto.Price;
+                equipment.Description = dto.Description;
+                equipment.InStock = dto.InStock;
+                
+                // Update image path if provided
+                if (!string.IsNullOrWhiteSpace(dto.ImagePath))
+                {
+                    equipment.ImagePath = dto.ImagePath;
+                }
+
+                await _unitOfWork.OfferEquipment.UpdateAsync(equipment);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Equipment updated. OfferId: {OfferId}, EquipmentId: {EquipmentId}. Changes saved to OfferEquipment only, not Product table.", offerId, equipmentId);
+
+                return new OfferEquipmentDTO
+                {
+                    Id = equipment.Id,
+                    OfferId = equipment.OfferId,
+                    Name = equipment.Name,
+                    Model = equipment.Model,
+                    Provider = equipment.Provider,
+                    Country = equipment.Country,
+                    Year = equipment.Year,
+                    ImagePath = equipment.ImagePath,
+                    ProviderImagePath = equipment.ProviderImagePath,
+                    Price = equipment.Price,
+                    Description = equipment.Description,
+                    InStock = equipment.InStock
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating equipment. OfferId: {OfferId}, EquipmentId: {EquipmentId}", offerId, equipmentId);
+                throw;
+            }
+        }
+
         public async Task<OfferEquipmentDTO> UpdateEquipmentImagePathAsync(long offerId, long equipmentId, string imagePath)
         {
             try
@@ -1311,6 +1848,7 @@ namespace SoitMed.Services
                     Provider = equipment.Provider,
                     Country = equipment.Country,
                     ImagePath = equipment.ImagePath,
+                    ProviderImagePath = equipment.ProviderImagePath,
                     Price = equipment.Price,
                     Description = equipment.Description,
                     InStock = equipment.InStock
@@ -1364,7 +1902,7 @@ namespace SoitMed.Services
                 if (matchedProduct == null)
                 {
                     // Extract first 3-4 meaningful words from equipment name for better matching
-                    var words = normalizedEquipmentName
+                    string[] words = normalizedEquipmentName
                         .Split(new[] { ' ', '(', '-', ')', '/', '\\' }, StringSplitOptions.RemoveEmptyEntries)
                         .Where(w => w.Length > 2 && !w.All(char.IsDigit)) // Filter out very short words and pure numbers
                         .Take(4)
@@ -1384,7 +1922,7 @@ namespace SoitMed.Services
                             .OrderByDescending(p => {
                                 var productNameLower = p.Name.ToLower();
                                 // Calculate similarity: check if product name contains key words from equipment name
-                                var matchCount = words.Count(w => productNameLower.Contains(w.ToLower()));
+                                int matchCount = words.Count(w => productNameLower.Contains(w.ToLower()));
                                 // Bonus if product name starts with the first word
                                 if (words.Length > 0 && productNameLower.StartsWith(words[0].ToLower()))
                                     matchCount += 2;
@@ -1405,11 +1943,12 @@ namespace SoitMed.Services
                                 var shorterSearchTerm = string.Join(" ", words.Take(2));
                                 _logger.LogInformation("Trying shorter search term: {SearchTerm}", shorterSearchTerm);
                                 var shorterMatchProducts = (await _unitOfWork.Products.SearchAsync(shorterSearchTerm)).Take(20).ToList();
+                                string[] wordsSubset = words.Take(2).ToArray();
                                 matchedProduct = shorterMatchProducts
                                     .OrderByDescending(p => {
                                         var productNameLower = p.Name.ToLower();
-                                        var matchCount = words.Take(2).Count(w => productNameLower.Contains(w.ToLower()));
-                                        if (words.Length > 0 && productNameLower.StartsWith(words[0].ToLower()))
+                                        int matchCount = wordsSubset.Count(w => productNameLower.Contains(w.ToLower()));
+                                        if (wordsSubset.Length > 0 && productNameLower.StartsWith(wordsSubset[0].ToLower()))
                                             matchCount += 2;
                                         return matchCount;
                                     })
@@ -1463,7 +2002,7 @@ namespace SoitMed.Services
                             matchedProduct = lastResortProducts
                                 .OrderByDescending(p => {
                                     var productNameLower = p.Name.ToLower();
-                                    var matchCount = keyWords.Count(w => productNameLower.Contains(w));
+                                    int matchCount = keyWords.Count(w => productNameLower.Contains(w));
                                     // Bonus if product name starts with first key word
                                     if (keyWords.Any() && productNameLower.StartsWith(keyWords[0]))
                                         matchCount += 3;
@@ -1759,10 +2298,29 @@ namespace SoitMed.Services
             var creator = await _unitOfWork.Users.GetByIdAsync(offer.CreatedBy);
             var salesman = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
 
+            // Get OfferRequest information if linked
+            string? requesterId = null;
+            string? requesterName = null;
+            if (offer.OfferRequestId.HasValue)
+            {
+                var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId.Value);
+                if (offerRequest != null)
+                {
+                    requesterId = offerRequest.RequestedBy;
+                    var requester = await _unitOfWork.Users.GetByIdAsync(offerRequest.RequestedBy);
+                    if (requester != null)
+                    {
+                        requesterName = $"{requester.FirstName} {requester.LastName}".Trim();
+                    }
+                }
+            }
+
             return new OfferResponseDTO
             {
                 Id = offer.Id,
                 OfferRequestId = offer.OfferRequestId,
+                OfferRequestRequesterId = requesterId,
+                OfferRequestRequesterName = requesterName,
                 ClientId = offer.ClientId,
                 ClientName = client?.Name ?? "Unknown Client",
                 CreatedBy = offer.CreatedBy,
@@ -1778,7 +2336,13 @@ namespace SoitMed.Services
                 Status = offer.Status,
                 SentToClientAt = offer.SentToClientAt,
                 ClientResponse = offer.ClientResponse,
-                CreatedAt = offer.CreatedAt
+                SalesManagerApprovedBy = offer.SalesManagerApprovedBy,
+                SalesManagerApprovedAt = offer.SalesManagerApprovedAt,
+                SalesManagerComments = offer.SalesManagerComments,
+                SalesManagerRejectionReason = offer.SalesManagerRejectionReason,
+                CreatedAt = offer.CreatedAt,
+                IsSalesManagerApproved = offer.Status == OfferStatus.Sent && !string.IsNullOrEmpty(offer.SalesManagerApprovedBy),
+                CanSendToSalesman = offer.Status == OfferStatus.Sent
             };
         }
 
@@ -1789,10 +2353,16 @@ namespace SoitMed.Services
             usersDict.TryGetValue(offer.CreatedBy ?? string.Empty, out var creator);
             usersDict.TryGetValue(offer.AssignedTo ?? string.Empty, out var salesman);
 
+            // Note: OfferRequest information should be loaded separately if needed in batch operations
+            // For now, we'll set it to null in batch operations to avoid N+1 queries
+            // Individual offer retrieval will use the async method that loads OfferRequest
+
             return new OfferResponseDTO
             {
                 Id = offer.Id,
                 OfferRequestId = offer.OfferRequestId,
+                OfferRequestRequesterId = null, // Will be populated in individual retrieval
+                OfferRequestRequesterName = null, // Will be populated in individual retrieval
                 ClientId = offer.ClientId,
                 ClientName = client?.Name ?? "Unknown Client",
                 CreatedBy = offer.CreatedBy,
@@ -1808,7 +2378,13 @@ namespace SoitMed.Services
                 Status = offer.Status,
                 SentToClientAt = offer.SentToClientAt,
                 ClientResponse = offer.ClientResponse,
-                CreatedAt = offer.CreatedAt
+                SalesManagerApprovedBy = offer.SalesManagerApprovedBy,
+                SalesManagerApprovedAt = offer.SalesManagerApprovedAt,
+                SalesManagerComments = offer.SalesManagerComments,
+                SalesManagerRejectionReason = offer.SalesManagerRejectionReason,
+                CreatedAt = offer.CreatedAt,
+                IsSalesManagerApproved = offer.Status == OfferStatus.Sent && !string.IsNullOrEmpty(offer.SalesManagerApprovedBy),
+                CanSendToSalesman = offer.Status == OfferStatus.Sent
             };
         }
 
@@ -1892,6 +2468,103 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error auto-adding equipment to offer {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Sends notification to all SalesManager users when an offer needs approval
+        /// </summary>
+        private async Task SendSalesManagerApprovalNotificationAsync(SalesOffer offer)
+        {
+            try
+            {
+                // Get client info for notification
+                var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                var clientName = client?.Name ?? "Unknown Client";
+
+                // Get creator info
+                var creator = await _unitOfWork.Users.GetByIdAsync(offer.CreatedBy);
+                var creatorName = creator != null ? $"{creator.FirstName} {creator.LastName}".Trim() : "SalesSupport";
+
+                // Get all SalesManagers
+                var salesManagers = await _userManager.GetUsersInRoleAsync("SalesManager");
+                var activeSalesManagers = salesManagers.Where(sm => sm.IsActive).ToList();
+
+                if (!activeSalesManagers.Any())
+                {
+                    _logger.LogWarning("No active SalesManagers found to notify for Offer: {OfferId}", offer.Id);
+                    return;
+                }
+
+                var notificationTitle = "Offer Pending Approval";
+                var notificationMessage = $"New offer #{offer.Id} created by {creatorName} for {clientName} (Amount: {offer.TotalAmount:C}) requires your approval before sending to salesman.";
+
+                var metadata = new Dictionary<string, object>
+                {
+                    ["offerId"] = offer.Id,
+                    ["clientName"] = clientName,
+                    ["creatorName"] = creatorName,
+                    ["totalAmount"] = offer.TotalAmount,
+                    ["status"] = offer.Status
+                };
+
+                // Send notification to all SalesManagers
+                _logger.LogInformation("📢 Sending notifications to {Count} active SalesManagers for Offer: {OfferId}", 
+                    activeSalesManagers.Count, offer.Id);
+
+                // Also send a broadcast to the role group as backup
+                try
+                {
+                    await _notificationService.SendNotificationToRoleGroupAsync(
+                        "SalesManager",
+                        notificationTitle,
+                        notificationMessage,
+                        metadata,
+                        CancellationToken.None
+                    );
+                    _logger.LogInformation("  Broadcast notification sent to Role_SalesManager group for Offer: {OfferId}", offer.Id);
+                }
+                catch (Exception broadcastEx)
+                {
+                    _logger.LogWarning(broadcastEx, "⚠️ Failed to send broadcast to role group (continuing with individual notifications)");
+                }
+
+                foreach (var salesManager in activeSalesManagers)
+                {
+                    try
+                    {
+                        _logger.LogInformation("📤 Creating notification for SalesManager: {SalesManagerId} ({SalesManagerName}) for Offer: {OfferId}", 
+                            salesManager.Id, salesManager.UserName, offer.Id);
+
+                        var notification = await _notificationService.CreateNotificationAsync(
+                            salesManager.Id,
+                            notificationTitle,
+                            notificationMessage,
+                            "Offer",
+                            "High",
+                            null,
+                            null,
+                            true, // Mobile push notification
+                            metadata,
+                            CancellationToken.None
+                        );
+
+                        _logger.LogInformation("  Notification created successfully for SalesManager: {SalesManagerId}, NotificationId: {NotificationId}", 
+                            salesManager.Id, notification?.Id);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogWarning(notifEx, "⚠️ Failed to create notification for SalesManager: {SalesManagerId} for Offer: {OfferId}", 
+                            salesManager.Id, offer.Id);
+                    }
+                }
+
+                _logger.LogInformation("  Completed sending SalesManager approval notifications for Offer: {OfferId}", offer.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error sending SalesManager approval notifications for Offer: {OfferId}", offer.Id);
                 throw;
             }
         }

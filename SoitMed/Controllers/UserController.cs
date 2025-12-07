@@ -171,7 +171,7 @@ namespace SoitMed.Controllers
 			}
 		}
 		[HttpDelete("{userId}")]
-		[Authorize(Roles = "SuperAdmin,Admin")]
+		[Authorize(Roles = "SuperAdmin,superadmin,Admin,admin")]
 		public async Task<IActionResult> DeleteUser(string userId)
 		{
 			if (string.IsNullOrEmpty(userId))
@@ -245,7 +245,7 @@ namespace SoitMed.Controllers
 			}
 		}
 		[HttpPatch("{userId}")]
-		[Authorize(Roles = "SuperAdmin,Admin")]
+		[Authorize(Roles = "SuperAdmin,superadmin,Admin,admin")]
 		public async Task<IActionResult> UpdateUser(string userId, UpdateUserDTO userDTO)
 		{
 			if (string.IsNullOrEmpty(userId))
@@ -502,7 +502,7 @@ namespace SoitMed.Controllers
 
 	// Get user data by username
 	[HttpGet("username/{username}")]
-	[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
+	[Authorize(Roles = "SuperAdmin,superadmin,Admin,admin,FinanceManager,LegalManager")]
 	public async Task<IActionResult> GetUserByUsername(string username)
 		{
 			var user = await context.Users
@@ -542,7 +542,7 @@ namespace SoitMed.Controllers
 
 		// Get all users with detailed data (optimized version with eager loading)
 		[HttpGet("all")]
-		[Authorize(Roles = "SuperAdmin,Admin,Doctor")]
+		[Authorize(Roles = "SuperAdmin,superadmin,Admin,admin,Doctor")]
 		public async Task<IActionResult> GetAllUsersData([FromQuery] UserFilterDTO filter)
 		{
 			// If role filter is specified, use the role-specific approach
@@ -713,7 +713,7 @@ namespace SoitMed.Controllers
 
 		// Get users by role (OPTIMIZED)
 		[HttpGet("role/{role}")]
-		[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
+		[Authorize(Roles = "SuperAdmin,superadmin,Admin,admin,FinanceManager,LegalManager")]
 		public async Task<IActionResult> GetUsersByRole(string role)
 		{
 			// Validate role
@@ -739,7 +739,7 @@ namespace SoitMed.Controllers
 
 		// Get users by department (OPTIMIZED)
 		[HttpGet("department/{departmentId}")]
-		[Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
+		[Authorize(Roles = "SuperAdmin,superadmin,Admin,admin,FinanceManager,LegalManager")]
 		public async Task<IActionResult> GetUsersByDepartment(int departmentId)
 		{
 			var department = await context.Departments.FindAsync(departmentId);
@@ -766,9 +766,9 @@ namespace SoitMed.Controllers
 		}
 
 
-		// SuperAdmin: Activate or Deactivate User
+		// Admin/SuperAdmin: Activate or Deactivate User
 		[HttpPut("activate-deactivate")]
-		[Authorize(Roles = "SuperAdmin")]
+		[Authorize(Roles = "SuperAdmin,superadmin,Admin,admin")]
 		public async Task<IActionResult> ActivateDeactivateUser([FromBody] UserActivationDTO activationDTO)
 		{
 			if (!ModelState.IsValid)
@@ -836,9 +836,9 @@ namespace SoitMed.Controllers
 			return Ok(response);
 		}
 
-		// SuperAdmin: Get User Statistics
+		// Admin/SuperAdmin: Get User Statistics
 		[HttpGet("statistics")]
-		[Authorize(Roles = "SuperAdmin")]
+		[Authorize(Roles = "SuperAdmin,superadmin,Admin,admin")]
 		public async Task<IActionResult> GetUserStatistics()
 		{
 			try
@@ -893,9 +893,9 @@ namespace SoitMed.Controllers
 			}
 		}
 
-		// SuperAdmin: Get User Counts (Simple version)
+		// Admin/SuperAdmin: Get User Counts (Simple version)
 		[HttpGet("counts")]
-		[Authorize(Roles = "SuperAdmin")]
+		[Authorize(Roles = "SuperAdmin,superadmin,Admin,admin")]
 		public async Task<IActionResult> GetUserCounts()
 		{
 			try

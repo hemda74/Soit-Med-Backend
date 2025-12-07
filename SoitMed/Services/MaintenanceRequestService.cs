@@ -192,6 +192,12 @@ namespace SoitMed.Services
             if (request == null)
                 throw new ArgumentException("Maintenance request not found", nameof(requestId));
 
+            // Validate status transition
+            if (!IsValidStatusTransition(request.Status, status))
+            {
+                throw new InvalidOperationException($"Cannot transition from {request.Status} to {status}");
+            }
+
             request.Status = status;
             if (!string.IsNullOrEmpty(notes))
             {
@@ -204,13 +210,157 @@ namespace SoitMed.Services
             }
             else if (status == MaintenanceRequestStatus.InProgress)
             {
-                request.StartedAt = DateTime.UtcNow;
+                if (request.StartedAt == null)
+                {
+                    request.StartedAt = DateTime.UtcNow;
+                }
             }
 
             await _unitOfWork.MaintenanceRequests.UpdateAsync(request);
             await _unitOfWork.SaveChangesAsync();
 
+            _logger.LogInformation("Maintenance request status updated. RequestId: {RequestId}, Status: {Status}", 
+                requestId, status);
+
+            // Notify customer about status change
+            await _notificationService.CreateNotificationAsync(
+                request.CustomerId,
+                "Maintenance request status updated",
+                $"Request #{requestId} status changed to {status}",
+                "MaintenanceRequest",
+                "Medium",
+                null,
+                null,
+                true,
+                new Dictionary<string, object> { { "MaintenanceRequestId", requestId }, { "Status", status.ToString() } }
+            );
+
             return await MapToResponseDTO(request);
+        }
+
+        public async Task<MaintenanceRequestResponseDTO> CancelRequestAsync(int requestId, string userId, string? reason = null)
+        {
+            var request = await _unitOfWork.MaintenanceRequests.GetByIdAsync(requestId);
+            if (request == null)
+                throw new ArgumentException("Maintenance request not found", nameof(requestId));
+
+            // Check if request can be cancelled
+            if (request.Status == MaintenanceRequestStatus.Completed)
+            {
+                throw new InvalidOperationException("Cannot cancel a completed request");
+            }
+
+            // Check if there's an active visit
+            var activeVisits = await _unitOfWork.MaintenanceVisits.GetByMaintenanceRequestIdAsync(requestId);
+            var hasActiveVisit = activeVisits.Any(v => v.IsActive && v.CompletedAt == null);
+            if (hasActiveVisit)
+            {
+                throw new InvalidOperationException("Cannot cancel request with active visit in progress");
+            }
+
+            // Check permissions
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new ArgumentException("User not found", nameof(userId));
+
+            var userRoles = await _userManager.GetRolesAsync(user);
+            var isCustomer = request.CustomerId == userId;
+            var isMaintenanceStaff = userRoles.Contains(UserRoles.MaintenanceSupport) || 
+                                    userRoles.Contains(UserRoles.MaintenanceManager) ||
+                                    userRoles.Contains(UserRoles.SuperAdmin);
+
+            if (!isCustomer && !isMaintenanceStaff)
+            {
+                throw new UnauthorizedAccessException("You don't have permission to cancel this request");
+            }
+
+            request.Status = MaintenanceRequestStatus.Cancelled;
+            if (!string.IsNullOrEmpty(reason))
+            {
+                request.Notes = $"Cancelled: {reason}";
+            }
+
+            await _unitOfWork.MaintenanceRequests.UpdateAsync(request);
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogInformation("Maintenance request cancelled. RequestId: {RequestId}, UserId: {UserId}", 
+                requestId, userId);
+
+            // Notify all stakeholders
+            var notifications = new List<Task>();
+            
+            // Notify customer (if not the one cancelling)
+            if (request.CustomerId != userId)
+            {
+                notifications.Add(_notificationService.CreateNotificationAsync(
+                    request.CustomerId,
+                    "Maintenance request cancelled",
+                    $"Request #{requestId} has been cancelled",
+                    "MaintenanceRequest",
+                    "High",
+                    null,
+                    null,
+                    true,
+                    new Dictionary<string, object> { { "MaintenanceRequestId", requestId } }
+                ));
+            }
+
+            // Notify engineer if assigned
+            if (request.AssignedToEngineerId != null && request.AssignedToEngineerId != userId)
+            {
+                notifications.Add(_notificationService.CreateNotificationAsync(
+                    request.AssignedToEngineerId,
+                    "Maintenance request cancelled",
+                    $"Request #{requestId} has been cancelled",
+                    "MaintenanceRequest",
+                    "High",
+                    null,
+                    null,
+                    true,
+                    new Dictionary<string, object> { { "MaintenanceRequestId", requestId } }
+                ));
+            }
+
+            // Notify maintenance support
+            await _notificationService.SendNotificationToRoleGroupAsync(
+                UserRoles.MaintenanceSupport,
+                "Maintenance request cancelled",
+                $"Request #{requestId} cancelled by {user.UserName}",
+                new Dictionary<string, object> { { "MaintenanceRequestId", requestId } }
+            );
+
+            await Task.WhenAll(notifications);
+
+            return await MapToResponseDTO(request);
+        }
+
+        private bool IsValidStatusTransition(MaintenanceRequestStatus currentStatus, MaintenanceRequestStatus newStatus)
+        {
+            // Define valid transitions
+            var validTransitions = new Dictionary<MaintenanceRequestStatus, List<MaintenanceRequestStatus>>
+            {
+                { MaintenanceRequestStatus.Pending, new List<MaintenanceRequestStatus> { MaintenanceRequestStatus.Assigned, MaintenanceRequestStatus.Cancelled, MaintenanceRequestStatus.OnHold } },
+                { MaintenanceRequestStatus.Assigned, new List<MaintenanceRequestStatus> { MaintenanceRequestStatus.InProgress, MaintenanceRequestStatus.Cancelled, MaintenanceRequestStatus.OnHold } },
+                { MaintenanceRequestStatus.InProgress, new List<MaintenanceRequestStatus> { MaintenanceRequestStatus.Completed, MaintenanceRequestStatus.NeedsSecondVisit, MaintenanceRequestStatus.NeedsSparePart, MaintenanceRequestStatus.OnHold } },
+                { MaintenanceRequestStatus.NeedsSecondVisit, new List<MaintenanceRequestStatus> { MaintenanceRequestStatus.Assigned, MaintenanceRequestStatus.InProgress, MaintenanceRequestStatus.Cancelled } },
+                { MaintenanceRequestStatus.NeedsSparePart, new List<MaintenanceRequestStatus> { MaintenanceRequestStatus.WaitingForSparePart, MaintenanceRequestStatus.Cancelled } },
+                { MaintenanceRequestStatus.WaitingForSparePart, new List<MaintenanceRequestStatus> { MaintenanceRequestStatus.WaitingForCustomerApproval, MaintenanceRequestStatus.InProgress, MaintenanceRequestStatus.Cancelled } },
+                { MaintenanceRequestStatus.WaitingForCustomerApproval, new List<MaintenanceRequestStatus> { MaintenanceRequestStatus.InProgress, MaintenanceRequestStatus.Cancelled } },
+                { MaintenanceRequestStatus.OnHold, new List<MaintenanceRequestStatus> { MaintenanceRequestStatus.Assigned, MaintenanceRequestStatus.InProgress, MaintenanceRequestStatus.Cancelled } },
+            };
+
+            // Completed and Cancelled are terminal states
+            if (currentStatus == MaintenanceRequestStatus.Completed || currentStatus == MaintenanceRequestStatus.Cancelled)
+            {
+                return false;
+            }
+
+            if (validTransitions.TryGetValue(currentStatus, out var allowed))
+            {
+                return allowed.Contains(newStatus);
+            }
+
+            return false;
         }
 
         private async Task<MaintenanceRequestResponseDTO> MapToResponseDTO(MaintenanceRequest request)
@@ -329,6 +479,13 @@ namespace SoitMed.Services
                 if (string.IsNullOrEmpty(location))
                 {
                     _logger.LogInformation("No location found for equipment, skipping auto-assignment");
+                    // Notify maintenance support that manual assignment is needed
+                    await _notificationService.SendNotificationToRoleGroupAsync(
+                        UserRoles.MaintenanceSupport,
+                        "Manual assignment required",
+                        $"Request #{requestId} requires manual assignment (no location found)",
+                        new Dictionary<string, object> { { "MaintenanceRequestId", requestId } }
+                    );
                     return;
                 }
 
@@ -356,6 +513,13 @@ namespace SoitMed.Services
                 if (!availableEngineers.Any())
                 {
                     _logger.LogInformation("No available engineers found for location {Location}", location);
+                    // Notify maintenance support that manual assignment is needed
+                    await _notificationService.SendNotificationToRoleGroupAsync(
+                        UserRoles.MaintenanceSupport,
+                        "Manual assignment required",
+                        $"Request #{requestId} requires manual assignment (no engineers available for location: {location})",
+                        new Dictionary<string, object> { { "MaintenanceRequestId", requestId } }
+                    );
                     return;
                 }
 

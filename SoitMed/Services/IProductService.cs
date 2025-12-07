@@ -15,6 +15,10 @@ namespace SoitMed.Services
         Task<ProductResponseDTO> UpdateProductAsync(long id, UpdateProductDTO updateDto, string userId);
         Task<bool> DeleteProductAsync(long id);
         Task<ProductResponseDTO> UpdateProductImageAsync(long id, string imagePath);
+        Task<ProductResponseDTO> UpdateProviderImageAsync(long id, string imagePath);
+        Task<ProductResponseDTO> UpdateDataSheetAsync(long id, string pdfPath);
+        Task<ProductResponseDTO> UpdateCatalogAsync(long id, string pdfPath);
+        Task<ProductResponseDTO> UpdateInventoryQuantityAsync(long id, int inventoryQuantity);
     }
 }
 

@@ -58,9 +58,12 @@ namespace SoitMed.Repositories
 
         public async Task<List<SalesDeal>> GetPendingApprovalsForSuperAdminAsync()
         {
+            // SuperAdmin can approve deals that are either:
+            // 1. PendingSuperAdminApproval (new deals created after client response)
+            // 2. PendingManagerApproval (legacy deals - SalesManager only approves offers, not deals)
             return await _context.SalesDeals
                 .AsNoTracking()
-                .Where(d => d.Status == "PendingSuperAdminApproval")
+                .Where(d => d.Status == "PendingSuperAdminApproval" || d.Status == "PendingManagerApproval")
                 .OrderBy(d => d.CreatedAt)
                 .ToListAsync();
         }

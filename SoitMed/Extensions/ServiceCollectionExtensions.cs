@@ -28,9 +28,10 @@ namespace SoitMed.Extensions
             // Enhanced offer services
             services.AddScoped<IOfferEquipmentImageService, OfferEquipmentImageService>();
             
-            // Product catalog service
+            // Product catalog services
             services.AddScoped<IProductService, ProductService>();
-
+            services.AddScoped<IProductCategoryService, ProductCategoryService>();
+            
             // Maintenance services
             services.AddScoped<IMaintenanceRequestService, MaintenanceRequestService>();
             services.AddScoped<IMaintenanceVisitService, MaintenanceVisitService>();
@@ -40,6 +41,9 @@ namespace SoitMed.Extensions
             // Payment services
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IAccountingService, AccountingService>();
+
+            // Chat services
+            services.AddScoped<IChatService, ChatService>();
 
             return services;
         }

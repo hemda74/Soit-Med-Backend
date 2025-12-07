@@ -19,7 +19,7 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Roles = "SuperAdmin,Admin,SalesManager,SalesSupport")]
         public async Task<IActionResult> GetGovernorates()
         {
             var governorates = await context.Governorates

@@ -18,7 +18,7 @@ namespace SoitMed.Services
         #endregion
 
         #region Search and Filter
-        Task<List<ClientResponseDTO>> SearchClientsAsync(SearchClientDTO searchDto, string userId);
+        Task<PaginatedClientsResponseDTO> SearchClientsAsync(SearchClientDTO searchDto, string userId);
         Task<List<ClientResponseDTO>> GetClientsByClassificationAsync(string classification, string userId);
         Task<ClientResponseDTO> FindOrCreateClientAsync(FindOrCreateClientDTO findDto, string userId);
         Task<ClientStatisticsDTO> GetClientStatisticsAsync(string userId);

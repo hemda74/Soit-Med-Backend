@@ -54,6 +54,15 @@ namespace SoitMed.Services
                 await _unitOfWork.MaintenanceVisits.UpdateAsync(visit);
                 await _unitOfWork.SaveChangesAsync();
 
+                // Update maintenance request status to WaitingForSparePart
+                var maintenanceRequest = await _unitOfWork.MaintenanceRequests.GetByIdAsync(dto.MaintenanceRequestId);
+                if (maintenanceRequest != null && maintenanceRequest.Status == MaintenanceRequestStatus.NeedsSparePart)
+                {
+                    maintenanceRequest.Status = MaintenanceRequestStatus.WaitingForSparePart;
+                    await _unitOfWork.MaintenanceRequests.UpdateAsync(maintenanceRequest);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+
                 _logger.LogInformation("Spare part request created. RequestId: {RequestId}", sparePartRequest.Id);
 
                 // Notify SparePartsCoordinator
@@ -143,10 +152,18 @@ namespace SoitMed.Services
             await _unitOfWork.SparePartRequests.UpdateAsync(request);
             await _unitOfWork.SaveChangesAsync();
 
-            // Notify customer
+            // Update maintenance request status and notify customer
             var maintenanceRequest = await _unitOfWork.MaintenanceRequests.GetByIdAsync(request.MaintenanceRequestId);
             if (maintenanceRequest != null)
             {
+                if (maintenanceRequest.Status == MaintenanceRequestStatus.WaitingForSparePart)
+                {
+                    maintenanceRequest.Status = MaintenanceRequestStatus.WaitingForCustomerApproval;
+                    await _unitOfWork.MaintenanceRequests.UpdateAsync(maintenanceRequest);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+
+                // Notify customer
                 await _notificationService.CreateNotificationAsync(
                     maintenanceRequest.CustomerId,
                     "Spare part price available",
@@ -180,12 +197,26 @@ namespace SoitMed.Services
             if (dto.Approved)
             {
                 request.Status = SparePartAvailabilityStatus.CustomerApproved;
+                // Update maintenance request status back to InProgress
+                if (maintenanceRequest != null)
+                {
+                    maintenanceRequest.Status = MaintenanceRequestStatus.InProgress;
+                    await _unitOfWork.MaintenanceRequests.UpdateAsync(maintenanceRequest);
+                    await _unitOfWork.SaveChangesAsync();
+                }
                 // Create payment
                 // TODO: Integrate with PaymentService
             }
             else
             {
                 request.Status = SparePartAvailabilityStatus.CustomerRejected;
+                // Update maintenance request status - could be cancelled or back to NeedsSparePart
+                if (maintenanceRequest != null)
+                {
+                    maintenanceRequest.Status = MaintenanceRequestStatus.NeedsSparePart;
+                    await _unitOfWork.MaintenanceRequests.UpdateAsync(maintenanceRequest);
+                    await _unitOfWork.SaveChangesAsync();
+                }
             }
 
             await _unitOfWork.SparePartRequests.UpdateAsync(request);
