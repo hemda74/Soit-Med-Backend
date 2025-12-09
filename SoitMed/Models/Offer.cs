@@ -71,6 +71,11 @@ namespace SoitMed.Models
 
         [MaxLength(1000)]
         public string? ClientResponse { get; set; }
+
+        [MaxLength(500)]
+        public string? PdfPath { get; set; }
+
+        public DateTime? PdfGeneratedAt { get; set; }
         #endregion
 
         #region Business Logic Methods

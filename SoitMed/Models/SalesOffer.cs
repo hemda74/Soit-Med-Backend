@@ -87,6 +87,11 @@ namespace SoitMed.Models
         
         [MaxLength(2000)]
         public string? Notes { get; set; }
+
+        [MaxLength(500)]
+        public string? PdfPath { get; set; }
+
+        public DateTime? PdfGeneratedAt { get; set; }
         #endregion
 
         #region Navigation Properties

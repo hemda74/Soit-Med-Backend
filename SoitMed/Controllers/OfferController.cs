@@ -2,11 +2,15 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using SoitMed.Common;
 using SoitMed.DTO;
+using SoitMed.Models;
 using SoitMed.Models.Identity;
+using SoitMed.Repositories;
 using SoitMed.Services;
 using System.IO;
+using System.Security.Claims;
 
 namespace SoitMed.Controllers
 {
@@ -20,21 +24,27 @@ namespace SoitMed.Controllers
     {
         private readonly IOfferService _offerService;
         private readonly IOfferEquipmentImageService _equipmentImageService;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<OfferController> _logger;
         private readonly IWebHostEnvironment _environment;
+        private readonly IOfferPdfService _pdfService;
 
         public OfferController(
             IOfferService offerService,
             IOfferEquipmentImageService equipmentImageService,
+            IUnitOfWork unitOfWork,
             ILogger<OfferController> logger,
             UserManager<ApplicationUser> userManager,
-            IWebHostEnvironment environment) 
+            IWebHostEnvironment environment,
+            IOfferPdfService pdfService) 
             : base(userManager)
         {
             _offerService = offerService;
             _equipmentImageService = equipmentImageService;
+            _unitOfWork = unitOfWork;
             _logger = logger;
             _environment = environment;
+            _pdfService = pdfService;
         }
 
         /// <summary>
@@ -174,12 +184,82 @@ namespace SoitMed.Controllers
         {
             try
             {
-                var userId = GetCurrentUserId();
-                
-                // Try to parse userId as clientId (for customers, their userId often maps to clientId)
-                if (!long.TryParse(userId, out var clientId))
+                // Get user ID directly from JWT token claim (same as other controllers)
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
                 {
-                    return BadRequest(ResponseHelper.CreateErrorResponse("Invalid user ID format"));
+                    return BadRequest(ResponseHelper.CreateErrorResponse("User ID not found"));
+                }
+
+                // Get current user to find their client record
+                var currentUser = await _unitOfWork.Users.GetByIdAsync(userId);
+                if (currentUser == null)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("User not found"));
+                }
+
+                long clientId = 0;
+                Client? client = null;
+
+                // Try to find client by customer's email (case-insensitive)
+                var context = _unitOfWork.GetContext();
+                if (!string.IsNullOrEmpty(currentUser.Email))
+                {
+                    var userEmailLower = currentUser.Email.ToLower();
+                    _logger.LogInformation("Searching for client record for customer user {UserId} with email {Email}", 
+                        userId, currentUser.Email);
+                    
+                    // Try to find by Client.Email first
+                    client = await context.Clients
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.Email) && 
+                                                  c.Email.ToLower() == userEmailLower);
+
+                    // If not found, try ContactPersonEmail
+                    if (client == null)
+                    {
+                        _logger.LogInformation("Client not found by Email, trying ContactPersonEmail for {Email}", currentUser.Email);
+                        client = await context.Clients
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.ContactPersonEmail) && 
+                                                      c.ContactPersonEmail.ToLower() == userEmailLower);
+                    }
+                }
+
+                if (client != null)
+                {
+                    clientId = client.Id;
+                    _logger.LogInformation("Found client record for customer user {UserId} by email {Email}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                        userId, currentUser.Email, clientId, client.Name);
+                }
+                else
+                {
+                    // Try to find by user's full name
+                    var userFullName = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
+                    if (!string.IsNullOrEmpty(userFullName))
+                    {
+                        _logger.LogInformation("Client not found by email, trying to find by name: {Name}", userFullName);
+                        var namePattern = $"%{userFullName}%";
+                        client = await context.Clients
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, namePattern) ||
+                                                      (c.ContactPerson != null && EF.Functions.Like(c.ContactPerson, namePattern)));
+
+                        if (client != null)
+                        {
+                            clientId = client.Id;
+                            _logger.LogInformation("Found client record for customer user {UserId} by name {Name}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                                userId, userFullName, clientId, client.Name);
+                        }
+                    }
+                }
+
+                // If still not found, return empty list with a message
+                if (client == null || clientId == 0)
+                {
+                    _logger.LogWarning("Client record not found for customer user {UserId}. Email: {Email}, Name: {Name}", 
+                        userId, currentUser.Email, $"{currentUser.FirstName} {currentUser.LastName}");
+                    return Ok(ResponseHelper.CreateSuccessResponse(new List<OfferResponseDTO>(), "No client record found. Please contact support to link your account to a client record."));
                 }
 
                 var result = await _offerService.GetOffersByClientAsync(clientId);
@@ -267,21 +347,136 @@ namespace SoitMed.Controllers
         /// Get offer by ID
         /// </summary>
         [HttpGet("{id}")]
-        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman,Customer")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman,Customer,Doctor,Technician")]
         public async Task<IActionResult> GetOffer(long id)
         {
             try
             {
-                var result = await _offerService.GetOfferAsync(id);
-                
-                if (result == null)
-                    return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("User ID not found"));
+                }
 
-                return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer retrieved successfully"));
+                var userRole = GetCurrentUserRole();
+                
+                // For customer roles, validate they can access this offer
+                if (!string.IsNullOrEmpty(userRole) && 
+                    (userRole.Equals("Customer", StringComparison.OrdinalIgnoreCase) ||
+                     userRole.Equals("Doctor", StringComparison.OrdinalIgnoreCase) ||
+                     userRole.Equals("Technician", StringComparison.OrdinalIgnoreCase)))
+                {
+                    // Get current user to find their client record
+                    var currentUser = await _unitOfWork.Users.GetByIdAsync(userId);
+                    if (currentUser == null)
+                    {
+                        return BadRequest(ResponseHelper.CreateErrorResponse("User not found"));
+                    }
+
+                    long clientId = 0;
+                    Client? client = null;
+
+                    // Try to find client by customer's email (case-insensitive)
+                    var context = _unitOfWork.GetContext();
+                    if (!string.IsNullOrEmpty(currentUser.Email))
+                    {
+                        var userEmailLower = currentUser.Email.ToLower();
+                        _logger.LogInformation("Searching for client record for customer user {UserId} with email {Email}", 
+                            userId, currentUser.Email);
+                        
+                        // Try to find by Client.Email first
+                        client = await context.Clients
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.Email) && 
+                                                      c.Email.ToLower() == userEmailLower);
+
+                        // If not found, try ContactPersonEmail
+                        if (client == null)
+                        {
+                            _logger.LogInformation("Client not found by Email, trying ContactPersonEmail for {Email}", currentUser.Email);
+                            client = await context.Clients
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.ContactPersonEmail) && 
+                                                          c.ContactPersonEmail.ToLower() == userEmailLower);
+                        }
+                    }
+
+                    if (client != null)
+                    {
+                        clientId = client.Id;
+                        _logger.LogInformation("Found client record for customer user {UserId} by email {Email}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                            userId, currentUser.Email, clientId, client.Name);
+                    }
+                    else
+                    {
+                        // Try to find by user's full name
+                        var userFullName = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
+                        if (!string.IsNullOrEmpty(userFullName))
+                        {
+                            _logger.LogInformation("Client not found by email, trying to find by name: {Name}", userFullName);
+                            var namePattern = $"%{userFullName}%";
+                            client = await context.Clients
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, namePattern) ||
+                                                          (c.ContactPerson != null && EF.Functions.Like(c.ContactPerson, namePattern)));
+
+                            if (client != null)
+                            {
+                                clientId = client.Id;
+                                _logger.LogInformation("Found client record for customer user {UserId} by name {Name}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                                    userId, userFullName, clientId, client.Name);
+                            }
+                        }
+                    }
+
+                    if (clientId == 0)
+                    {
+                        _logger.LogWarning("Client record not found for customer user {UserId}. Email: {Email}, Name: {Name}", 
+                            userId, currentUser.Email, $"{currentUser.FirstName} {currentUser.LastName}");
+                        return BadRequest(ResponseHelper.CreateErrorResponse("Client record not found. Please contact support to link your account to a client record."));
+                    }
+
+                    // Get the offer and verify it belongs to this client
+                    var result = await _offerService.GetOfferAsync(id);
+                    
+                    if (result == null)
+                        return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
+
+                    // Verify the offer belongs to this client
+                    if (result.ClientId != clientId)
+                    {
+                        _logger.LogWarning("Customer {UserId} (ClientId: {ClientId}) attempted to access offer {OfferId} belonging to ClientId {OfferClientId}", 
+                            userId, clientId, id, result.ClientId);
+                        return Forbid();
+                    }
+
+                    // Only return offers that have been sent to the client
+                    if (result.Status != "Sent" && 
+                        result.Status != "Accepted" && 
+                        result.Status != "Rejected" && 
+                        result.Status != "Completed")
+                    {
+                        _logger.LogInformation("Customer {UserId} attempted to access offer {OfferId} with status {Status} (not yet sent)", 
+                            userId, id, result.Status);
+                        return NotFound(ResponseHelper.CreateErrorResponse("Offer not found or not yet sent"));
+                    }
+
+                    return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer retrieved successfully"));
+                }
+                else
+                {
+                    // For other roles (SalesSupport, SalesManager, etc.), allow access
+                    var result = await _offerService.GetOfferAsync(id);
+                    
+                    if (result == null)
+                        return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
+
+                    return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer retrieved successfully"));
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving offer");
+                _logger.LogError(ex, "Error retrieving offer {OfferId}", id);
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving offer"));
             }
         }
@@ -548,9 +743,38 @@ namespace SoitMed.Controllers
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Installment plan created"));
         }
 
-        // PDF Export
-      
-       
+        // PDF Export (On-demand generation, no storage)
+        /// <summary>
+        /// Generate and download PDF for an offer (generated on-demand, not stored)
+        /// </summary>
+        [HttpGet("{offerId}/pdf")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Customer,Doctor,Technician")]
+        public async Task<IActionResult> GetOfferPdf(long offerId, [FromQuery] string language = "en")
+        {
+            try
+            {
+                // Validate language
+                if (language != "en" && language != "ar")
+                {
+                    language = "en";
+                }
+
+                // Generate PDF on-demand (no storage)
+                var pdfBytes = await _pdfService.GenerateOfferPdfAsync(offerId, language);
+                
+                return File(pdfBytes, "application/pdf", $"Offer_{offerId}_{DateTime.UtcNow:yyyyMMddHHmmss}.pdf");
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for PDF generation. OfferId: {OfferId}", offerId);
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating PDF for offer {OfferId}", offerId);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while generating PDF"));
+            }
+        }
 
         // Send to Salesman
         [HttpPost("{offerId}/send-to-salesman")]

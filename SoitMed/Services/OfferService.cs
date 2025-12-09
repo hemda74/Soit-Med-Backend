@@ -2342,7 +2342,9 @@ namespace SoitMed.Services
                 SalesManagerRejectionReason = offer.SalesManagerRejectionReason,
                 CreatedAt = offer.CreatedAt,
                 IsSalesManagerApproved = offer.Status == OfferStatus.Sent && !string.IsNullOrEmpty(offer.SalesManagerApprovedBy),
-                CanSendToSalesman = offer.Status == OfferStatus.Sent
+                CanSendToSalesman = offer.Status == OfferStatus.Sent,
+                PdfPath = offer.PdfPath,
+                PdfGeneratedAt = offer.PdfGeneratedAt
             };
         }
 
@@ -2384,7 +2386,9 @@ namespace SoitMed.Services
                 SalesManagerRejectionReason = offer.SalesManagerRejectionReason,
                 CreatedAt = offer.CreatedAt,
                 IsSalesManagerApproved = offer.Status == OfferStatus.Sent && !string.IsNullOrEmpty(offer.SalesManagerApprovedBy),
-                CanSendToSalesman = offer.Status == OfferStatus.Sent
+                CanSendToSalesman = offer.Status == OfferStatus.Sent,
+                PdfPath = offer.PdfPath,
+                PdfGeneratedAt = offer.PdfGeneratedAt
             };
         }
 
