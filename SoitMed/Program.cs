@@ -175,6 +175,7 @@ namespace SoitMed
                 builder.Services.AddScoped<ISalesmanStatisticsService, SalesmanStatisticsService>();
                 builder.Services.AddScoped<IImageUploadService, ImageUploadService>();
                 builder.Services.AddScoped<IPdfUploadService, PdfUploadService>();
+                builder.Services.AddScoped<IOfferPdfService, OfferPdfService>();
                 builder.Services.AddScoped<IRoleBasedImageUploadService, RoleBasedImageUploadService>();
                 builder.Services.AddScoped<IVoiceUploadService, VoiceUploadService>();
                 builder.Services.AddScoped<IEmailService, EmailService>();
