@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using SoitMed.DTO;
 using SoitMed.Hubs;
 using SoitMed.Models;
+using SoitMed.Models.Core;
+using SoitMed.Models.Enums;
 using SoitMed.Models.Identity;
 using SoitMed.Repositories;
 using System.Security.Claims;
@@ -18,6 +21,7 @@ namespace SoitMed.Services
         private readonly ILogger<ChatService> _logger;
         private readonly IWebHostEnvironment _environment;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly UserManager<ApplicationUser> _userManager;
 
         public ChatService(
             IUnitOfWork unitOfWork,
@@ -25,7 +29,8 @@ namespace SoitMed.Services
             INotificationService notificationService,
             ILogger<ChatService> logger,
             IWebHostEnvironment environment,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            UserManager<ApplicationUser> userManager)
         {
             _unitOfWork = unitOfWork;
             _hubContext = hubContext;
@@ -33,23 +38,31 @@ namespace SoitMed.Services
             _logger = logger;
             _environment = environment;
             _httpContextAccessor = httpContextAccessor;
+            _userManager = userManager;
         }
 
-        public async Task<ChatConversationResponseDTO> GetOrCreateConversationAsync(string customerId, string? adminId, CancellationToken cancellationToken = default)
+        public async Task<ChatConversationResponseDTO> GetOrCreateConversationAsync(string customerId, ChatType chatType, string? adminId = null, CancellationToken cancellationToken = default)
         {
-            // Check if conversation already exists
-            var existingConversation = await _unitOfWork.ChatConversations.GetByCustomerIdAsync(customerId, cancellationToken);
+            // Check if conversation already exists for this customer and chat type
+            var existingConversation = await _unitOfWork.ChatConversations.GetByCustomerIdAndTypeAsync(customerId, chatType, cancellationToken);
             
             if (existingConversation != null)
             {
                 return await MapToConversationDTOAsync(existingConversation, cancellationToken);
             }
 
+            // Auto-assign admin based on chat type if not provided
+            if (string.IsNullOrEmpty(adminId))
+            {
+                adminId = await AutoAssignAdminByChatTypeAsync(chatType, cancellationToken);
+            }
+
             // Create new conversation
             var conversation = new ChatConversation
             {
                 CustomerId = customerId,
-                AdminId = adminId, // Can be null for auto-assignment
+                AdminId = adminId, // Can be null if no support staff available
+                ChatType = chatType,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
@@ -59,26 +72,120 @@ namespace SoitMed.Services
             await _unitOfWork.ChatConversations.CreateAsync(conversation, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Created new chat conversation. ConversationId: {ConversationId}, CustomerId: {CustomerId}", 
-                conversation.Id, customerId);
+            _logger.LogInformation("Created new chat conversation. ConversationId: {ConversationId}, CustomerId: {CustomerId}, ChatType: {ChatType}, AdminId: {AdminId}", 
+                conversation.Id, customerId, chatType, adminId ?? "None");
 
             return await MapToConversationDTOAsync(conversation, cancellationToken);
         }
 
-        public async Task<IEnumerable<ChatConversationResponseDTO>> GetConversationsAsync(string userId, bool isAdmin, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Auto-assigns an admin/support staff based on chat type
+        /// </summary>
+        private async Task<string?> AutoAssignAdminByChatTypeAsync(ChatType chatType, CancellationToken cancellationToken)
+        {
+            try
+            {
+                string targetRole;
+                switch (chatType)
+                {
+                    case ChatType.Support:
+                        targetRole = UserRoles.Admin;
+                        break;
+                    case ChatType.Sales:
+                        targetRole = UserRoles.SalesSupport;
+                        break;
+                    case ChatType.Maintenance:
+                        targetRole = UserRoles.MaintenanceSupport;
+                        break;
+                    default:
+                        targetRole = UserRoles.Admin;
+                        break;
+                }
+
+                // Get all users with the target role
+                var supportUsers = await _userManager.GetUsersInRoleAsync(targetRole);
+                var activeUsers = supportUsers.Where(u => u.IsActive).ToList();
+
+                if (!activeUsers.Any())
+                {
+                    _logger.LogWarning("No active {Role} users found for chat type {ChatType}. Conversation will be created without assignment.", 
+                        targetRole, chatType);
+                    return null;
+                }
+
+                // For now, assign to the first active user
+                // TODO: Could implement round-robin or load balancing here
+                var assignedUser = activeUsers.First();
+                _logger.LogInformation("Auto-assigned {Role} user {UserId} ({UserName}) for chat type {ChatType}", 
+                    targetRole, assignedUser.Id, assignedUser.UserName, chatType);
+
+                return assignedUser.Id;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error auto-assigning admin for chat type {ChatType}", chatType);
+                return null;
+            }
+        }
+
+        public async Task<IEnumerable<ChatConversationResponseDTO>> GetConversationsAsync(string userId, List<string> userRoles, CancellationToken cancellationToken = default)
         {
             IEnumerable<ChatConversation> conversations;
+            var isSuperAdmin = userRoles.Contains(UserRoles.SuperAdmin);
+            var isAdmin = userRoles.Contains(UserRoles.Admin);
+            var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
+            var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
+            var isCustomer = userRoles.Contains("Customer");
 
-            if (isAdmin)
+            if (isSuperAdmin)
             {
-                // Admin can see all conversations or assigned conversations
+                // SuperAdmin can see ALL conversations regardless of type
                 conversations = await _unitOfWork.ChatConversations.GetAllActiveConversationsAsync(cancellationToken);
+            }
+            else if (isAdmin || isSalesSupport || isMaintenanceSupport)
+            {
+                // Support staff can see conversations assigned to them or unassigned conversations of their type
+                var allConversations = new List<ChatConversation>();
+
+                // Get conversations assigned to this user
+                var assignedConversations = await _unitOfWork.ChatConversations.GetAdminConversationsAsync(userId, cancellationToken);
+
+                // Get unassigned conversations based on role
+                if (isAdmin)
+                {
+                    var unassignedSupport = await _unitOfWork.ChatConversations.GetActiveConversationsByTypeAsync(ChatType.Support, cancellationToken);
+                    allConversations.AddRange(unassignedSupport.Where(c => string.IsNullOrEmpty(c.AdminId)));
+                }
+                if (isSalesSupport)
+                {
+                    var unassignedSales = await _unitOfWork.ChatConversations.GetActiveConversationsByTypeAsync(ChatType.Sales, cancellationToken);
+                    allConversations.AddRange(unassignedSales.Where(c => string.IsNullOrEmpty(c.AdminId)));
+                }
+                if (isMaintenanceSupport)
+                {
+                    var unassignedMaintenance = await _unitOfWork.ChatConversations.GetActiveConversationsByTypeAsync(ChatType.Maintenance, cancellationToken);
+                    allConversations.AddRange(unassignedMaintenance.Where(c => string.IsNullOrEmpty(c.AdminId)));
+                }
+
+                // Combine assigned and unassigned conversations
+                allConversations.AddRange(assignedConversations);
+                conversations = allConversations.DistinctBy(c => c.Id);
+            }
+            else if (isCustomer)
+            {
+                // Customer can see all their conversations (one per chat type)
+                var supportConv = await _unitOfWork.ChatConversations.GetByCustomerIdAndTypeAsync(userId, ChatType.Support, cancellationToken);
+                var salesConv = await _unitOfWork.ChatConversations.GetByCustomerIdAndTypeAsync(userId, ChatType.Sales, cancellationToken);
+                var maintenanceConv = await _unitOfWork.ChatConversations.GetByCustomerIdAndTypeAsync(userId, ChatType.Maintenance, cancellationToken);
+
+                conversations = new[] { supportConv, salesConv, maintenanceConv }
+                    .Where(c => c != null)
+                    .Cast<ChatConversation>();
             }
             else
             {
-                // Customer can only see their own conversation
-                var conversation = await _unitOfWork.ChatConversations.GetByCustomerIdAsync(userId, cancellationToken);
-                conversations = conversation != null ? new[] { conversation } : Enumerable.Empty<ChatConversation>();
+                // No conversations for other roles
+                conversations = Enumerable.Empty<ChatConversation>();
             }
 
             var result = new List<ChatConversationResponseDTO>();
@@ -91,17 +198,51 @@ namespace SoitMed.Services
             return result.OrderByDescending(c => c.LastMessageAt);
         }
 
-        public async Task<ChatConversationResponseDTO?> GetConversationByIdAsync(long conversationId, string userId, bool isAdmin, CancellationToken cancellationToken = default)
+        public async Task<ChatConversationResponseDTO?> GetConversationByIdAsync(long conversationId, string userId, List<string> userRoles, CancellationToken cancellationToken = default)
         {
             var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
             
             if (conversation == null)
                 return null;
 
-            // Security check: Customer can only access their own conversation
-            if (!isAdmin && conversation.CustomerId != userId)
+            var isSuperAdmin = userRoles.Contains(UserRoles.SuperAdmin);
+            var isAdmin = userRoles.Contains(UserRoles.Admin);
+            var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
+            var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
+            var isCustomer = userRoles.Contains("Customer");
+
+            // Security check
+            if (isSuperAdmin)
             {
-                throw new UnauthorizedAccessException("You do not have access to this conversation");
+                // SuperAdmin can access any conversation
+            }
+            else if (isCustomer)
+            {
+                // Customer can only access their own conversations
+                if (conversation.CustomerId != userId)
+                {
+                    throw new UnauthorizedAccessException("You do not have access to this conversation");
+                }
+            }
+            else
+            {
+                // Support staff can only access conversations of their type
+                bool hasAccess = false;
+                if (isAdmin && conversation.ChatType == ChatType.Support)
+                    hasAccess = true;
+                else if (isSalesSupport && conversation.ChatType == ChatType.Sales)
+                    hasAccess = true;
+                else if (isMaintenanceSupport && conversation.ChatType == ChatType.Maintenance)
+                    hasAccess = true;
+
+                // Also allow if assigned to them
+                if (!hasAccess && conversation.AdminId == userId)
+                    hasAccess = true;
+
+                if (!hasAccess)
+                {
+                    throw new UnauthorizedAccessException("You do not have access to this conversation type");
+                }
             }
 
             return await MapToConversationDTOAsync(conversation, cancellationToken);
@@ -132,7 +273,7 @@ namespace SoitMed.Services
             return await MapToConversationDTOAsync(conversation, cancellationToken);
         }
 
-        public async Task<ChatMessageResponseDTO> SendTextMessageAsync(long conversationId, string senderId, string content, bool isAdmin, CancellationToken cancellationToken = default)
+        public async Task<ChatMessageResponseDTO> SendTextMessageAsync(long conversationId, string senderId, string content, List<string> userRoles, CancellationToken cancellationToken = default)
         {
             var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
             if (conversation == null)
@@ -140,15 +281,32 @@ namespace SoitMed.Services
 
             // Check if sender is customer
             var isCustomer = conversation.CustomerId == senderId;
+            var isSuperAdmin = userRoles.Contains(UserRoles.SuperAdmin);
+            var isAdmin = userRoles.Contains(UserRoles.Admin);
+            var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
+            var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
 
-            // Security check: sender must be either the customer or an admin
-            if (!isCustomer && !isAdmin)
+            // Security check: sender must be either the customer or authorized support staff
+            if (!isCustomer)
             {
-                throw new UnauthorizedAccessException("You are not authorized to send messages in this conversation");
+                bool isAuthorized = false;
+                if (isSuperAdmin)
+                    isAuthorized = true;
+                else if (isAdmin && conversation.ChatType == ChatType.Support)
+                    isAuthorized = true;
+                else if (isSalesSupport && conversation.ChatType == ChatType.Sales)
+                    isAuthorized = true;
+                else if (isMaintenanceSupport && conversation.ChatType == ChatType.Maintenance)
+                    isAuthorized = true;
+
+                if (!isAuthorized)
+                {
+                    throw new UnauthorizedAccessException("You are not authorized to send messages in this conversation type");
+                }
             }
 
-            // If admin is sending and AdminId is null, assign this admin to the conversation
-            if (isAdmin && string.IsNullOrEmpty(conversation.AdminId))
+            // If support staff is sending and AdminId is null, assign them to the conversation
+            if (!isCustomer && string.IsNullOrEmpty(conversation.AdminId))
             {
                 conversation.AdminId = senderId;
                 conversation.UpdatedAt = DateTime.UtcNow;
@@ -215,7 +373,7 @@ namespace SoitMed.Services
             return messageDTO;
         }
 
-        public async Task<ChatMessageResponseDTO> SendVoiceMessageAsync(long conversationId, string senderId, string voiceFilePath, int voiceDuration, bool isAdmin, CancellationToken cancellationToken = default)
+        public async Task<ChatMessageResponseDTO> SendVoiceMessageAsync(long conversationId, string senderId, string voiceFilePath, int voiceDuration, List<string> userRoles, CancellationToken cancellationToken = default)
         {
             var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
             if (conversation == null)
@@ -223,15 +381,32 @@ namespace SoitMed.Services
 
             // Check if sender is customer
             var isCustomer = conversation.CustomerId == senderId;
+            var isSuperAdmin = userRoles.Contains(UserRoles.SuperAdmin);
+            var isAdmin = userRoles.Contains(UserRoles.Admin);
+            var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
+            var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
 
-            // Security check: sender must be either the customer or an admin
-            if (!isCustomer && !isAdmin)
+            // Security check: sender must be either the customer or authorized support staff
+            if (!isCustomer)
             {
-                throw new UnauthorizedAccessException("You are not authorized to send messages in this conversation");
+                bool isAuthorized = false;
+                if (isSuperAdmin)
+                    isAuthorized = true;
+                else if (isAdmin && conversation.ChatType == ChatType.Support)
+                    isAuthorized = true;
+                else if (isSalesSupport && conversation.ChatType == ChatType.Sales)
+                    isAuthorized = true;
+                else if (isMaintenanceSupport && conversation.ChatType == ChatType.Maintenance)
+                    isAuthorized = true;
+
+                if (!isAuthorized)
+                {
+                    throw new UnauthorizedAccessException("You are not authorized to send messages in this conversation type");
+                }
             }
 
-            // If admin is sending and AdminId is null, assign this admin to the conversation
-            if (isAdmin && string.IsNullOrEmpty(conversation.AdminId))
+            // If support staff is sending and AdminId is null, assign them to the conversation
+            if (!isCustomer && string.IsNullOrEmpty(conversation.AdminId))
             {
                 conversation.AdminId = senderId;
                 conversation.UpdatedAt = DateTime.UtcNow;
@@ -299,16 +474,50 @@ namespace SoitMed.Services
             return messageDTO;
         }
 
-        public async Task<IEnumerable<ChatMessageResponseDTO>> GetMessagesAsync(long conversationId, string userId, bool isAdmin, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<ChatMessageResponseDTO>> GetMessagesAsync(long conversationId, string userId, List<string> userRoles, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default)
         {
             var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
             if (conversation == null)
                 throw new ArgumentException("Conversation not found", nameof(conversationId));
 
+            var isSuperAdmin = userRoles.Contains(UserRoles.SuperAdmin);
+            var isAdmin = userRoles.Contains(UserRoles.Admin);
+            var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
+            var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
+            var isCustomer = userRoles.Contains("Customer");
+
             // Security check
-            if (!isAdmin && conversation.CustomerId != userId)
+            if (isSuperAdmin)
             {
-                throw new UnauthorizedAccessException("You are not authorized to view messages in this conversation");
+                // SuperAdmin can view any conversation
+            }
+            else if (isCustomer)
+            {
+                // Customer can only view their own conversations
+                if (conversation.CustomerId != userId)
+                {
+                    throw new UnauthorizedAccessException("You are not authorized to view messages in this conversation");
+                }
+            }
+            else
+            {
+                // Support staff can only view conversations of their type
+                bool hasAccess = false;
+                if (isAdmin && conversation.ChatType == ChatType.Support)
+                    hasAccess = true;
+                else if (isSalesSupport && conversation.ChatType == ChatType.Sales)
+                    hasAccess = true;
+                else if (isMaintenanceSupport && conversation.ChatType == ChatType.Maintenance)
+                    hasAccess = true;
+
+                // Also allow if assigned to them
+                if (!hasAccess && conversation.AdminId == userId)
+                    hasAccess = true;
+
+                if (!hasAccess)
+                {
+                    throw new UnauthorizedAccessException("You are not authorized to view messages in this conversation type");
+                }
             }
 
             var messages = await _unitOfWork.ChatMessages.GetConversationMessagesAsync(conversationId, page, pageSize, cancellationToken);
@@ -416,6 +625,14 @@ namespace SoitMed.Services
                 CustomerImageUrl = customerImageUrl,
                 AdminId = conversation.AdminId,
                 AdminName = admin != null ? $"{admin.FirstName} {admin.LastName}".Trim() : null,
+                ChatType = conversation.ChatType,
+                ChatTypeName = conversation.ChatType switch
+                {
+                    ChatType.Support => "Support",
+                    ChatType.Sales => "Sales",
+                    ChatType.Maintenance => "Maintenance",
+                    _ => "Support"
+                },
                 LastMessageAt = conversation.LastMessageAt,
                 LastMessagePreview = conversation.LastMessagePreview,
                 IsActive = conversation.IsActive,
