@@ -1,11 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SoitMed.Models.Enums;
 using SoitMed.Models.Identity;
 
 namespace SoitMed.Models
 {
     /// <summary>
-    /// Chat conversation between a customer and admin
+    /// Chat conversation between a customer and support staff
     /// </summary>
     public class ChatConversation
     {
@@ -17,7 +18,14 @@ namespace SoitMed.Models
         public string CustomerId { get; set; } = string.Empty;
 
         [MaxLength(450)]
-        public string? AdminId { get; set; } // Assigned admin (nullable for auto-assignment)
+        public string? AdminId { get; set; } // Assigned support staff (nullable for auto-assignment)
+
+        /// <summary>
+        /// Type of chat conversation (Support, Sales, or Maintenance)
+        /// Determines which role can handle the conversation
+        /// </summary>
+        [Required]
+        public ChatType ChatType { get; set; } = ChatType.Support;
 
         public DateTime LastMessageAt { get; set; } = DateTime.UtcNow;
 
