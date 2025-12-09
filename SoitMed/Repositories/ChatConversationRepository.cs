@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SoitMed.Models;
+using SoitMed.Models.Enums;
 
 namespace SoitMed.Repositories
 {
@@ -17,6 +18,14 @@ namespace SoitMed.Repositories
                 .FirstOrDefaultAsync(c => c.CustomerId == customerId && c.IsActive, cancellationToken);
         }
 
+        public async Task<ChatConversation?> GetByCustomerIdAndTypeAsync(string customerId, ChatType chatType, CancellationToken cancellationToken = default)
+        {
+            return await _context.ChatConversations
+                .Include(c => c.Customer)
+                .Include(c => c.Admin)
+                .FirstOrDefaultAsync(c => c.CustomerId == customerId && c.ChatType == chatType && c.IsActive, cancellationToken);
+        }
+
         public async Task<IEnumerable<ChatConversation>> GetAdminConversationsAsync(string adminId, CancellationToken cancellationToken = default)
         {
             return await _context.ChatConversations
@@ -27,12 +36,32 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
+        public async Task<IEnumerable<ChatConversation>> GetAdminConversationsByTypeAsync(string adminId, ChatType chatType, CancellationToken cancellationToken = default)
+        {
+            return await _context.ChatConversations
+                .Include(c => c.Customer)
+                .Include(c => c.Admin)
+                .Where(c => c.AdminId == adminId && c.ChatType == chatType && c.IsActive)
+                .OrderByDescending(c => c.LastMessageAt)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<IEnumerable<ChatConversation>> GetAllActiveConversationsAsync(CancellationToken cancellationToken = default)
         {
             return await _context.ChatConversations
                 .Include(c => c.Customer)
                 .Include(c => c.Admin)
                 .Where(c => c.IsActive)
+                .OrderByDescending(c => c.LastMessageAt)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<IEnumerable<ChatConversation>> GetActiveConversationsByTypeAsync(ChatType chatType, CancellationToken cancellationToken = default)
+        {
+            return await _context.ChatConversations
+                .Include(c => c.Customer)
+                .Include(c => c.Admin)
+                .Where(c => c.ChatType == chatType && c.IsActive)
                 .OrderByDescending(c => c.LastMessageAt)
                 .ToListAsync(cancellationToken);
         }
