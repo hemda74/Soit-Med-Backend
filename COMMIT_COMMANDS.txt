@@ -1,0 +1,258 @@
+Backend Project - Manual Commit Commands for Dev Branch
+========================================================
+
+Make sure you're on the dev branch:
+  git checkout dev
+
+Commit 1: Maintenance Module - Core Models and DTOs
+---------------------------------------------------
+git add SoitMed/Models/MaintenanceRequest.cs
+git add SoitMed/Models/MaintenanceVisit.cs
+git add SoitMed/Models/MaintenanceRequestAttachment.cs
+git add SoitMed/Models/SparePartRequest.cs
+git add SoitMed/Models/MaintenanceRequestRating.cs
+git add SoitMed/DTO/MaintenanceDTOs.cs
+git commit -m "feat: add maintenance module core models and DTOs
+
+- Add MaintenanceRequest model with status tracking
+- Add MaintenanceVisit model for engineer visits
+- Add MaintenanceRequestAttachment model for file attachments
+- Add SparePartRequest model with availability workflow
+- Add MaintenanceRequestRating model for customer feedback
+- Add comprehensive DTOs for maintenance operations"
+
+Commit 2: Maintenance Module - Repositories
+--------------------------------------------
+git add SoitMed/Repositories/IMaintenanceRequestRepository.cs
+git add SoitMed/Repositories/MaintenanceRequestRepository.cs
+git add SoitMed/Repositories/IMaintenanceVisitRepository.cs
+git add SoitMed/Repositories/MaintenanceVisitRepository.cs
+git add SoitMed/Repositories/ISparePartRequestRepository.cs
+git add SoitMed/Repositories/SparePartRequestRepository.cs
+git add SoitMed/Repositories/IMaintenanceRequestAttachmentRepository.cs
+git add SoitMed/Repositories/MaintenanceRequestAttachmentRepository.cs
+git add SoitMed/Repositories/IUnitOfWork.cs
+git add SoitMed/Repositories/UnitOfWork.cs
+git commit -m "feat: implement maintenance module repositories
+
+- Add MaintenanceRequestRepository with CRUD operations
+- Add MaintenanceVisitRepository for visit management
+- Add SparePartRequestRepository for spare parts workflow
+- Add MaintenanceRequestAttachmentRepository for file management
+- Update UnitOfWork to include maintenance repositories"
+
+Commit 3: Maintenance Module - Services
+----------------------------------------
+git add SoitMed/Services/IMaintenanceRequestService.cs
+git add SoitMed/Services/MaintenanceRequestService.cs
+git add SoitMed/Services/IMaintenanceVisitService.cs
+git add SoitMed/Services/MaintenanceVisitService.cs
+git add SoitMed/Services/ISparePartRequestService.cs
+git add SoitMed/Services/SparePartRequestService.cs
+git add SoitMed/Services/MaintenanceAttachmentService.cs
+git commit -m "feat: implement maintenance module services
+
+- Add MaintenanceRequestService with auto-assignment logic
+- Add MaintenanceVisitService for visit operations
+- Add SparePartRequestService for spare parts workflow
+- Add MaintenanceAttachmentService for file upload handling
+- Implement role-based filtering and status tracking"
+
+Commit 4: Maintenance Module - Controllers
+--------------------------------------------
+git add SoitMed/Controllers/MaintenanceRequestController.cs
+git add SoitMed/Controllers/MaintenanceVisitController.cs
+git add SoitMed/Controllers/SparePartRequestController.cs
+git add SoitMed/Controllers/MaintenanceAttachmentController.cs
+git commit -m "feat: add maintenance module API controllers
+
+- Add MaintenanceRequestController with full CRUD operations
+- Add MaintenanceVisitController for visit management
+- Add SparePartRequestController for spare parts workflow
+- Add MaintenanceAttachmentController for file uploads
+- Implement role-based authorization and validation"
+
+Commit 5: Payment Module
+------------------------
+git add SoitMed/Models/Payment.cs
+git add SoitMed/Models/PaymentTransaction.cs
+git add SoitMed/Models/PaymentGatewayConfig.cs
+git add SoitMed/DTO/PaymentDTOs.cs
+git add SoitMed/Repositories/IPaymentRepository.cs
+git add SoitMed/Repositories/PaymentRepository.cs
+git add SoitMed/Services/IPaymentService.cs
+git add SoitMed/Services/PaymentService.cs
+git add SoitMed/Services/IAccountingService.cs
+git add SoitMed/Services/AccountingService.cs
+git add SoitMed/Controllers/PaymentController.cs
+git commit -m "feat: implement payment module
+
+- Add Payment, PaymentTransaction, and PaymentGatewayConfig models
+- Add PaymentDTOs for payment operations
+- Add PaymentRepository and PaymentService
+- Add AccountingService for payment approval workflow
+- Add PaymentController with payment processing endpoints"
+
+Commit 6: Service Registration and Configuration
+-------------------------------------------------
+git add SoitMed/Extensions/ServiceCollectionExtensions.cs
+git add SoitMed/Program.cs
+git commit -m "chore: register maintenance and payment services
+
+- Update ServiceCollectionExtensions with new service registrations
+- Configure dependency injection for maintenance and payment modules
+- Update Program.cs with necessary middleware and configurations"
+
+Commit 7: Equipment Model Updates
+----------------------------------
+git add SoitMed/Models/Equipment.cs
+git commit -m "refactor: update Equipment model to support hospital and customer links
+
+- Add nullable HospitalId and CustomerId properties
+- Support equipment linking to both hospitals and direct customers"
+
+Commit 8: Chat Module - Chat Type Enum and Model Updates
+-----------------------------------------------------------
+git add SoitMed/Models/Enums/ChatType.cs
+git add SoitMed/Models/ChatConversation.cs
+git commit -m "feat: add chat type categorization for conversation routing
+
+Business Logic:
+- Add ChatType enum (Support, Sales, Maintenance) to categorize conversations
+- Support conversations route to Admin role for app problems and complaints
+- Sales conversations route to SalesSupport role for sales inquiries
+- Maintenance conversations route to MaintenanceSupport role for maintenance inquiries
+- Update ChatConversation model with ChatType property for role-based routing
+- Enable automatic conversation assignment based on chat type and user roles
+- Improve customer support efficiency by routing to appropriate specialists"
+
+Commit 9: Chat Module - Repository Updates
+-------------------------------------------
+git add SoitMed/Repositories/IChatConversationRepository.cs
+git add SoitMed/Repositories/ChatConversationRepository.cs
+git commit -m "feat: enhance chat repository with chat type filtering
+
+Business Logic:
+- Add GetByCustomerIdAndTypeAsync for retrieving conversations by type
+- Add GetAdminConversationsByTypeAsync for role-based conversation filtering
+- Add GetActiveConversationsByTypeAsync for unassigned conversation management
+- Enable support staff to view only conversations matching their role
+- Support efficient conversation assignment workflow by chat type
+- Improve query performance with indexed chat type lookups"
+
+Commit 10: Chat Module - Service Updates
+------------------------------------------
+git add SoitMed/Services/IChatService.cs
+git add SoitMed/Services/ChatService.cs
+git commit -m "feat: implement chat type-based conversation routing and assignment
+
+Business Logic:
+- Add chat type parameter to GetOrCreateConversationAsync method
+- Implement AutoAssignAdminByChatTypeAsync for automatic role-based assignment
+- Support conversations route to Admin role automatically
+- Sales conversations route to SalesSupport role automatically
+- Maintenance conversations route to MaintenanceSupport role automatically
+- Update GetConversationsAsync to filter by user role and chat type
+- Enhance authorization checks to ensure users only access appropriate conversations
+- Improve customer experience by connecting them to the right support specialist
+- Add comprehensive logging for conversation assignment and routing decisions"
+
+Commit 11: Chat Module - Controller and DTO Updates
+-----------------------------------------------------
+git add SoitMed/Controllers/ChatController.cs
+git add SoitMed/DTO/ChatDTOs.cs
+git commit -m "feat: update chat API to support chat type categorization
+
+Business Logic:
+- Add ChatType to CreateConversationDTO for conversation type specification
+- Add ChatType and ChatTypeName to ChatConversationResponseDTO
+- Update GetOrCreateConversation endpoint to accept and process chat type
+- Validate chat type in conversation creation requests
+- Return chat type information in all conversation responses
+- Enable frontend to display conversation category to users
+- Support role-based conversation filtering in API responses"
+
+Commit 12: Chat Module - Database Migration
+---------------------------------------------
+git add SoitMed/Scripts/AddChatTypeToConversations.sql
+git commit -m "feat: add database migration for chat type column
+
+Business Logic:
+- Add ChatType column to ChatConversations table with default Support type
+- Create index on ChatType for improved query performance
+- Create composite index on CustomerId and ChatType for efficient lookups
+- Support existing conversations with backward compatibility (default to Support)
+- Enable efficient filtering of conversations by type for role-based access
+- Improve database query performance for chat type-based operations"
+
+Commit 13: Offer PDF Generation - Service Updates
+--------------------------------------------------
+git add SoitMed/Services/IOfferPdfService.cs
+git add SoitMed/Services/OfferPdfService.cs
+git commit -m "feat: enhance offer PDF generation with on-demand streaming
+
+Business Logic:
+- Implement on-demand PDF generation without file storage on server
+- Stream PDF bytes directly to client for improved performance and storage efficiency
+- Support multi-language PDF generation (AR/EN) for international customers
+- Integrate letterhead template for professional offer document branding
+- Use PuppeteerSharp for HTML to PDF conversion with proper image loading
+- Add browser download management with semaphore for thread safety
+- Improve PDF generation reliability with proper error handling and logging
+- Reduce server storage requirements by eliminating PDF file persistence
+- Support A4 format with proper margins and background image rendering"
+
+Commit 14: Offer Controller - PDF Endpoint Updates
+---------------------------------------------------
+git add SoitMed/Controllers/OfferController.cs
+git commit -m "feat: add on-demand PDF generation endpoint for offers
+
+Business Logic:
+- Add GetOfferPdf endpoint with language parameter support (en/ar)
+- Stream PDF directly to client without saving to server storage
+- Validate language parameter and default to English if invalid
+- Generate PDF filename with offer ID and timestamp for uniqueness
+- Improve offer document accessibility for sales team and customers
+- Support instant PDF generation for offers without pre-generation
+- Enable customers to download offer documents in their preferred language"
+
+Commit 15: Database Scripts and Maintenance
+--------------------------------------------
+git add SoitMed/Scripts/00_CheckDatabase.sql
+git add SoitMed/Scripts/01_UseCorrectDatabase.sql
+git add SoitMed/Scripts/DEBUG_NOTIFICATIONS.sql
+git add SoitMed/Scripts/SeedProductsFromPDF_Safe.sql
+git commit -m "chore: update database maintenance and debugging scripts
+
+- Update database check and selection scripts
+- Add notification debugging script for troubleshooting
+- Update product seeding script with safety checks
+- Improve script documentation and error handling"
+
+Commit 16: Generated PDF Files (Temporary - Exclude from Production)
+-----------------------------------------------------------------------
+# Note: These are generated test files, consider adding to .gitignore
+# git add SoitMed/wwwroot/Offer_*.pdf
+# git add SoitMed/wwwroot/chat/voice/*.m4a
+# git commit -m "chore: add generated test PDF and voice files (temporary)"
+
+# OR exclude them:
+# Add to .gitignore: SoitMed/wwwroot/Offer_*.pdf
+# Add to .gitignore: SoitMed/wwwroot/chat/voice/*.m4a
+
+Commit 17: Documentation
+-------------------------
+git add COMMIT_COMMANDS.txt
+git commit -m "docs: update commit commands documentation
+
+- Add comprehensive commit commands for chat type feature
+- Document offer PDF generation improvements
+- Include business logic descriptions for all commits"
+
+Push to Remote
+-------------
+git push origin dev
+
+
+
+
