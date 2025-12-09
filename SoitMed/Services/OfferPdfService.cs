@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using PuppeteerSharp;
 using PuppeteerSharp.Media;
@@ -19,17 +20,20 @@ namespace SoitMed.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<OfferPdfService> _logger;
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private static bool _browserDownloaded = false;
         private static readonly SemaphoreSlim _browserSemaphore = new SemaphoreSlim(1, 1);
 
         public OfferPdfService(
             IUnitOfWork unitOfWork,
             IWebHostEnvironment environment,
-            ILogger<OfferPdfService> logger)
+            ILogger<OfferPdfService> logger,
+            IHttpContextAccessor httpContextAccessor)
         {
             _unitOfWork = unitOfWork;
             _environment = environment;
             _logger = logger;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -83,7 +87,7 @@ namespace SoitMed.Services
                 });
                 
                 // Wait a bit more to ensure background images are fully loaded
-                await page.WaitForTimeoutAsync(500);
+                await Task.Delay(500);
 
                 // Generate PDF with no margins to ensure letterhead shows fully
                 var pdfOptions = new PdfOptions
@@ -98,10 +102,12 @@ namespace SoitMed.Services
                         Left = "0mm"
                     }
                 };
+                // Generate PDF in memory (no file saving - returns bytes directly)
                 var pdfBytes = await page.PdfDataAsync(pdfOptions);
 
-                _logger.LogInformation("PDF generated on-demand for offer {OfferId} (size: {Size} bytes)", offerId, pdfBytes.Length);
+                _logger.LogInformation("PDF generated on-demand for offer {OfferId} (size: {Size} bytes) - NOT saved to disk", offerId, pdfBytes.Length);
 
+                // Return bytes directly - no file saving occurs
                 return pdfBytes;
             }
             catch (Exception ex)
@@ -221,9 +227,9 @@ namespace SoitMed.Services
         }
 
         /// <summary>
-        /// Get full image URL for equipment images
+        /// Get full absolute image URL for equipment images (required for Puppeteer)
         /// </summary>
-        private string GetImageUrl(string? imagePath, string baseUrl = "")
+        private string GetImageUrl(string? imagePath)
         {
             if (string.IsNullOrEmpty(imagePath))
                 return "";
@@ -232,12 +238,31 @@ namespace SoitMed.Services
             if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://"))
                 return imagePath;
 
-            // If starts with /, it's already a relative path
-            if (imagePath.StartsWith("/"))
-                return imagePath;
+            // Get base URL from HTTP context
+            var httpContext = _httpContextAccessor.HttpContext;
+            string baseUrl = "";
+            
+            if (httpContext != null)
+            {
+                var request = httpContext.Request;
+                baseUrl = $"{request.Scheme}://{request.Host}";
+            }
+            else
+            {
+                // Fallback if no HTTP context (shouldn't happen in normal flow)
+                baseUrl = "http://localhost:5117"; // Default development URL
+                _logger.LogWarning("No HTTP context available, using fallback base URL");
+            }
 
-            // Otherwise, construct relative path
-            return $"/{imagePath.Replace('\\', '/')}";
+            // Normalize path
+            string normalizedPath = imagePath.Replace('\\', '/');
+            if (!normalizedPath.StartsWith("/"))
+            {
+                normalizedPath = "/" + normalizedPath;
+            }
+
+            // Return absolute URL
+            return $"{baseUrl}{normalizedPath}";
         }
 
         private string GenerateOfferHtml(
@@ -340,12 +365,11 @@ namespace SoitMed.Services
             // Calculate content area matching jsPDF logic
             // A4 page: 210mm x 297mm
             double pageHeight = 297.0; // mm
-            double pageWidth = 210.0; // mm
             double topContentMargin = pageHeight * 0.16; // 16% from top = ~47.5mm
-            double bottomContentMargin = pageHeight * 0.15; // 15% from bottom = ~44.5mm
+            double bottomContentMargin = pageHeight * 0.20; // 20% from bottom = ~59.4mm
             double contentStartY = topContentMargin; // Content starts here
             double contentEndY = pageHeight - bottomContentMargin; // Content ends here
-            double availableContentHeight = contentEndY - contentStartY; // ~205mm
+            double availableContentHeight = contentEndY - contentStartY; // ~190mm (reduced from ~205mm)
             
             // Calculate row heights dynamically (matching jsPDF: 20% of page height per product, but adjusted)
             double baseRowHeight = pageHeight * 0.2; // 20% = ~59.4mm per product
@@ -355,71 +379,81 @@ namespace SoitMed.Services
             // Header section heights (approximate, matching jsPDF)
             double headerHeight = 60.0; // Date + greeting + intro + title
             double tableHeaderHeight = 8.0; // Table header row
-            double financialSectionHeight = 80.0; // Financial summary
-            double termsSectionHeight = 100.0; // Terms & conditions (variable)
-            double footerHeight = 40.0; // Footer
             
             // Split equipment into pages based on available space (matching jsPDF logic)
             var productPages = new List<List<OfferEquipment>>();
             
             if (equipment != null && equipment.Any())
             {
-                var currentPageProducts = new List<OfferEquipment>();
-                double currentPageUsedHeight = headerHeight; // First page has header
-                bool isFirstPage = true;
-                
-                foreach (var product in equipment)
+                // Special case: Exactly 2 products - first page gets header + first product, second page gets second product + summary
+                if (equipment.Count == 2)
                 {
-                    // Calculate product row height
-                    // Estimate: base height adjusted for content (name, description, image)
-                    double productRowHeight = baseRowHeight;
+                    // First page: Header + First product
+                    productPages.Add(new List<OfferEquipment> { equipment[0] });
+                    // Second page: Second product + Financial summary + Terms + Footer
+                    productPages.Add(new List<OfferEquipment> { equipment[1] });
+                }
+                else
+                {
+                    // For other cases, use dynamic pagination
+                    var currentPageProducts = new List<OfferEquipment>();
+                    double currentPageUsedHeight = headerHeight; // First page has header
+                    bool isFirstPage = true;
                     
-                    // Adjust based on description length (if description is long, add more height)
-                    if (!string.IsNullOrEmpty(product.Description) && product.Description.Length > 100)
+                    foreach (var product in equipment)
                     {
-                        productRowHeight += 10.0; // Add 10mm for long descriptions
-                    }
-                    
-                    // Ensure minimum height
-                    productRowHeight = Math.Max(productRowHeight, minRowHeight);
-                    
-                    // Check if this product fits on current page
-                    // Account for table header if this is the first product on a new page
-                    double requiredHeight = productRowHeight;
-                    if (currentPageProducts.Count == 0 && !isFirstPage)
-                    {
-                        requiredHeight += tableHeaderHeight; // Need table header on new product pages
-                    }
-                    
-                    // Check if adding this product would exceed available space
-                    // Leave some margin (10mm) for safety
-                    if (currentPageUsedHeight + requiredHeight + 10.0 > availableContentHeight)
-                    {
-                        // Current page is full, start a new page
-                        if (currentPageProducts.Any())
+                        // Calculate product row height
+                        // Estimate: base height adjusted for content (name, description, image)
+                        double productRowHeight = baseRowHeight;
+                        
+                        // Adjust based on description length (if description is long, add more height)
+                        if (!string.IsNullOrEmpty(product.Description) && product.Description.Length > 100)
                         {
-                            productPages.Add(currentPageProducts);
+                            productRowHeight += 10.0; // Add 10mm for long descriptions
                         }
-                        currentPageProducts = new List<OfferEquipment> { product };
-                        currentPageUsedHeight = tableHeaderHeight + productRowHeight; // New page: header + first product
-                        isFirstPage = false;
-                    }
-                    else
-                    {
-                        // Product fits, add to current page
+                        
+                        // Ensure minimum height
+                        productRowHeight = Math.Max(productRowHeight, minRowHeight);
+                        
+                        // Check if this product fits on current page
+                        // Account for table header if this is the first product on a new page
+                        double requiredHeight = productRowHeight;
                         if (currentPageProducts.Count == 0 && !isFirstPage)
                         {
-                            currentPageUsedHeight += tableHeaderHeight; // Add table header for new page
+                            requiredHeight += tableHeaderHeight; // Need table header on new product pages
                         }
-                        currentPageProducts.Add(product);
-                        currentPageUsedHeight += productRowHeight + rowSpacing; // Add product + spacing
+                        
+                    // Check if adding this product would exceed available space
+                    // Content wraps to next page when it reaches 20% margin from bottom
+                    // Leave some margin (10mm) for safety
+                    if (currentPageUsedHeight + requiredHeight + 10.0 > availableContentHeight)
+                        {
+                            // Current page is full, start a new page
+                            if (currentPageProducts.Any())
+                            {
+                                productPages.Add(currentPageProducts);
+                            }
+                            currentPageProducts = new List<OfferEquipment> { product };
+                            currentPageUsedHeight = tableHeaderHeight + productRowHeight; // New page: header + first product
+                            isFirstPage = false;
+                        }
+                        else
+                        {
+                            // Product fits, add to current page
+                            if (currentPageProducts.Count == 0 && !isFirstPage)
+                            {
+                                currentPageUsedHeight += tableHeaderHeight; // Add table header for new page
+                            }
+                            currentPageProducts.Add(product);
+                            currentPageUsedHeight += productRowHeight + rowSpacing; // Add product + spacing
+                        }
                     }
-                }
-                
-                // Add the last page if it has products
-                if (currentPageProducts.Any())
-                {
-                    productPages.Add(currentPageProducts);
+                    
+                    // Add the last page if it has products
+                    if (currentPageProducts.Any())
+                    {
+                        productPages.Add(currentPageProducts);
+                    }
                 }
             }
             else
@@ -451,9 +485,9 @@ namespace SoitMed.Services
                     }
                     rows.AppendLine("</td>");
                     rows.AppendLine("<td class='col-image'>");
-                    if (!string.IsNullOrEmpty(imageUrl))
+                    if (!string.IsNullOrEmpty(imageUrl) && !string.IsNullOrEmpty(eq.ImagePath))
                     {
-                        rows.AppendLine($"<img src='{imageUrl}' alt='{System.Net.WebUtility.HtmlEncode(eq.Name)}' class='product-image' onerror='this.style.display=\"none\"'>");
+                        rows.AppendLine($"<img src='{imageUrl}' alt='{System.Net.WebUtility.HtmlEncode(eq.Name)}' class='product-image' style='width: 50mm; height: 50mm; object-fit: contain; display: block; margin: 0 auto;' onerror=\"this.onerror=null; this.parentElement.innerHTML='<div class=\\'no-image-placeholder\\'><span>{translations["noImage"]}</span></div>';\">");
                     }
                     else
                     {
@@ -461,15 +495,17 @@ namespace SoitMed.Services
                     }
                     rows.AppendLine("</td>");
                     rows.AppendLine("<td class='col-provider'>");
+                    rows.AppendLine("<div class='provider-info'>");
                     if (!string.IsNullOrEmpty(providerImageUrl))
                     {
-                        rows.AppendLine($"<img src='{providerImageUrl}' alt='{System.Net.WebUtility.HtmlEncode(eq.Provider ?? "")}' class='provider-logo' onerror='this.style.display=\"none\"'>");
+                        rows.AppendLine($"<img src='{providerImageUrl}' alt='{System.Net.WebUtility.HtmlEncode(eq.Provider ?? "")}' class='provider-logo' style='width: 30mm; height: 15mm; object-fit: contain; display: block; margin-bottom: 4pt;' onerror='this.style.display=\"none\"'>");
                     }
                     rows.AppendLine($"<span class='provider-name'>{System.Net.WebUtility.HtmlEncode(eq.Provider ?? "N/A")}</span>");
                     if (!string.IsNullOrEmpty(eq.Country))
                     {
                         rows.AppendLine($"<div class='country-info'>{System.Net.WebUtility.HtmlEncode(eq.Country)}</div>");
                     }
+                    rows.AppendLine("</div>");
                     rows.AppendLine("</td>");
                     rows.AppendLine($"<td class='col-price'><span class='price-value'>{FormatCurrency(eq.Price)}</span></td>");
                     rows.AppendLine("</tr>");
@@ -711,9 +747,9 @@ namespace SoitMed.Services
 
 body {{
     font-family: {fontFamily};
-    font-size: 10pt;
+    font-size: 12pt; /* Increased from 10pt */
     color: var(--print-text);
-    line-height: 1.4;
+    line-height: 1.5; /* Increased from 1.4 */
     background: white; /* White background for PDF */
     margin: 0;
     padding: 0;
@@ -744,12 +780,12 @@ body {{
 .page-content {{
     position: relative;
     z-index: 2;
-    padding: 47.5mm 15mm 44.5mm 15mm; /* Match jsPDF: 16% top (~47.5mm), 15% bottom (~44.5mm) on A4 (297mm) */
+    padding: 47.5mm 15mm 59.4mm 15mm; /* Match jsPDF: 16% top (~47.5mm), 20% bottom (~59.4mm) on A4 (297mm) */
     margin: 0;
     box-sizing: border-box;
     background: transparent !important; /* Ensure transparent so letterhead shows through */
-    min-height: 205mm; /* Content area: 297mm - 47.5mm - 44.5mm = 205mm (available for content) */
-    max-height: 205mm; /* Limit to available content area */
+    min-height: 190mm; /* Content area: 297mm - 47.5mm - 59.4mm = 190mm (available for content) */
+    max-height: 190mm; /* Limit to available content area - content wraps to next page if exceeds */
     width: 100%;
     overflow: visible;
 }}
@@ -760,7 +796,7 @@ body {{
 
 .date-section {{
     margin-bottom: 8pt;
-    font-size: 11pt;
+    font-size: 13pt; /* Increased from 11pt */
 }}
 
 .date-section .label {{
@@ -774,19 +810,19 @@ body {{
 }}
 
 .client-greeting {{
-    font-size: 11pt;
+    font-size: 13pt; /* Increased from 11pt */
     color: var(--print-secondary);
     margin-bottom: 8pt;
 }}
 
 .document-intro {{
-    font-size: 10pt;
+    font-size: 12pt; /* Increased from 10pt */
     color: var(--print-secondary);
-    line-height: 1.5;
+    line-height: 1.6; /* Increased from 1.5 */
 }}
 
 .section-title {{
-    font-size: 13pt;
+    font-size: 15pt; /* Increased from 13pt */
     font-weight: 700;
     color: var(--print-primary);
     margin: 16pt 0 8pt 0;
@@ -815,10 +851,10 @@ body {{
     text-align: center;
 }}
 
-.col-product {{ width: 25%; }}
+.col-product {{ width: 28%; }}
 .col-image {{ width: 30%; text-align: center; }}
-.col-provider {{ width: 15%; }}
-.col-price {{ width: 15%; text-align: end; }}
+.col-provider {{ width: 17%; }}
+.col-price {{ width: 10%; text-align: end; }}
 
 .product-page {{
     position: relative;
@@ -874,21 +910,25 @@ body {{
 }}
 
 .product-description {{
-    font-size: 9pt;
+    font-size: 11pt; /* Increased from 9pt */
     color: var(--print-text-muted);
-    line-height: 1.3;
+    line-height: 1.4; /* Increased from 1.3 */
     margin-bottom: 4pt;
 }}
 
 .product-model {{
-    font-size: 9pt;
+    font-size: 11pt; /* Increased from 9pt */
     color: var(--print-text-muted);
     font-style: italic;
 }}
 
 .product-image {{
-    width: 50mm;
-    height: 50mm;
+    width: 50mm !important;
+    height: 50mm !important;
+    min-width: 50mm;
+    min-height: 50mm;
+    max-width: 50mm;
+    max-height: 50mm;
     object-fit: contain;
     display: block;
     margin: 0 auto;
@@ -896,19 +936,26 @@ body {{
     image-rendering: crisp-edges;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    background-color: white;
+    border: 1px solid var(--print-border-light);
 }}
 
 .no-image-placeholder {{
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 50mm;
-    height: 50mm;
+    width: 50mm !important;
+    height: 50mm !important;
+    min-width: 50mm;
+    min-height: 50mm;
+    max-width: 50mm;
+    max-height: 50mm;
     border: 1px dashed var(--print-border);
     background: #fafafa;
     color: var(--print-text-muted);
     font-size: 8pt;
     margin: 0 auto;
+    box-sizing: border-box;
 }}
 
 .provider-info {{
@@ -924,22 +971,23 @@ body {{
     max-height: 15mm;
     object-fit: contain;
     margin-bottom: 4pt;
+    display: block;
 }}
 
 .provider-name {{
-    font-size: 9pt;
+    font-size: 11pt; /* Increased from 9pt */
     color: var(--print-text);
     font-weight: 500;
 }}
 
 .country-info {{
-    font-size: 8pt;
+    font-size: 10pt; /* Increased from 8pt */
     color: var(--print-text-muted);
     margin-top: 2pt;
 }}
 
 .price-value {{
-    font-size: 10pt;
+    font-size: 12pt; /* Increased from 10pt */
     font-weight: 600;
     color: var(--print-text);
 }}
@@ -979,7 +1027,7 @@ body {{
 
 .financial-table .total-row .label,
 .financial-table .total-row .value {{
-    font-size: 10pt;
+    font-size: 12pt; /* Increased from 10pt */
     font-weight: 700;
     color: var(--print-primary);
 }}
@@ -993,7 +1041,7 @@ body {{
 .terms-table td {{
     border: 1px solid var(--print-border);
     padding: 6pt 10pt;
-    font-size: 8pt;
+    font-size: 10pt; /* Increased from 8pt */
 }}
 
 .terms-table .label {{
@@ -1016,7 +1064,7 @@ body {{
     display: flex;
     gap: 8pt;
     margin-bottom: 4pt;
-    font-size: 10pt;
+    font-size: 12pt; /* Increased from 10pt */
 }}
 
 .footer-row .label {{
