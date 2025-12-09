@@ -759,9 +759,11 @@ namespace SoitMed.Controllers
                     language = "en";
                 }
 
-                // Generate PDF on-demand (no storage)
+                // Generate PDF on-demand (no storage - streams directly to client)
+                // Note: PDFs appearing in wwwroot are from browser downloads, not server-side saving
                 var pdfBytes = await _pdfService.GenerateOfferPdfAsync(offerId, language);
                 
+                // Stream PDF directly to client - no file is saved on server
                 return File(pdfBytes, "application/pdf", $"Offer_{offerId}_{DateTime.UtcNow:yyyyMMddHHmmss}.pdf");
             }
             catch (ArgumentException ex)
