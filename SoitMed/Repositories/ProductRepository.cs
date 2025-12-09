@@ -27,6 +27,20 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<Product>> GetByCategoryIdAsync(long? categoryId)
+        {
+            if (!categoryId.HasValue)
+            {
+                return await GetAllActiveAsync();
+            }
+
+            return await _context.Products
+                .AsNoTracking()
+                .Where(p => p.IsActive && p.CategoryId == categoryId.Value)
+                .OrderBy(p => p.Name)
+                .ToListAsync();
+        }
+
         public async Task<IEnumerable<Product>> SearchAsync(string searchTerm)
         {
             if (string.IsNullOrWhiteSpace(searchTerm))

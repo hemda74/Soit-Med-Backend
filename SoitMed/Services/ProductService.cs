@@ -20,13 +20,23 @@ namespace SoitMed.Services
             _logger = logger;
         }
 
-        public async Task<List<ProductResponseDTO>> GetAllProductsAsync(string? category = null, bool? inStock = null)
+        public async Task<List<ProductResponseDTO>> GetAllProductsAsync(string? category = null, long? categoryId = null, bool? inStock = null)
         {
             try
             {
                 IEnumerable<Product> products;
 
-                if (!string.IsNullOrWhiteSpace(category) && inStock.HasValue)
+                // Priority: categoryId > category > inStock > all
+                if (categoryId.HasValue && inStock.HasValue)
+                {
+                    products = await _unitOfWork.Products.GetByCategoryIdAsync(categoryId);
+                    products = products.Where(p => p.InStock == inStock.Value);
+                }
+                else if (categoryId.HasValue)
+                {
+                    products = await _unitOfWork.Products.GetByCategoryIdAsync(categoryId);
+                }
+                else if (!string.IsNullOrWhiteSpace(category) && inStock.HasValue)
                 {
                     products = await _unitOfWork.Products.GetByCategoryAsync(category);
                     products = products.Where(p => p.InStock == inStock.Value);

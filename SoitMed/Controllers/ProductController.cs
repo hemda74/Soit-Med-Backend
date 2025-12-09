@@ -47,11 +47,12 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin,Doctor")]
         public async Task<IActionResult> GetAllProducts(
             [FromQuery] string? category = null,
+            [FromQuery] long? categoryId = null,
             [FromQuery] bool? inStock = null)
         {
             try
             {
-                var result = await _productService.GetAllProductsAsync(category, inStock);
+                var result = await _productService.GetAllProductsAsync(category, categoryId, inStock);
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Products retrieved successfully"));
             }
             catch (Exception ex)
