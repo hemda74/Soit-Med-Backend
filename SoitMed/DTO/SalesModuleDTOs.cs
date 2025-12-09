@@ -328,6 +328,8 @@ namespace SoitMed.DTO
         public DateTime CreatedAt { get; set; }
         public bool IsSalesManagerApproved { get; set; }
         public bool CanSendToSalesman { get; set; }
+        public string? PdfPath { get; set; }
+        public DateTime? PdfGeneratedAt { get; set; }
     }
 
     public class OfferSummaryDTO
