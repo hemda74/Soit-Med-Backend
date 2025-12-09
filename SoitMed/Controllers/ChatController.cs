@@ -32,7 +32,7 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
-        /// Get or create conversation for current user (customer) or get all conversations (admin)
+        /// Get conversations for current user (filtered by role and chat type)
         /// </summary>
         [HttpGet("conversations")]
         public async Task<IActionResult> GetConversations(CancellationToken cancellationToken = default)
@@ -51,12 +51,8 @@ namespace SoitMed.Controllers
                     return Unauthorized();
                 }
 
-                var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
-                             await UserManager.IsInRoleAsync(user, "Admin") ||
-                             await UserManager.IsInRoleAsync(user, "SalesManager") ||
-                             await UserManager.IsInRoleAsync(user, "SalesSupport");
-
-                var conversations = await _chatService.GetConversationsAsync(userId, isAdmin, cancellationToken);
+                var userRoles = (await UserManager.GetRolesAsync(user)).ToList();
+                var conversations = await _chatService.GetConversationsAsync(userId, userRoles, cancellationToken);
                 return SuccessResponse(conversations);
             }
             catch (Exception ex)
@@ -67,7 +63,7 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
-        /// Get or create conversation for customer
+        /// Get or create conversation for customer with specified chat type
         /// </summary>
         [HttpPost("conversations")]
         public async Task<IActionResult> GetOrCreateConversation([FromBody] CreateConversationDTO dto, CancellationToken cancellationToken = default)
@@ -80,22 +76,27 @@ namespace SoitMed.Controllers
                     return Unauthorized();
                 }
 
-                // Only customers can create conversations for themselves
                 var user = await UserManager.FindByIdAsync(userId);
                 if (user == null)
                 {
                     return Unauthorized();
                 }
 
-                var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
-                             await UserManager.IsInRoleAsync(user, "Admin") ||
-                             await UserManager.IsInRoleAsync(user, "SalesManager") ||
-                             await UserManager.IsInRoleAsync(user, "SalesSupport");
+                var userRoles = (await UserManager.GetRolesAsync(user)).ToList();
+                var isSuperAdmin = userRoles.Contains("SuperAdmin");
+                var isAdmin = userRoles.Contains("Admin") || userRoles.Contains("SalesManager") || userRoles.Contains("SalesSupport");
 
                 // If admin is creating, they can specify customerId, otherwise use current user
                 var customerId = isAdmin ? dto.CustomerId : userId;
+                
+                // Validate chat type is provided
+                if (!isAdmin && string.IsNullOrEmpty(dto.CustomerId))
+                {
+                    // For customers, chat type must be provided
+                    // This will be handled by the DTO validation
+                }
 
-                var conversation = await _chatService.GetOrCreateConversationAsync(customerId, dto.AdminId, cancellationToken);
+                var conversation = await _chatService.GetOrCreateConversationAsync(customerId, dto.ChatType, dto.AdminId, cancellationToken);
                 return SuccessResponse(conversation);
             }
             catch (Exception ex)
@@ -125,12 +126,8 @@ namespace SoitMed.Controllers
                     return Unauthorized();
                 }
 
-                var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
-                             await UserManager.IsInRoleAsync(user, "Admin") ||
-                             await UserManager.IsInRoleAsync(user, "SalesManager") ||
-                             await UserManager.IsInRoleAsync(user, "SalesSupport");
-
-                var conversation = await _chatService.GetConversationByIdAsync(id, userId, isAdmin, cancellationToken);
+                var userRoles = (await UserManager.GetRolesAsync(user)).ToList();
+                var conversation = await _chatService.GetConversationByIdAsync(id, userId, userRoles, cancellationToken);
                 if (conversation == null)
                 {
                     return NotFound();
@@ -194,12 +191,8 @@ namespace SoitMed.Controllers
                     return Unauthorized();
                 }
 
-                var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
-                             await UserManager.IsInRoleAsync(user, "Admin") ||
-                             await UserManager.IsInRoleAsync(user, "SalesManager") ||
-                             await UserManager.IsInRoleAsync(user, "SalesSupport");
-
-                var messages = await _chatService.GetMessagesAsync(id, userId, isAdmin, page, pageSize, cancellationToken);
+                var userRoles = (await UserManager.GetRolesAsync(user)).ToList();
+                var messages = await _chatService.GetMessagesAsync(id, userId, userRoles, page, pageSize, cancellationToken);
                 return SuccessResponse(messages);
             }
             catch (UnauthorizedAccessException ex)
@@ -234,13 +227,8 @@ namespace SoitMed.Controllers
                     return Unauthorized();
                 }
 
-                // Check if user is admin
-                var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
-                             await UserManager.IsInRoleAsync(user, "Admin") ||
-                             await UserManager.IsInRoleAsync(user, "SalesManager") ||
-                             await UserManager.IsInRoleAsync(user, "SalesSupport");
-
-                var message = await _chatService.SendTextMessageAsync(dto.ConversationId, userId, dto.Content, isAdmin, cancellationToken);
+                var userRoles = (await UserManager.GetRolesAsync(user)).ToList();
+                var message = await _chatService.SendTextMessageAsync(dto.ConversationId, userId, dto.Content, userRoles, cancellationToken);
                 return SuccessResponse(message);
             }
             catch (UnauthorizedAccessException ex)
@@ -304,11 +292,7 @@ namespace SoitMed.Controllers
                     return Unauthorized();
                 }
 
-                // Check if user is admin
-                var isAdmin = await UserManager.IsInRoleAsync(user, "SuperAdmin") || 
-                             await UserManager.IsInRoleAsync(user, "Admin") ||
-                             await UserManager.IsInRoleAsync(user, "SalesManager") ||
-                             await UserManager.IsInRoleAsync(user, "SalesSupport");
+                var userRoles = (await UserManager.GetRolesAsync(user)).ToList();
 
                 // Save voice file
                 var conversationFolder = Path.Combine(_environment.WebRootPath, "chat", "voice", conversationId.ToString());
@@ -324,7 +308,7 @@ namespace SoitMed.Controllers
                 }
 
                 // Create message
-                var message = await _chatService.SendVoiceMessageAsync(conversationId, userId, relativePath, voiceDuration, isAdmin, cancellationToken);
+                var message = await _chatService.SendVoiceMessageAsync(conversationId, userId, relativePath, voiceDuration, userRoles, cancellationToken);
                 
                 return SuccessResponse(message);
             }

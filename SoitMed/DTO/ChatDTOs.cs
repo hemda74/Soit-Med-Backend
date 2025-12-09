@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using SoitMed.Models.Enums;
 
 namespace SoitMed.DTO
 {
@@ -15,6 +16,8 @@ namespace SoitMed.DTO
         public string? CustomerImageUrl { get; set; }
         public string? AdminId { get; set; }
         public string? AdminName { get; set; }
+        public ChatType ChatType { get; set; }
+        public string ChatTypeName { get; set; } = string.Empty; // "Support", "Sales", "Maintenance"
         public DateTime LastMessageAt { get; set; }
         public string? LastMessagePreview { get; set; }
         public bool IsActive { get; set; }
@@ -31,6 +34,9 @@ namespace SoitMed.DTO
 
         [MaxLength(450)]
         public string? AdminId { get; set; } // Optional - can be auto-assigned
+
+        [Required]
+        public ChatType ChatType { get; set; } = ChatType.Support; // Support, Sales, or Maintenance
     }
 
     public class AssignConversationDTO
