@@ -168,7 +168,12 @@ namespace SoitMed.DTO
         public string? PaymentType { get; set; } // Cash, Installments, Other
         
         [Range(0.01, double.MaxValue)]
+        [JsonPropertyName("finalPrice")]
         public decimal? FinalPrice { get; set; } // Required if creating installments
+        
+        [Range(0, double.MaxValue)]
+        [JsonPropertyName("discountAmount")]
+        public decimal? DiscountAmount { get; set; } // Optional discount amount
         
         [MaxLength(200)]
         public string? OfferDuration { get; set; }
@@ -251,7 +256,12 @@ namespace SoitMed.DTO
         public string? PaymentType { get; set; } // Cash, Installments, Other
         
         [Range(0.01, double.MaxValue)]
+        [JsonPropertyName("finalPrice")]
         public decimal? FinalPrice { get; set; }
+        
+        [Range(0, double.MaxValue)]
+        [JsonPropertyName("discountAmount")]
+        public decimal? DiscountAmount { get; set; } // Optional discount amount
         
         [MaxLength(200)]
         public string? OfferDuration { get; set; }
@@ -292,7 +302,12 @@ namespace SoitMed.DTO
         public string? PaymentType { get; set; }
 
         [Range(0.01, double.MaxValue)]
+        [JsonPropertyName("finalPrice")]
         public decimal? FinalPrice { get; set; }
+
+        [Range(0, double.MaxValue)]
+        [JsonPropertyName("discountAmount")]
+        public decimal? DiscountAmount { get; set; } // Optional discount amount
 
         [MaxLength(200)]
         public string? OfferDuration { get; set; }
@@ -326,10 +341,22 @@ namespace SoitMed.DTO
         public string? SalesManagerComments { get; set; }
         public string? SalesManagerRejectionReason { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
         public bool IsSalesManagerApproved { get; set; }
         public bool CanSendToSalesman { get; set; }
         public string? PdfPath { get; set; }
         public DateTime? PdfGeneratedAt { get; set; }
+        // Additional fields from SalesOffer model
+        [JsonPropertyName("paymentType")]
+        public string? PaymentType { get; set; }
+        [JsonPropertyName("finalPrice")]
+        public decimal? FinalPrice { get; set; }
+        [JsonPropertyName("discountAmount")]
+        public decimal? DiscountAmount { get; set; } // Calculated discount amount
+        [JsonPropertyName("offerDuration")]
+        public string? OfferDuration { get; set; }
+        [JsonPropertyName("notes")]
+        public string? Notes { get; set; }
     }
 
     public class OfferSummaryDTO
