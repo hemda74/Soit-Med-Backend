@@ -67,6 +67,21 @@ namespace SoitMed.Services
                     assignedTo = createOfferDto.AssignedTo;
                 }
 
+                // Calculate FinalPrice from discount if provided
+                decimal? finalPrice = createOfferDto.FinalPrice;
+                if (createOfferDto.DiscountAmount.HasValue && createOfferDto.DiscountAmount.Value > 0)
+                {
+                    finalPrice = createOfferDto.TotalAmount - createOfferDto.DiscountAmount.Value;
+                    if (finalPrice < 0) finalPrice = 0;
+                    _logger.LogInformation("Discount applied to offer. TotalAmount: {TotalAmount}, DiscountAmount: {DiscountAmount}, FinalPrice: {FinalPrice}", 
+                        createOfferDto.TotalAmount, createOfferDto.DiscountAmount.Value, finalPrice);
+                }
+                // If no discount and no FinalPrice provided, set FinalPrice = TotalAmount
+                if (!finalPrice.HasValue)
+                {
+                    finalPrice = createOfferDto.TotalAmount;
+                }
+
                 var offer = new SalesOffer
                 {
                     OfferRequestId = createOfferDto.OfferRequestId,
@@ -89,7 +104,7 @@ namespace SoitMed.Services
                         : null,
                     Notes = createOfferDto.Notes,
                     PaymentType = createOfferDto.PaymentType,
-                    FinalPrice = createOfferDto.FinalPrice,
+                    FinalPrice = finalPrice,
                     OfferDuration = createOfferDto.OfferDuration,
                     Status = OfferStatus.PendingSalesManagerApproval // Require SalesManager approval before sending to Salesman
                 };
@@ -185,6 +200,21 @@ namespace SoitMed.Services
                     ? createOfferDto.AssignedTo 
                     : offerRequest.RequestedBy;
 
+                // Calculate FinalPrice from discount if provided
+                decimal? finalPrice = createOfferDto.FinalPrice;
+                if (createOfferDto.DiscountAmount.HasValue && createOfferDto.DiscountAmount.Value > 0)
+                {
+                    finalPrice = createOfferDto.TotalAmount - createOfferDto.DiscountAmount.Value;
+                    if (finalPrice < 0) finalPrice = 0;
+                    _logger.LogInformation("Discount applied to offer (with items). TotalAmount: {TotalAmount}, DiscountAmount: {DiscountAmount}, FinalPrice: {FinalPrice}", 
+                        createOfferDto.TotalAmount, createOfferDto.DiscountAmount.Value, finalPrice);
+                }
+                // If no discount and no FinalPrice provided, set FinalPrice = TotalAmount
+                if (!finalPrice.HasValue)
+                {
+                    finalPrice = createOfferDto.TotalAmount;
+                }
+
                 var offer = new SalesOffer
                 {
                     OfferRequestId = createOfferDto.OfferRequestId, // REQUIRED - link to offer request
@@ -207,7 +237,7 @@ namespace SoitMed.Services
                         : null,
                     Notes = createOfferDto.Notes,
                     PaymentType = createOfferDto.PaymentType,
-                    FinalPrice = createOfferDto.FinalPrice,
+                    FinalPrice = finalPrice,
                     OfferDuration = createOfferDto.OfferDuration,
                     Status = OfferStatus.PendingSalesManagerApproval // Require SalesManager approval before sending to Salesman
                 };
@@ -560,8 +590,18 @@ namespace SoitMed.Services
                 if (!string.IsNullOrEmpty(updateDto.PaymentType))
                     offer.PaymentType = updateDto.PaymentType;
 
-                if (updateDto.FinalPrice.HasValue)
+                // Handle discount amount - calculate FinalPrice if discount is provided
+                if (updateDto.DiscountAmount.HasValue && updateDto.DiscountAmount.Value > 0)
+                {
+                    var total = updateDto.TotalAmount ?? offer.TotalAmount;
+                    var finalPrice = total - updateDto.DiscountAmount.Value;
+                    if (finalPrice < 0) finalPrice = 0;
+                    offer.FinalPrice = finalPrice;
+                }
+                else if (updateDto.FinalPrice.HasValue)
+                {
                     offer.FinalPrice = updateDto.FinalPrice.Value;
+                }
 
                 if (!string.IsNullOrEmpty(updateDto.OfferDuration))
                     offer.OfferDuration = updateDto.OfferDuration;
@@ -873,16 +913,20 @@ namespace SoitMed.Services
                 if (offer == null)
                     throw new ArgumentException("Offer not found", nameof(offerId));
 
-                // Verify user can respond to this offer (must be assigned to them if Customer or Salesman)
+                // Verify user can respond to this offer
+                // Note: Customer role authorization is handled in the controller
+                // This service method only checks for Salesman role
                 var user = await _unitOfWork.Users.GetByIdAsync(userId);
                 if (user != null)
                 {
                     var userRoles = await _userManager.GetRolesAsync(user);
-                    bool isCustomerOrSalesman = userRoles.Contains("Customer") || userRoles.Contains("Salesman");
+                    bool isSalesman = userRoles.Contains("Salesman");
                     bool isManagerOrAdmin = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin") || userRoles.Contains("SalesSupport");
+                    bool isCustomer = userRoles.Contains("Customer") || userRoles.Contains("Doctor") || userRoles.Contains("Technician");
 
-                    // If user is Customer or Salesman (and not a Manager/Admin), verify they are assigned to this offer
-                    if (isCustomerOrSalesman && !isManagerOrAdmin)
+                    // For Salesman (and not a Manager/Admin), verify they are assigned to this offer
+                    // Customers are authorized in the controller based on client ownership
+                    if (isSalesman && !isManagerOrAdmin && !isCustomer)
                     {
                         if (string.IsNullOrEmpty(offer.AssignedTo) || offer.AssignedTo != userId)
                         {
@@ -2315,6 +2359,13 @@ namespace SoitMed.Services
                 }
             }
 
+            // Calculate discount amount from FinalPrice and TotalAmount
+            decimal? discountAmount = null;
+            if (offer.FinalPrice.HasValue && offer.FinalPrice.Value < offer.TotalAmount)
+            {
+                discountAmount = offer.TotalAmount - offer.FinalPrice.Value;
+            }
+
             return new OfferResponseDTO
             {
                 Id = offer.Id,
@@ -2341,10 +2392,16 @@ namespace SoitMed.Services
                 SalesManagerComments = offer.SalesManagerComments,
                 SalesManagerRejectionReason = offer.SalesManagerRejectionReason,
                 CreatedAt = offer.CreatedAt,
+                UpdatedAt = offer.UpdatedAt,
                 IsSalesManagerApproved = offer.Status == OfferStatus.Sent && !string.IsNullOrEmpty(offer.SalesManagerApprovedBy),
                 CanSendToSalesman = offer.Status == OfferStatus.Sent,
                 PdfPath = offer.PdfPath,
-                PdfGeneratedAt = offer.PdfGeneratedAt
+                PdfGeneratedAt = offer.PdfGeneratedAt,
+                PaymentType = offer.PaymentType,
+                FinalPrice = offer.FinalPrice,
+                DiscountAmount = discountAmount,
+                OfferDuration = offer.OfferDuration,
+                Notes = offer.Notes
             };
         }
 
@@ -2358,6 +2415,13 @@ namespace SoitMed.Services
             // Note: OfferRequest information should be loaded separately if needed in batch operations
             // For now, we'll set it to null in batch operations to avoid N+1 queries
             // Individual offer retrieval will use the async method that loads OfferRequest
+
+            // Calculate discount amount from FinalPrice and TotalAmount
+            decimal? discountAmount = null;
+            if (offer.FinalPrice.HasValue && offer.FinalPrice.Value < offer.TotalAmount)
+            {
+                discountAmount = offer.TotalAmount - offer.FinalPrice.Value;
+            }
 
             return new OfferResponseDTO
             {
@@ -2385,10 +2449,16 @@ namespace SoitMed.Services
                 SalesManagerComments = offer.SalesManagerComments,
                 SalesManagerRejectionReason = offer.SalesManagerRejectionReason,
                 CreatedAt = offer.CreatedAt,
+                UpdatedAt = offer.UpdatedAt,
                 IsSalesManagerApproved = offer.Status == OfferStatus.Sent && !string.IsNullOrEmpty(offer.SalesManagerApprovedBy),
                 CanSendToSalesman = offer.Status == OfferStatus.Sent,
                 PdfPath = offer.PdfPath,
-                PdfGeneratedAt = offer.PdfGeneratedAt
+                PdfGeneratedAt = offer.PdfGeneratedAt,
+                PaymentType = offer.PaymentType,
+                FinalPrice = offer.FinalPrice,
+                DiscountAmount = discountAmount,
+                OfferDuration = offer.OfferDuration,
+                Notes = offer.Notes
             };
         }
 
