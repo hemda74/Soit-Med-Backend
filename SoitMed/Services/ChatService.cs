@@ -147,8 +147,23 @@ namespace SoitMed.Services
                 // Support staff can see conversations assigned to them or unassigned conversations of their type
                 var allConversations = new List<ChatConversation>();
 
-                // Get conversations assigned to this user
-                var assignedConversations = await _unitOfWork.ChatConversations.GetAdminConversationsAsync(userId, cancellationToken);
+                // Get conversations assigned to this user - FILTERED BY CHAT TYPE based on role
+                IEnumerable<ChatConversation> assignedConversations = Enumerable.Empty<ChatConversation>();
+                if (isAdmin)
+                {
+                    // Admin can only see Support type conversations assigned to them
+                    assignedConversations = await _unitOfWork.ChatConversations.GetAdminConversationsByTypeAsync(userId, ChatType.Support, cancellationToken);
+                }
+                else if (isSalesSupport)
+                {
+                    // SalesSupport can only see Sales type conversations assigned to them
+                    assignedConversations = await _unitOfWork.ChatConversations.GetAdminConversationsByTypeAsync(userId, ChatType.Sales, cancellationToken);
+                }
+                else if (isMaintenanceSupport)
+                {
+                    // MaintenanceSupport can only see Maintenance type conversations assigned to them
+                    assignedConversations = await _unitOfWork.ChatConversations.GetAdminConversationsByTypeAsync(userId, ChatType.Maintenance, cancellationToken);
+                }
 
                 // Get unassigned conversations based on role
                 if (isAdmin)
