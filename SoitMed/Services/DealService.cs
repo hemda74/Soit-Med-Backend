@@ -394,7 +394,43 @@ namespace SoitMed.Services
         {
             try
             {
+                // Get all deals first to debug
+                var context = _unitOfWork.GetContext();
+                var allDealsCount = await context.SalesDeals.AsNoTracking().CountAsync();
+                _logger.LogInformation("Total deals in database: {Count}", allDealsCount);
+                
                 var deals = await _unitOfWork.SalesDeals.GetPendingApprovalsForSuperAdminAsync();
+                
+                // Log for debugging
+                _logger.LogInformation("GetPendingSuperAdminApprovalsAsync: Found {Count} deals with pending status", deals.Count);
+                
+                if (deals.Count == 0 && allDealsCount > 0)
+                {
+                    // Log all deal statuses for debugging
+                    var allDeals = await context.SalesDeals
+                        .AsNoTracking()
+                        .Select(d => new { d.Id, d.Status, d.CreatedAt })
+                        .OrderByDescending(d => d.CreatedAt)
+                        .Take(50)
+                        .ToListAsync();
+                    
+                    var statusCounts = allDeals
+                        .GroupBy(d => d.Status ?? "NULL")
+                        .Select(g => new { Status = g.Key, Count = g.Count() })
+                        .ToList();
+                    
+                    _logger.LogWarning("No pending deals found. Total deals: {Total}, Status breakdown: {Statuses}",
+                        allDealsCount,
+                        string.Join(", ", statusCounts.Select(s => $"{s.Status}: {s.Count}")));
+                    
+                    // Log individual deal statuses for debugging
+                    foreach (var deal in allDeals.Take(20))
+                    {
+                        _logger.LogInformation("Deal - Id: {DealId}, Status: '{Status}', CreatedAt: {CreatedAt}", 
+                            deal.Id, deal.Status ?? "NULL", deal.CreatedAt);
+                    }
+                }
+                
                 var result = new List<DealResponseDTO>();
 
                 foreach (var deal in deals)
@@ -402,6 +438,7 @@ namespace SoitMed.Services
                     result.Add(await MapToDealResponseDTO(deal));
                 }
 
+                _logger.LogInformation("Returning {Count} deals to SuperAdmin", result.Count);
                 return result;
             }
             catch (Exception ex)
