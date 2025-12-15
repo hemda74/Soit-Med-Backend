@@ -362,23 +362,44 @@ namespace SoitMed.Services
             }
             var finalAmount = offer.TotalAmount - discountAmount;
 
+            // Build terms rows early to calculate their height for pagination
+            var termsRows = new StringBuilder();
+            int termsRowCount = 0;
+            if (!string.IsNullOrEmpty(offer.PaymentTerms))
+            {
+                termsRowCount++;
+            }
+            if (!string.IsNullOrEmpty(offer.DeliveryTerms))
+            {
+                termsRowCount++;
+            }
+            if (!string.IsNullOrEmpty(offer.WarrantyTerms))
+            {
+                termsRowCount++;
+            }
+
             // Calculate content area matching jsPDF logic
             // A4 page: 210mm x 297mm
             double pageHeight = 297.0; // mm
-            double topContentMargin = pageHeight * 0.16; // 16% from top = ~47.5mm
-            double bottomContentMargin = pageHeight * 0.20; // 20% from bottom = ~59.4mm
+            double topContentMargin = pageHeight * 0.15; // 15% from top = ~44.55mm
+            double bottomContentMargin = pageHeight * 0.10; // 10% from bottom = ~29.7mm
             double contentStartY = topContentMargin; // Content starts here
             double contentEndY = pageHeight - bottomContentMargin; // Content ends here
-            double availableContentHeight = contentEndY - contentStartY; // ~190mm (reduced from ~205mm)
+            double availableContentHeight = contentEndY - contentStartY; // ~222.75mm (297 - 44.55 - 29.7)
             
-            // Calculate row heights dynamically (matching jsPDF: 20% of page height per product, but adjusted)
-            double baseRowHeight = pageHeight * 0.2; // 20% = ~59.4mm per product
-            double minRowHeight = 50.0; // Minimum 50mm per product row
-            double rowSpacing = 5.0; // 5mm spacing between products
+            // Calculate row heights dynamically (optimized for better space usage)
+            double baseRowHeight = 55.0; // Reduced from 59.4mm to allow more products per page
+            double minRowHeight = 45.0; // Reduced minimum from 50mm to 45mm
+            double rowSpacing = 4.0; // Reduced spacing from 5mm to 4mm
             
-            // Header section heights (approximate, matching jsPDF)
-            double headerHeight = 60.0; // Date + greeting + intro + title
+            // Header section heights (optimized for better space usage)
+            double headerHeight = 50.0; // Date + greeting + intro + title (reduced from 60mm)
             double tableHeaderHeight = 8.0; // Table header row
+            double financialSectionHeight = 80.0; // Financial summary section
+            double termsSectionHeight = 100.0; // Terms & conditions section (variable)
+            double footerHeight = 40.0; // Footer section
+            
+            // Updated safe area: 15% top, 10% bottom (was 16% top, 20% bottom)
             
             // Split equipment into pages based on available space (matching jsPDF logic)
             var productPages = new List<List<OfferEquipment>>();
@@ -424,9 +445,10 @@ namespace SoitMed.Services
                         }
                         
                     // Check if adding this product would exceed available space
-                    // Content wraps to next page when it reaches 20% margin from bottom
-                    // Leave some margin (10mm) for safety
-                    if (currentPageUsedHeight + requiredHeight + 10.0 > availableContentHeight)
+                    // Content MUST wrap to next page when it reaches 10% margin from bottom (~222.75mm limit)
+                    // Use smaller safety margin (5mm) to maximize space usage, especially on first page
+                    double safetyMargin = isFirstPage ? 5.0 : 8.0; // Less conservative on first page
+                    if (currentPageUsedHeight + requiredHeight + safetyMargin > availableContentHeight)
                         {
                             // Current page is full, start a new page
                             if (currentPageProducts.Any())
@@ -453,6 +475,36 @@ namespace SoitMed.Services
                     if (currentPageProducts.Any())
                     {
                         productPages.Add(currentPageProducts);
+                    }
+                }
+                
+                // Check if financial/terms/footer sections would fit on last page
+                // If not, create a new page for them
+                if (productPages.Count > 0)
+                {
+                    var lastPageProducts = productPages[productPages.Count - 1];
+                    double lastPageUsedHeight = lastPageProducts.Count == 0 ? headerHeight : (lastPageProducts.Count == 1 && productPages.Count == 1 ? headerHeight : tableHeaderHeight);
+                    
+                    // Calculate used height for last page
+                    foreach (var product in lastPageProducts)
+                    {
+                        double productRowHeight = baseRowHeight;
+                        if (!string.IsNullOrEmpty(product.Description) && product.Description.Length > 100)
+                        {
+                            productRowHeight += 10.0;
+                        }
+                        productRowHeight = Math.Max(productRowHeight, minRowHeight);
+                        lastPageUsedHeight += productRowHeight + rowSpacing;
+                    }
+                    
+                    // Check if financial + terms + footer would fit
+                    double remainingSpace = availableContentHeight - lastPageUsedHeight;
+                    double requiredForSummary = financialSectionHeight + (termsRowCount > 0 ? termsSectionHeight : 0) + footerHeight;
+                    
+                    // If summary sections don't fit, create a new empty page for them
+                    if (remainingSpace < requiredForSummary + 10.0) // 10mm safety margin
+                    {
+                        productPages.Add(new List<OfferEquipment>()); // Empty page for summary sections
                     }
                 }
             }
@@ -513,8 +565,9 @@ namespace SoitMed.Services
                 return rows.ToString();
             }
 
-            // Build terms rows
-            var termsRows = new StringBuilder();
+            // Build terms rows HTML (already counted rows above for pagination)
+            // Clear and rebuild termsRows StringBuilder with actual HTML
+            termsRows.Clear();
             if (!string.IsNullOrEmpty(offer.PaymentTerms))
             {
                 try
@@ -614,11 +667,12 @@ namespace SoitMed.Services
             html.AppendLine($"<div class='offer-print-container {(isRTL ? "rtl" : "ltr")}' dir='{dir}' {letterheadStyle}>");
             html.AppendLine("<div class='letterhead-background' aria-hidden='true'></div>");
 
-            // Build pages
+                // Build pages with 10% bottom and 15% top safe area enforcement
             for (int pageIndex = 0; pageIndex < productPages.Count; pageIndex++)
             {
                 var pageProducts = productPages[pageIndex];
                 html.AppendLine($"<div class='product-page {(pageIndex > 0 ? "page-break" : "")}'>");
+                // Page content with 10% bottom and 15% top safe area - content MUST NOT exceed max-height: ~222.75mm
                 html.AppendLine("<div class='page-content'>");
 
                 // Header only on first page
@@ -661,7 +715,8 @@ namespace SoitMed.Services
                 }
 
                 // Financial summary and terms only on last page
-                // Check if they fit, otherwise add to a new page
+                // These sections MUST respect the 10% bottom safe area
+                // Pagination logic ensures they fit or creates a new page for them
                 if (pageIndex == productPages.Count - 1)
                 {
                     html.AppendLine("<section class='financial-section'>");
@@ -780,22 +835,26 @@ body {{
 .page-content {{
     position: relative;
     z-index: 2;
-    padding: 47.5mm 15mm 59.4mm 15mm; /* Match jsPDF: 16% top (~47.5mm), 20% bottom (~59.4mm) on A4 (297mm) */
+    padding: 44.55mm 15mm 29.7mm 15mm; /* 15% top (~44.55mm), 10% bottom (~29.7mm) on A4 (297mm) */
     margin: 0;
     box-sizing: border-box;
     background: transparent !important; /* Ensure transparent so letterhead shows through */
-    min-height: 190mm; /* Content area: 297mm - 47.5mm - 59.4mm = 190mm (available for content) */
-    max-height: 190mm; /* Limit to available content area - content wraps to next page if exceeds */
+    min-height: 222.75mm; /* Content area: 297mm - 44.55mm - 29.7mm = 222.75mm (available for content) */
+    max-height: 222.75mm !important; /* CRITICAL: Enforce 10% bottom safe area - content MUST NOT exceed this */
     width: 100%;
-    overflow: visible;
+    overflow: hidden; /* Hide content that exceeds safe area - it will be on next page via pagination logic */
+    page-break-inside: avoid !important; /* Prevent page breaks inside content area - entire content moves to next page */
+    orphans: 3; /* Minimum lines at bottom of page */
+    widows: 3; /* Minimum lines at top of page */
+    display: block;
 }}
 
 .offer-header {{
-    margin-bottom: 12pt;
+    margin-bottom: 8pt; /* Reduced from 12pt to reduce empty space */
 }}
 
 .date-section {{
-    margin-bottom: 8pt;
+    margin-bottom: 4pt; /* Reduced from 8pt */
     font-size: 13pt; /* Increased from 11pt */
 }}
 
@@ -812,35 +871,49 @@ body {{
 .client-greeting {{
     font-size: 13pt; /* Increased from 11pt */
     color: var(--print-secondary);
-    margin-bottom: 8pt;
+    margin-bottom: 4pt; /* Reduced from 8pt */
+    margin-top: 2pt; /* Added minimal top margin */
 }}
 
 .document-intro {{
     font-size: 12pt; /* Increased from 10pt */
     color: var(--print-secondary);
-    line-height: 1.6; /* Increased from 1.5 */
+    line-height: 1.5; /* Reduced from 1.6 to save space */
+    margin-bottom: 4pt; /* Added to control spacing */
+    margin-top: 2pt; /* Added minimal top margin */
 }}
 
 .section-title {{
     font-size: 15pt; /* Increased from 13pt */
     font-weight: 700;
     color: var(--print-primary);
-    margin: 16pt 0 8pt 0;
+    margin: 8pt 0 6pt 0; /* Reduced from 16pt 0 8pt 0 to save space */
+}}
+
+.products-section {{
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: auto; /* Allow break before if needed */
+    break-before: auto;
+    margin-bottom: 8pt; /* Reduced from 12pt */
+    margin-top: 4pt; /* Added to control spacing */
+    orphans: 2;
+    widows: 2;
 }}
 
 .products-table {{
     width: 100%;
     border-collapse: collapse;
     border: 1px solid var(--print-border);
-    margin-bottom: 12pt;
+    margin-bottom: 8pt; /* Reduced from 12pt */
 }}
 
 .products-table th,
 .products-table td {{
     border: 1px solid var(--print-border);
     padding: 8pt 6pt;
-    vertical-align: top;
-    text-align: start;
+    vertical-align: middle; /* Changed from top to middle for vertical centering */
+    text-align: center; /* Changed from start to center for horizontal centering */
 }}
 
 .products-table thead th {{
@@ -851,16 +924,17 @@ body {{
     text-align: center;
 }}
 
-.col-product {{ width: 28%; }}
+.col-product {{ width: 28%; text-align: center; }}
 .col-image {{ width: 30%; text-align: center; }}
-.col-provider {{ width: 17%; }}
-.col-price {{ width: 10%; text-align: end; }}
+.col-provider {{ width: 17%; text-align: center; }}
+.col-price {{ width: 10%; text-align: center; }}
 
 .product-page {{
     position: relative;
     width: 210mm;
     min-height: 297mm;
     height: 297mm;
+    max-height: 297mm !important; /* Exactly one page - no overflow */
     margin: 0;
     padding: 0;
     background-color: white;
@@ -872,13 +946,16 @@ body {{
     background-clip: border-box !important;
     background-attachment: local;
     box-sizing: border-box;
-    page-break-after: always;
-    page-break-inside: avoid;
+    page-break-after: always !important; /* Always break after page */
+    page-break-inside: avoid !important; /* Never break page inside */
+    break-after: page !important; /* Force page break after */
+    break-inside: avoid !important; /* Never break inside */
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
-    overflow: hidden;
+    overflow: hidden; /* Hide any content that exceeds page height */
+    display: block;
 }}
 
 .product-page:last-child {{
@@ -886,11 +963,14 @@ body {{
 }}
 
 .product-row {{
-    page-break-inside: avoid;
+    page-break-inside: avoid !important; /* Never break rows across pages */
+    break-inside: avoid !important; /* Prevent breaking inside row - force to next page */
     min-height: 50mm; /* Minimum height matching jsPDF */
     height: auto; /* Allow dynamic height based on content */
     vertical-align: top;
     margin-bottom: 5mm; /* 5mm spacing between products (matching jsPDF rowSpacing) */
+    orphans: 2; /* Minimum lines at bottom */
+    widows: 2; /* Minimum lines at top */
 }}
 
 .product-row:nth-child(even) {{
@@ -992,6 +1072,16 @@ body {{
     color: var(--print-text);
 }}
 
+.financial-section {{
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: auto; /* Allow break before if needed to avoid safe area */
+    break-before: auto;
+    margin-bottom: 12pt;
+    orphans: 2;
+    widows: 2;
+}}
+
 .financial-table {{
     width: 100%;
     border-collapse: collapse;
@@ -1032,6 +1122,16 @@ body {{
     color: var(--print-primary);
 }}
 
+.terms-section {{
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: auto; /* Allow break before if needed to avoid safe area */
+    break-before: auto;
+    margin-bottom: 12pt;
+    orphans: 2;
+    widows: 2;
+}}
+
 .terms-table {{
     width: 100%;
     border-collapse: collapse;
@@ -1058,6 +1158,12 @@ body {{
     margin-top: 16pt;
     padding-top: 8pt;
     border-top: 1px solid var(--print-border-light);
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: auto; /* Allow break before if needed to avoid safe area */
+    break-before: auto;
+    orphans: 2;
+    widows: 2;
 }}
 
 .footer-row {{
@@ -1086,6 +1192,7 @@ body {{
     @page {{
         size: A4 portrait;
         margin: 0;
+        /* Note: Bottom margin doesn't create safe area, we use max-height on .page-content instead */
     }}
 
     .offer-print-container {{
@@ -1099,9 +1206,12 @@ body {{
         width: 100%;
         min-height: 100vh;
         height: 100vh;
-        page-break-after: always;
+        max-height: 100vh !important; /* Exactly one page - no overflow */
+        page-break-after: always !important;
+        break-after: page !important; /* Force page break after */
         page-break-before: auto;
-        page-break-inside: avoid;
+        page-break-inside: avoid !important; /* CRITICAL: Never break inside page */
+        break-inside: avoid !important; /* Never break inside */
         background-image: var(--letterhead-url);
         background-repeat: no-repeat;
         background-size: cover;
@@ -1112,7 +1222,7 @@ body {{
         margin: 0;
         padding: 0;
         display: block;
-        overflow: hidden;
+        overflow: hidden; /* Hide any overflow - content should be on next page via pagination */
     }}
 
     .product-page:first-child {{
@@ -1126,15 +1236,45 @@ body {{
     .page-content {{
         position: relative;
         z-index: 2;
-        padding: 25% 15mm 25% 15mm;
+        padding: 44.55mm 15mm 29.7mm 15mm; /* 15% top, 10% bottom safe area enforced in print */
         margin: 0;
         background: transparent;
+        max-height: 222.75mm !important; /* CRITICAL: Enforce 10% bottom safe area in print */
+        overflow: hidden; /* Hide overflow - content exceeding safe area will be on next page via pagination */
+        page-break-inside: avoid !important; /* Entire content area moves to next page if needed */
+        orphans: 3;
+        widows: 3;
+        display: block;
     }}
 
     .product-row,
     .financial-table tr,
     .terms-table tr {{
-        page-break-inside: avoid;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important; /* Force page break before if needed */
+        orphans: 2;
+        widows: 2;
+    }}
+    
+    /* CRITICAL: Ensure sections respect 10% bottom safe area and move to next page if needed */
+    .products-section,
+    .financial-section,
+    .terms-section,
+    .offer-footer {{
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        page-break-before: auto; /* Allow page break before if needed */
+        break-before: auto; /* Allow break before section */
+        orphans: 2;
+        widows: 2;
+    }}
+    
+    /* Force page break before section if it would enter 10% bottom safe area */
+    .products-section:last-child,
+    .financial-section,
+    .terms-section,
+    .offer-footer {{
+        page-break-before: auto; /* Break before if needed to avoid safe area */
     }}
 }}";
         }
