@@ -271,8 +271,10 @@ namespace SoitMed.Controllers
                 }
 
                 // Only return offers that have been sent to the client (status = "Sent" or later)
+                // Include all statuses that are visible to customers after the offer has been sent
                 result = result.Where(o => 
                     o.Status == "Sent" || 
+                    o.Status == "UnderReview" ||
                     o.Status == "Accepted" || 
                     o.Status == "Rejected" || 
                     o.Status == "Completed").ToList();
@@ -753,15 +755,32 @@ namespace SoitMed.Controllers
         {
             try
             {
+                _logger.LogInformation("PDF generation requested for offer {OfferId} with language {Language}", offerId, language);
+
                 // Validate language
                 if (language != "en" && language != "ar")
                 {
+                    _logger.LogWarning("Invalid language '{Language}' provided, defaulting to 'en'", language);
                     language = "en";
                 }
 
                 // Generate PDF on-demand (no storage - streams directly to client)
                 // Note: PDFs appearing in wwwroot are from browser downloads, not server-side saving
                 var pdfBytes = await _pdfService.GenerateOfferPdfAsync(offerId, language);
+                
+                if (pdfBytes == null || pdfBytes.Length == 0)
+                {
+                    _logger.LogError("PDF generation returned empty bytes for offer {OfferId}", offerId);
+                    return StatusCode(500, ResponseHelper.CreateErrorResponse("PDF generation failed: empty result"));
+                }
+
+                _logger.LogInformation("PDF generated successfully for offer {OfferId} (size: {Size} bytes)", offerId, pdfBytes.Length);
+                
+                // Set response headers for better compatibility
+                Response.Headers.Add("Content-Disposition", $"inline; filename=\"Offer_{offerId}_{DateTime.UtcNow:yyyyMMddHHmmss}.pdf\"");
+                Response.Headers.Add("Cache-Control", "no-cache, no-store, must-revalidate");
+                Response.Headers.Add("Pragma", "no-cache");
+                Response.Headers.Add("Expires", "0");
                 
                 // Stream PDF directly to client - no file is saved on server
                 return File(pdfBytes, "application/pdf", $"Offer_{offerId}_{DateTime.UtcNow:yyyyMMddHHmmss}.pdf");
@@ -770,6 +789,11 @@ namespace SoitMed.Controllers
             {
                 _logger.LogWarning(ex, "Invalid request for PDF generation. OfferId: {OfferId}", offerId);
                 return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access attempt for PDF generation. OfferId: {OfferId}", offerId);
+                return StatusCode(403, ResponseHelper.CreateErrorResponse("You do not have permission to access this offer PDF"));
             }
             catch (Exception ex)
             {
@@ -943,30 +967,143 @@ namespace SoitMed.Controllers
         /// Record client response to an offer (Accept/Reject)
         /// </summary>
         [HttpPost("{offerId}/client-response")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin,SalesSupport,Customer,Doctor,Technician")]
         public async Task<IActionResult> RecordClientResponse(long offerId, [FromBody] RecordClientResponseDTO dto)
         {
             try
             {
+                // Log the incoming request for debugging
+                _logger.LogInformation("RecordClientResponse called. OfferId: {OfferId}, UserId: {UserId}, DTO: Response={Response}, Accepted={Accepted}", 
+                    offerId, GetCurrentUserId(), dto?.Response, dto?.Accepted);
+
                 if (!ModelState.IsValid)
                 {
-                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                    var validationErrors = ValidationHelperService.FormatValidationErrors(ModelState);
+                    _logger.LogWarning("ModelState validation failed for RecordClientResponse. OfferId: {OfferId}, Errors: {Errors}", 
+                        offerId, validationErrors);
+                    return BadRequest(validationErrors);
                 }
 
                 var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                {
+                    _logger.LogWarning("User ID not found in RecordClientResponse. OfferId: {OfferId}", offerId);
+                    return BadRequest(ResponseHelper.CreateErrorResponse("User ID not found"));
+                }
+
+                var userRole = GetCurrentUserRole();
+                
+                // For customer roles, validate they can respond to this offer
+                if (!string.IsNullOrEmpty(userRole) && 
+                    (userRole.Equals("Customer", StringComparison.OrdinalIgnoreCase) ||
+                     userRole.Equals("Doctor", StringComparison.OrdinalIgnoreCase) ||
+                     userRole.Equals("Technician", StringComparison.OrdinalIgnoreCase)))
+                {
+                    // Get current user to find their client record
+                    var currentUser = await _unitOfWork.Users.GetByIdAsync(userId);
+                    if (currentUser == null)
+                    {
+                        return BadRequest(ResponseHelper.CreateErrorResponse("User not found"));
+                    }
+
+                    long clientId = 0;
+                    Client? client = null;
+
+                    // Try to find client by customer's email (case-insensitive)
+                    var context = _unitOfWork.GetContext();
+                    if (!string.IsNullOrEmpty(currentUser.Email))
+                    {
+                        var userEmailLower = currentUser.Email.ToLower();
+                        
+                        // Try to find by Client.Email first
+                        client = await context.Clients
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.Email) && 
+                                                      c.Email.ToLower() == userEmailLower);
+
+                        // If not found, try ContactPersonEmail
+                        if (client == null)
+                        {
+                            client = await context.Clients
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.ContactPersonEmail) && 
+                                                          c.ContactPersonEmail.ToLower() == userEmailLower);
+                        }
+                    }
+
+                    if (client != null)
+                    {
+                        clientId = client.Id;
+                    }
+                    else
+                    {
+                        // Try to find by user's full name
+                        var userFullName = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
+                        if (!string.IsNullOrEmpty(userFullName))
+                        {
+                            var namePattern = $"%{userFullName}%";
+                            client = await context.Clients
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, namePattern) ||
+                                                          (c.ContactPerson != null && EF.Functions.Like(c.ContactPerson, namePattern)));
+
+                            if (client != null)
+                            {
+                                clientId = client.Id;
+                            }
+                        }
+                    }
+
+                    if (clientId == 0)
+                    {
+                        _logger.LogWarning("Client record not found for customer user {UserId}. Email: {Email}, Name: {Name}", 
+                            userId, currentUser.Email, $"{currentUser.FirstName} {currentUser.LastName}");
+                        return BadRequest(ResponseHelper.CreateErrorResponse("Client record not found. Please contact support to link your account to a client record."));
+                    }
+
+                    // Get the offer and verify it belongs to this client
+                    var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                    if (offer == null)
+                    {
+                        return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
+                    }
+
+                    // Verify the offer belongs to this client
+                    if (offer.ClientId != clientId)
+                    {
+                        _logger.LogWarning("Customer {UserId} (ClientId: {ClientId}) attempted to respond to offer {OfferId} belonging to ClientId {OfferClientId}", 
+                            userId, clientId, offerId, offer.ClientId);
+                        return Forbid();
+                    }
+
+                    // Only allow response if offer status is "Sent"
+                    if (offer.Status != "Sent")
+                    {
+                        _logger.LogInformation("Customer {UserId} attempted to respond to offer {OfferId} with status {Status} (not in Sent status)", 
+                            userId, offerId, offer.Status);
+                        return BadRequest(ResponseHelper.CreateErrorResponse("You can only respond to offers that have been sent to you."));
+                    }
+                }
+
                 var result = await _offerService.RecordClientResponseAsync(offerId, dto.Response, dto.Accepted, userId);
 
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Client response recorded successfully"));
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access attempt for recording client response. OfferId: {OfferId}", offerId);
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
+            }
             catch (ArgumentException ex)
             {
-                _logger.LogWarning(ex, "Invalid request for recording client response. OfferId: {OfferId}", offerId);
+                _logger.LogWarning(ex, "Invalid request for recording client response. OfferId: {OfferId}, Error: {Error}", offerId, ex.Message);
                 return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error recording client response. OfferId: {OfferId}", offerId);
-                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while recording client response"));
+                _logger.LogError(ex, "Error recording client response. OfferId: {OfferId}, Error: {Error}, StackTrace: {StackTrace}", 
+                    offerId, ex.Message, ex.StackTrace);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse($"An error occurred while recording client response: {ex.Message}"));
             }
         }
 
