@@ -1,4 +1,5 @@
 <!-- acd45b7d-638c-4cba-ad8a-aab1b6f101e5 f36b69d1-01e8-4876-9c0a-eae6c8621089 -->
+
 # خطة تنفيذ وحدة المبيعات الكاملة | Complete Sales Module Implementation Plan
 
 ## نظرة عامة | Overview
@@ -12,7 +13,7 @@
 This plan covers implementing a comprehensive sales module including:
 
 - Client management with complete history
-- New structure: WeeklyPlan → Tasks → Progress  
+- New structure: WeeklyPlan → Tasks → Progress
 - Offers and deals with multi-level approval workflow
 
 ---
@@ -28,65 +29,65 @@ public class Client : BaseEntity
 {
     [Required, MaxLength(200)]
     public string Name { get; set; }
-    
+
     [Required, MaxLength(50)]
     public string Type { get; set; } // Hospital, Clinic, Lab, Pharmacy
-    
+
     [MaxLength(100)]
     public string? Specialization { get; set; }
-    
+
     [MaxLength(200)]
     public string? Location { get; set; }
-    
+
     [MaxLength(20)]
     public string? Phone { get; set; }
-    
+
     [MaxLength(100)]
     public string? Email { get; set; }
-    
+
     [MaxLength(500)]
     public string? Address { get; set; }
-    
+
     [MaxLength(100)]
     public string? City { get; set; }
-    
+
     [MaxLength(100)]
     public string? Governorate { get; set; }
-    
+
     [MaxLength(200)]
     public string? ContactPerson { get; set; }
-    
+
     [MaxLength(20)]
     public string? ContactPersonPhone { get; set; }
-    
+
     [MaxLength(100)]
     public string? ContactPersonEmail { get; set; }
-    
+
     [MaxLength(1000)]
     public string? Notes { get; set; }
-    
+
     [Required, MaxLength(50)]
     public string Status { get; set; } = "Active"; // Active, Inactive, Potential
-    
+
     [Required, MaxLength(50)]
     public string Priority { get; set; } = "Normal"; // VIP, High, Normal, Low
-    
+
     // Client Classification
     [MaxLength(1)]
     public string? Classification { get; set; } // A, B, C, D
-    
+
     [Column(TypeName = "decimal(18,2)")]
     public decimal? PotentialValue { get; set; }
-    
+
     public DateTime? LastContactDate { get; set; }
     public DateTime? NextContactDate { get; set; }
     public int? SatisfactionRating { get; set; }
-    
+
     [Required]
     public string CreatedBy { get; set; }
-    
+
     public string? AssignedTo { get; set; }
-    
+
     // Navigation Properties - Complete History
     public virtual ICollection<TaskProgress> TaskProgresses { get; set; } // All visits/interactions
     public virtual ICollection<Offer> Offers { get; set; } // All offers
@@ -103,32 +104,32 @@ public class WeeklyPlan : BaseEntity
 {
     [Required]
     public string EmployeeId { get; set; }
-    
+
     [Required]
     public DateTime WeekStartDate { get; set; }
-    
+
     [Required]
     public DateTime WeekEndDate { get; set; }
-    
+
     [Required, MaxLength(200)]
     public string Title { get; set; }
-    
+
     [MaxLength(1000)]
     public string? Description { get; set; }
-    
+
     [Required]
     public bool IsActive { get; set; } = true;
-    
+
     // Manager Review Fields
     public int? Rating { get; set; } // 1-5
-    
+
     [MaxLength(1000)]
     public string? ManagerComment { get; set; }
-    
+
     public DateTime? ManagerReviewedAt { get; set; }
-    
+
     public string? ReviewedBy { get; set; }
-    
+
     // Navigation Properties
     public virtual ApplicationUser Employee { get; set; }
     public virtual ApplicationUser? Reviewer { get; set; }
@@ -145,59 +146,59 @@ public class WeeklyPlanTask : BaseEntity
 {
     [Required]
     public long WeeklyPlanId { get; set; }
-    
+
     // ========== Task Type ==========
     [Required, MaxLength(50)]
     public string TaskType { get; set; } = "Visit"; // Visit, FollowUp
-    
+
     // ========== Client Information ==========
     public long? ClientId { get; set; } // NULL for new clients
-    
+
     [MaxLength(20)]
     public string? ClientStatus { get; set; } // "Old", "New"
-    
+
     // For NEW clients - basic info
     [MaxLength(200)]
     public string? ClientName { get; set; }
-    
+
     [MaxLength(200)]
     public string? PlaceName { get; set; }
-    
+
     [MaxLength(50)]
     public string? PlaceType { get; set; } // Hospital, Clinic, Lab
-    
+
     [MaxLength(20)]
     public string? ClientPhone { get; set; }
-    
+
     [MaxLength(500)]
     public string? ClientAddress { get; set; }
-    
+
     [MaxLength(100)]
     public string? ClientLocation { get; set; }
-    
+
     // ========== Client Classification ==========
     [MaxLength(1)]
     public string? ClientClassification { get; set; } // A, B, C, D
-    
+
     // ========== Task Planning ==========
     [Required]
     public DateTime PlannedDate { get; set; }
-    
+
     [MaxLength(20)]
     public string? PlannedTime { get; set; }
-    
+
     [MaxLength(500)]
     public string? Purpose { get; set; }
-    
+
     [MaxLength(1000)]
     public string? Notes { get; set; }
-    
+
     [MaxLength(50)]
     public string Priority { get; set; } = "Medium"; // High, Medium, Low
-    
+
     [MaxLength(50)]
     public string Status { get; set; } = "Planned"; // Planned, InProgress, Completed, Cancelled
-    
+
     // Navigation Properties
     public virtual WeeklyPlan WeeklyPlan { get; set; }
     public virtual Client? Client { get; set; } // Link to existing client if Old
@@ -209,7 +210,7 @@ public static class TaskTypeConstants
 {
     public const string Visit = "Visit";
     public const string FollowUp = "FollowUp";
-    
+
     public static readonly string[] AllTypes = { Visit, FollowUp };
 }
 ```
@@ -223,58 +224,58 @@ public class TaskProgress : BaseEntity
 {
     [Required]
     public long TaskId { get; set; } // Link to WeeklyPlanTask
-    
+
     public long? ClientId { get; set; } // Link to Client for history tracking
-    
+
     [Required]
     public string EmployeeId { get; set; } // Who made this progress
-    
+
     // ========== Visit/Progress Details ==========
     [Required]
     public DateTime ProgressDate { get; set; }
-    
+
     [MaxLength(50)]
     public string ProgressType { get; set; } = "Visit"; // Visit, Call, Meeting, Email
-    
+
     [MaxLength(2000)]
     public string? Description { get; set; }
-    
+
     [MaxLength(2000)]
     public string? Notes { get; set; }
-    
+
     // ========== Visit Result ==========
     [MaxLength(20)]
     public string? VisitResult { get; set; } // "Interested", "NotInterested"
-    
+
     // ========== If NOT Interested ==========
     [MaxLength(2000)]
     public string? NotInterestedComment { get; set; } // Why not interested
-    
+
     // ========== If Interested - Next Step ==========
     [MaxLength(20)]
     public string? NextStep { get; set; } // "NeedsDeal", "NeedsOffer"
-    
+
     // Links to created requests/offers/deals
     public long? OfferRequestId { get; set; }
     public long? OfferId { get; set; }
     public long? DealId { get; set; }
-    
+
     // ========== Follow-up ==========
     public DateTime? NextFollowUpDate { get; set; }
-    
+
     [MaxLength(1000)]
     public string? FollowUpNotes { get; set; }
-    
+
     // ========== Satisfaction ==========
     public int? SatisfactionRating { get; set; } // 1-5
-    
+
     [MaxLength(2000)]
     public string? Feedback { get; set; }
-    
+
     // ========== Attachments ==========
     [MaxLength(2000)]
     public string? Attachments { get; set; } // JSON array of file paths
-    
+
     // Navigation Properties
     public virtual WeeklyPlanTask Task { get; set; }
     public virtual Client? Client { get; set; }
@@ -291,7 +292,7 @@ public static class ProgressTypeConstants
     public const string Call = "Call";
     public const string Meeting = "Meeting";
     public const string Email = "Email";
-    
+
     public static readonly string[] AllTypes = { Visit, Call, Meeting, Email };
 }
 
@@ -299,7 +300,7 @@ public static class VisitResultConstants
 {
     public const string Interested = "Interested";
     public const string NotInterested = "NotInterested";
-    
+
     public static readonly string[] AllResults = { Interested, NotInterested };
 }
 
@@ -307,7 +308,7 @@ public static class NextStepConstants
 {
     public const string NeedsDeal = "NeedsDeal";
     public const string NeedsOffer = "NeedsOffer";
-    
+
     public static readonly string[] AllSteps = { NeedsDeal, NeedsOffer };
 }
 ```
@@ -320,34 +321,34 @@ public static class NextStepConstants
 public class OfferRequest : BaseEntity
 {
     [Required]
-    public string RequestedBy { get; set; } // Salesman ID
-    
+    public string RequestedBy { get; set; } // SalesMan ID
+
     [Required]
     public long ClientId { get; set; }
-    
+
     public long? TaskProgressId { get; set; } // Link to the progress that triggered this request
-    
+
     [Required, MaxLength(2000)]
     public string RequestedProducts { get; set; } // JSON or comma-separated
-    
+
     [MaxLength(2000)]
     public string? SpecialNotes { get; set; }
-    
+
     [Required]
     public DateTime RequestDate { get; set; }
-    
+
     [Required, MaxLength(50)]
     public string Status { get; set; } = "Requested"; // Requested, InProgress, Ready, Sent, Cancelled
-    
+
     public string? AssignedTo { get; set; } // Sales Support ID
-    
+
     public long? CreatedOfferId { get; set; }
-    
+
     public DateTime? CompletedAt { get; set; }
-    
+
     [MaxLength(1000)]
     public string? CompletionNotes { get; set; }
-    
+
     // Navigation Properties
     public virtual ApplicationUser Requester { get; set; }
     public virtual Client Client { get; set; }
@@ -365,50 +366,50 @@ public class OfferRequest : BaseEntity
 public class Offer : BaseEntity
 {
     public long? OfferRequestId { get; set; }
-    
+
     [Required]
     public long ClientId { get; set; }
-    
+
     [Required]
     public string CreatedBy { get; set; } // Sales Support ID
-    
+
     [Required]
-    public string AssignedTo { get; set; } // Salesman ID
-    
+    public string AssignedTo { get; set; } // SalesMan ID
+
     [Required, MaxLength(2000)]
     public string Products { get; set; } // JSON or detailed list
-    
+
     [Required, Column(TypeName = "decimal(18,2)")]
     public decimal TotalAmount { get; set; }
-    
+
     [MaxLength(2000)]
     public string? PaymentTerms { get; set; }
-    
+
     [MaxLength(2000)]
     public string? DeliveryTerms { get; set; }
-    
+
     [Required]
     public DateTime ValidUntil { get; set; }
-    
+
     [Required, MaxLength(50)]
     public string Status { get; set; } = "Draft"; // Draft, Sent, UnderReview, Accepted, Rejected, NeedsModification, Expired
-    
+
     public DateTime? SentToClientAt { get; set; }
-    
+
     [MaxLength(2000)]
     public string? ClientResponse { get; set; }
-    
+
     [MaxLength(2000)]
     public string? Documents { get; set; } // JSON array of file paths
-    
+
     [MaxLength(2000)]
     public string? Notes { get; set; }
-    
+
     // Navigation Properties
     public virtual OfferRequest? OfferRequest { get; set; }
     public virtual Client Client { get; set; }
     public virtual ApplicationUser Creator { get; set; }
-    public virtual ApplicationUser Salesman { get; set; }
+    public virtual ApplicationUser SalesMan { get; set; }
     public virtual Deal? Deal { get; set; }
 }
 ```
@@ -422,67 +423,67 @@ public class Deal : BaseEntity
 {
     [Required]
     public long OfferId { get; set; }
-    
+
     [Required]
     public long ClientId { get; set; }
-    
+
     [Required]
-    public string SalesmanId { get; set; }
-    
+    public string SalesManId { get; set; }
+
     [Required, Column(TypeName = "decimal(18,2)")]
     public decimal DealValue { get; set; }
-    
+
     [Required]
     public DateTime ClosedDate { get; set; }
-    
+
     [MaxLength(2000)]
     public string? PaymentTerms { get; set; }
-    
+
     [MaxLength(2000)]
     public string? DeliveryTerms { get; set; }
-    
+
     [Required, MaxLength(50)]
-    public string Status { get; set; } = "PendingManagerApproval"; 
-    // PendingManagerApproval, RejectedByManager, PendingSuperAdminApproval, 
+    public string Status { get; set; } = "PendingManagerApproval";
+    // PendingManagerApproval, RejectedByManager, PendingSuperAdminApproval,
     // RejectedBySuperAdmin, Approved, SentToLegal, Failed, Success
-    
+
     [MaxLength(2000)]
     public string? Notes { get; set; }
-    
+
     public DateTime? ExpectedDeliveryDate { get; set; }
-    
+
     // Manager Approval
     public string? ManagerApprovedBy { get; set; }
     public DateTime? ManagerApprovedAt { get; set; }
-    
+
     [MaxLength(50)]
     public string? ManagerRejectionReason { get; set; } // Money, CashFlow, OtherNeeds
-    
+
     [MaxLength(2000)]
     public string? ManagerComments { get; set; }
-    
+
     // SuperAdmin Approval
     public string? SuperAdminApprovedBy { get; set; }
     public DateTime? SuperAdminApprovedAt { get; set; }
-    
+
     [MaxLength(50)]
     public string? SuperAdminRejectionReason { get; set; } // Money, CashFlow, OtherNeeds
-    
+
     [MaxLength(2000)]
     public string? SuperAdminComments { get; set; }
-    
+
     public DateTime? SentToLegalAt { get; set; }
-    
+
     // Deal Outcome
     public DateTime? CompletedAt { get; set; }
-    
+
     [MaxLength(2000)]
     public string? CompletionNotes { get; set; }
-    
+
     // Navigation Properties
     public virtual Offer Offer { get; set; }
     public virtual Client Client { get; set; }
-    public virtual ApplicationUser Salesman { get; set; }
+    public virtual ApplicationUser SalesMan { get; set; }
     public virtual ApplicationUser? ManagerApprover { get; set; }
     public virtual ApplicationUser? SuperAdminApprover { get; set; }
 }
@@ -602,14 +603,14 @@ modelBuilder.Entity<Deal>()
     .OnDelete(DeleteBehavior.Restrict);
 
 modelBuilder.Entity<Deal>()
-    .HasOne(d => d.Salesman)
+    .HasOne(d => d.SalesMan)
     .WithMany()
-    .HasForeignKey(d => d.SalesmanId)
+    .HasForeignKey(d => d.SalesManId)
     .OnDelete(DeleteBehavior.Restrict);
 
 // Indexes for performance
 modelBuilder.Entity<Deal>()
-    .HasIndex(d => new { d.Status, d.SalesmanId });
+    .HasIndex(d => new { d.Status, d.SalesManId });
 
 modelBuilder.Entity<Offer>()
     .HasIndex(o => new { o.Status, o.AssignedTo });
@@ -704,7 +705,7 @@ public class CreateWeeklyPlanTaskDTO
     public string TaskType { get; set; } // Visit, FollowUp
     public long? ClientId { get; set; } // NULL for new client
     public string? ClientStatus { get; set; } // "Old", "New"
-    
+
     // For new clients
     public string? ClientName { get; set; }
     public string? PlaceName { get; set; }
@@ -712,7 +713,7 @@ public class CreateWeeklyPlanTaskDTO
     public string? ClientPhone { get; set; }
     public string? ClientAddress { get; set; }
     public string? ClientLocation { get; set; }
-    
+
     public string? ClientClassification { get; set; } // A, B, C, D
     public DateTime PlannedDate { get; set; }
     public string? PlannedTime { get; set; }
@@ -769,18 +770,18 @@ public class CreateTaskProgressDTO
     public string ProgressType { get; set; } // Visit, Call, Meeting, Email
     public string? Description { get; set; }
     public string? Notes { get; set; }
-    
+
     // Visit Result
     public string? VisitResult { get; set; } // Interested, NotInterested
     public string? NotInterestedComment { get; set; }
-    
+
     // If Interested
     public string? NextStep { get; set; } // NeedsDeal, NeedsOffer
-    
+
     // Follow-up
     public DateTime? NextFollowUpDate { get; set; }
     public string? FollowUpNotes { get; set; }
-    
+
     // Satisfaction
     public int? SatisfactionRating { get; set; }
     public string? Feedback { get; set; }
@@ -905,8 +906,8 @@ public class DealResponseDTO
     public long OfferId { get; set; }
     public long ClientId { get; set; }
     public string ClientName { get; set; }
-    public string SalesmanId { get; set; }
-    public string SalesmanName { get; set; }
+    public string SalesManId { get; set; }
+    public string SalesManName { get; set; }
     public decimal DealValue { get; set; }
     public DateTime ClosedDate { get; set; }
     public string Status { get; set; }
@@ -960,19 +961,19 @@ public class ApproveDealDTO
 ### 4.4 OfferRequestRepository.cs
 
 - GetRequestsByStatusAsync(string status)
-- GetRequestsBySalesmanAsync(string salesmanId)
+- GetRequestsBySalesManAsync(string salesmanId)
 - GetRequestsAssignedToAsync(string supportId)
 
 ### 4.5 OfferRepository.cs
 
 - GetOffersByClientIdAsync(long clientId) - For client history
-- GetOffersBySalesmanAsync(string salesmanId)
+- GetOffersBySalesManAsync(string salesmanId)
 - GetOffersByStatusAsync(string status)
 
 ### 4.6 DealRepository.cs
 
 - GetDealsByClientIdAsync(long clientId) - For client history
-- GetDealsBySalesmanAsync(string salesmanId)
+- GetDealsBySalesManAsync(string salesmanId)
 - GetDealsByStatusAsync(string status)
 - GetPendingApprovalsForManagerAsync()
 - GetPendingApprovalsForSuperAdminAsync()
@@ -986,10 +987,10 @@ public class ApproveDealDTO
 ### 5.1 ClientService.cs
 
 - **GetClientProfileAsync(long clientId)** - Returns complete client history
-  - All visits/interactions
-  - All offers (pending, accepted, rejected)
-  - All deals (success/failed)
-  - Statistics
+     - All visits/interactions
+     - All offers (pending, accepted, rejected)
+     - All deals (success/failed)
+     - Statistics
 
 ### 5.2 WeeklyPlanService.cs
 
@@ -1013,14 +1014,14 @@ public class ApproveDealDTO
 ### 5.5 OfferService.cs
 
 - CreateOfferFromRequestAsync()
-- SendToSalesmanAsync()
+- SendToSalesManAsync()
 - GetOffersByClientAsync() - For client history
 
 ### 5.6 DealService.cs
 
 - CreateDealAsync()
 - **ManagerApprovalAsync()** - Manager approve/reject with reason
-- **SuperAdminApprovalAsync()** - CEO approve/reject with reason  
+- **SuperAdminApprovalAsync()** - CEO approve/reject with reason
 - **SendToLegalAsync()** - Automatic after final approval
 - GetDealsByClientAsync() - For client history
 
@@ -1085,7 +1086,7 @@ public class ApproveDealDTO
 - GET /api/deals/{id}
 - GET /api/deals/by-client/{clientId}
 - **POST /api/deals/{id}/manager-approval**
-- **POST /api/deals/{id}/superadmin-approval**
+- **POST /api/deals/{id}/superAdmin-approval**
 
 ---
 
@@ -1096,7 +1097,7 @@ public class ApproveDealDTO
 ```csharp
 public static class SalesRoles
 {
-    public const string Salesman = "Salesman";
+    public const string SalesMan = "SalesMan";
     public const string SalesManager = "SalesManager";
     public const string SalesSupport = "SalesSupport";
     public const string SuperAdmin = "SuperAdmin";
@@ -1110,24 +1111,24 @@ public static class SalesPermissions
     public const string ViewClientHistory = "ViewClientHistory";
     public const string CreateClient = "CreateClient";
     public const string EditClient = "EditClient";
-    
+
     // Weekly Plan permissions
     public const string CreateWeeklyPlan = "CreateWeeklyPlan";
     public const string ViewOwnWeeklyPlans = "ViewOwnWeeklyPlans";
     public const string ViewAllWeeklyPlans = "ViewAllWeeklyPlans";
     public const string ReviewWeeklyPlan = "ReviewWeeklyPlan";
-    
+
     // Task Progress permissions
     public const string CreateTaskProgress = "CreateTaskProgress";
     public const string ViewOwnProgress = "ViewOwnProgress";
     public const string ViewAllProgress = "ViewAllProgress";
-    
+
     // Offer permissions
     public const string RequestOffer = "RequestOffer";
     public const string CreateOffer = "CreateOffer";
     public const string ViewOwnOffers = "ViewOwnOffers";
     public const string ViewAllOffers = "ViewAllOffers";
-    
+
     // Deal permissions
     public const string CreateDeal = "CreateDeal";
     public const string ViewOwnDeals = "ViewOwnDeals";
@@ -1279,8 +1280,8 @@ dotnet ef database update
 1. إنشاء الجداول الجديدة (WeeklyPlanTask, TaskProgress)
 2. إذا كان هناك بيانات في WeeklyPlanItem القديم:
 
-   - نقل البيانات للجداول الجديدة
-   - أو الاحتفاظ بالجدول القديم للتاريخ فقط
+      - نقل البيانات للجداول الجديدة
+      - أو الاحتفاظ بالجدول القديم للتاريخ فقط
 
 3. تحديث الـ relationships
 
