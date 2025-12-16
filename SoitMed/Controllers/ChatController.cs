@@ -86,7 +86,7 @@ namespace SoitMed.Controllers
                 var isSuperAdmin = userRoles.Contains("SuperAdmin");
                 var isAdmin = userRoles.Contains("Admin") || userRoles.Contains("SalesManager") || userRoles.Contains("SalesSupport");
 
-                // If admin is creating, they can specify customerId, otherwise use current user
+                // If Admin is creating, they can specify customerId, otherwise use current user
                 var customerId = isAdmin ? dto.CustomerId : userId;
                 
                 // Validate chat type is provided
@@ -148,7 +148,7 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
-        /// Assign admin to conversation
+        /// Assign Admin to conversation
         /// </summary>
         [HttpPut("conversations/{id}/assign")]
         [Authorize(Roles = "SuperAdmin,SalesManager")]
@@ -161,13 +161,13 @@ namespace SoitMed.Controllers
             }
             catch (ArgumentException ex)
             {
-                _logger.LogWarning(ex, "Invalid request for assigning admin to conversation {ConversationId}", id);
+                _logger.LogWarning(ex, "Invalid request for assigning Admin to conversation {ConversationId}", id);
                 return BadRequest(ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error assigning admin to conversation {ConversationId}", id);
-                return ErrorResponse("An error occurred while assigning admin", 500);
+                _logger.LogError(ex, "Error assigning Admin to conversation {ConversationId}", id);
+                return ErrorResponse("An error occurred while assigning Admin", 500);
             }
         }
 
@@ -330,6 +330,93 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
+        /// Upload and send image message
+        /// </summary>
+        [HttpPost("messages/image")]
+        [RequestSizeLimit(10 * 1024 * 1024)] // 10MB limit
+        public async Task<IActionResult> SendImageMessage(
+            [FromForm] IFormFile file,
+            [FromForm] long conversationId,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                {
+                    return BadRequest(ErrorResponse("Image file is required"));
+                }
+
+                // Validate file type
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+                var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                if (!allowedExtensions.Contains(fileExtension))
+                {
+                    return BadRequest(ErrorResponse("Invalid file type. Allowed types: jpg, jpeg, png, gif, webp"));
+                }
+
+                // Validate file size (max 10MB)
+                if (file.Length > 10 * 1024 * 1024)
+                {
+                    return BadRequest(ErrorResponse("File size exceeds 10MB limit"));
+                }
+
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized();
+                }
+
+                var user = await UserManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    return Unauthorized();
+                }
+
+                var userRoles = (await UserManager.GetRolesAsync(user)).ToList();
+
+                // Save image file
+                var conversationFolder = Path.Combine(_environment.WebRootPath, "chat", "images", conversationId.ToString());
+                Directory.CreateDirectory(conversationFolder);
+
+                var fileName = $"{Guid.NewGuid()}{fileExtension}";
+                var filePath = Path.Combine(conversationFolder, fileName);
+                var relativePath = Path.Combine("chat", "images", conversationId.ToString(), fileName).Replace('\\', '/');
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream, cancellationToken);
+                }
+
+                // Create message
+                var message = await _chatService.SendImageMessageAsync(
+                    conversationId, 
+                    userId, 
+                    relativePath, 
+                    file.FileName, 
+                    file.Length, 
+                    userRoles, 
+                    cancellationToken);
+                
+                return SuccessResponse(message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized attempt to send image message");
+                return StatusCode(403, ErrorResponse(ex.Message));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for sending image message");
+                return BadRequest(ErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending image message");
+                return ErrorResponse("An error occurred while sending image message", 500);
+            }
+        }
+
+        /// <summary>
         /// Mark messages as read
         /// </summary>
         [HttpPut("conversations/{id}/read")]
@@ -343,8 +430,25 @@ namespace SoitMed.Controllers
                     return Unauthorized();
                 }
 
-                await _chatService.MarkMessagesAsReadAsync(id, userId, cancellationToken);
+                var user = await UserManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    return Unauthorized();
+                }
+
+                var userRoles = (await UserManager.GetRolesAsync(user)).ToList();
+                await _chatService.MarkMessagesAsReadAsync(id, userId, userRoles, cancellationToken);
                 return SuccessResponse("Messages marked as read");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized attempt to mark messages as read in conversation {ConversationId}", id);
+                return StatusCode(403, ErrorResponse(ex.Message));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for marking messages as read");
+                return BadRequest(ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
@@ -367,8 +471,25 @@ namespace SoitMed.Controllers
                     return Unauthorized();
                 }
 
-                var count = await _chatService.GetUnreadCountAsync(id, userId, cancellationToken);
+                var user = await UserManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    return Unauthorized();
+                }
+
+                var userRoles = (await UserManager.GetRolesAsync(user)).ToList();
+                var count = await _chatService.GetUnreadCountAsync(id, userId, userRoles, cancellationToken);
                 return SuccessResponse(new { UnreadCount = count });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized attempt to get unread count for conversation {ConversationId}", id);
+                return StatusCode(403, ErrorResponse(ex.Message));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for getting unread count");
+                return BadRequest(ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {

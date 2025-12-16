@@ -54,11 +54,15 @@ namespace SoitMed.DTO
         public long ConversationId { get; set; }
         public string SenderId { get; set; } = string.Empty;
         public string? SenderName { get; set; }
-        public string MessageType { get; set; } = "Text"; // "Text" or "Voice"
+        public string MessageType { get; set; } = "Text"; // "Text", "Voice", or "Image"
         public string? Content { get; set; }
         public string? VoiceFilePath { get; set; }
         public string? VoiceFileUrl { get; set; } // Full URL for accessing the file
         public int? VoiceDuration { get; set; }
+        public string? ImageFilePath { get; set; }
+        public string? ImageFileUrl { get; set; } // Full URL for accessing the image
+        public string? ImageFileName { get; set; }
+        public long? ImageFileSize { get; set; }
         public bool IsRead { get; set; }
         public DateTime? ReadAt { get; set; }
         public DateTime CreatedAt { get; set; }

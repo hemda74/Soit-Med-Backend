@@ -41,27 +41,27 @@ namespace SoitMed.Services
             _userManager = userManager;
         }
 
-        public async Task<ChatConversationResponseDTO> GetOrCreateConversationAsync(string customerId, ChatType chatType, string? adminId = null, CancellationToken cancellationToken = default)
+        public async Task<ChatConversationResponseDTO> GetOrCreateConversationAsync(string customerId, ChatType chatType, string? AdminId = null, CancellationToken cancellationToken = default)
         {
             // Check if conversation already exists for this customer and chat type
             var existingConversation = await _unitOfWork.ChatConversations.GetByCustomerIdAndTypeAsync(customerId, chatType, cancellationToken);
             
             if (existingConversation != null)
             {
-                return await MapToConversationDTOAsync(existingConversation, cancellationToken);
+                return await MapToConversationDTOAsync(existingConversation, customerId, cancellationToken);
             }
 
-            // Auto-assign admin based on chat type if not provided
-            if (string.IsNullOrEmpty(adminId))
+            // Auto-assign Admin based on chat type if not provided
+            if (string.IsNullOrEmpty(AdminId))
             {
-                adminId = await AutoAssignAdminByChatTypeAsync(chatType, cancellationToken);
+                AdminId = await AutoAssignAdminByChatTypeAsync(chatType, cancellationToken);
             }
 
             // Create new conversation
             var conversation = new ChatConversation
             {
                 CustomerId = customerId,
-                AdminId = adminId, // Can be null if no support staff available
+                AdminId = AdminId, // Can be null if no support staff available
                 ChatType = chatType,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
@@ -73,13 +73,13 @@ namespace SoitMed.Services
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Created new chat conversation. ConversationId: {ConversationId}, CustomerId: {CustomerId}, ChatType: {ChatType}, AdminId: {AdminId}", 
-                conversation.Id, customerId, chatType, adminId ?? "None");
+                conversation.Id, customerId, chatType, AdminId ?? "None");
 
-            return await MapToConversationDTOAsync(conversation, cancellationToken);
+            return await MapToConversationDTOAsync(conversation, customerId, cancellationToken);
         }
 
         /// <summary>
-        /// Auto-assigns an admin/support staff based on chat type
+        /// Auto-assigns an Admin/support staff based on chat type
         /// </summary>
         private async Task<string?> AutoAssignAdminByChatTypeAsync(ChatType chatType, CancellationToken cancellationToken)
         {
@@ -123,7 +123,7 @@ namespace SoitMed.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error auto-assigning admin for chat type {ChatType}", chatType);
+                _logger.LogError(ex, "Error auto-assigning Admin for chat type {ChatType}", chatType);
                 return null;
             }
         }
@@ -135,7 +135,10 @@ namespace SoitMed.Services
             var isAdmin = userRoles.Contains(UserRoles.Admin);
             var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
             var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
-            var isCustomer = userRoles.Contains("Customer");
+            // Customer can be "Customer", "Doctor", or "Technician"
+            var isCustomer = userRoles.Contains("Customer") || 
+                            userRoles.Contains("Doctor") || 
+                            userRoles.Contains("Technician");
 
             if (isSuperAdmin)
             {
@@ -206,7 +209,7 @@ namespace SoitMed.Services
             var result = new List<ChatConversationResponseDTO>();
             foreach (var conv in conversations)
             {
-                var dto = await MapToConversationDTOAsync(conv, cancellationToken);
+                var dto = await MapToConversationDTOAsync(conv, userId, cancellationToken);
                 result.Add(dto);
             }
 
@@ -224,7 +227,10 @@ namespace SoitMed.Services
             var isAdmin = userRoles.Contains(UserRoles.Admin);
             var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
             var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
-            var isCustomer = userRoles.Contains("Customer");
+            // Customer can be "Customer", "Doctor", or "Technician"
+            var isCustomer = userRoles.Contains("Customer") || 
+                            userRoles.Contains("Doctor") || 
+                            userRoles.Contains("Technician");
 
             // Security check
             if (isSuperAdmin)
@@ -260,32 +266,32 @@ namespace SoitMed.Services
                 }
             }
 
-            return await MapToConversationDTOAsync(conversation, cancellationToken);
+            return await MapToConversationDTOAsync(conversation, userId, cancellationToken);
         }
 
-        public async Task<ChatConversationResponseDTO> AssignAdminAsync(long conversationId, string adminId, CancellationToken cancellationToken = default)
+        public async Task<ChatConversationResponseDTO> AssignAdminAsync(long conversationId, string AdminId, CancellationToken cancellationToken = default)
         {
             var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
             if (conversation == null)
                 throw new ArgumentException("Conversation not found", nameof(conversationId));
 
-            conversation.AdminId = adminId;
+            conversation.AdminId = AdminId;
             conversation.UpdatedAt = DateTime.UtcNow;
             
             await _unitOfWork.ChatConversations.UpdateAsync(conversation, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Assigned admin to conversation. ConversationId: {ConversationId}, AdminId: {AdminId}", 
-                conversationId, adminId);
+            _logger.LogInformation("Assigned Admin to conversation. ConversationId: {ConversationId}, AdminId: {AdminId}", 
+                conversationId, AdminId);
 
-            // Notify admin via SignalR
-            await _hubContext.Clients.Group($"User_{adminId}").SendAsync("ConversationAssigned", new
+            // Notify Admin via SignalR
+            await _hubContext.Clients.Group($"User_{AdminId}").SendAsync("ConversationAssigned", new
             {
                 ConversationId = conversationId,
                 CustomerId = conversation.CustomerId
             });
 
-            return await MapToConversationDTOAsync(conversation, cancellationToken);
+            return await MapToConversationDTOAsync(conversation, null, cancellationToken);
         }
 
         public async Task<ChatMessageResponseDTO> SendTextMessageAsync(long conversationId, string senderId, string content, List<string> userRoles, CancellationToken cancellationToken = default)
@@ -294,12 +300,15 @@ namespace SoitMed.Services
             if (conversation == null)
                 throw new ArgumentException("Conversation not found", nameof(conversationId));
 
-            // Check if sender is customer
-            var isCustomer = conversation.CustomerId == senderId;
             var isSuperAdmin = userRoles.Contains(UserRoles.SuperAdmin);
             var isAdmin = userRoles.Contains(UserRoles.Admin);
             var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
             var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
+            // Customer can be "Customer", "Doctor", or "Technician"
+            var isCustomer = conversation.CustomerId == senderId ||
+                            userRoles.Contains("Customer") ||
+                            userRoles.Contains("Doctor") ||
+                            userRoles.Contains("Technician");
 
             // Security check: sender must be either the customer or authorized support staff
             if (!isCustomer)
@@ -489,6 +498,108 @@ namespace SoitMed.Services
             return messageDTO;
         }
 
+        public async Task<ChatMessageResponseDTO> SendImageMessageAsync(long conversationId, string senderId, string imageFilePath, string imageFileName, long imageFileSize, List<string> userRoles, CancellationToken cancellationToken = default)
+        {
+            var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
+            if (conversation == null)
+                throw new ArgumentException("Conversation not found", nameof(conversationId));
+
+            // Check if sender is customer
+            var isCustomer = conversation.CustomerId == senderId;
+            var isSuperAdmin = userRoles.Contains(UserRoles.SuperAdmin);
+            var isAdmin = userRoles.Contains(UserRoles.Admin);
+            var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
+            var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
+
+            // Security check: sender must be either the customer or authorized support staff
+            if (!isCustomer)
+            {
+                bool isAuthorized = false;
+                if (isSuperAdmin)
+                    isAuthorized = true;
+                else if (isAdmin && conversation.ChatType == ChatType.Support)
+                    isAuthorized = true;
+                else if (isSalesSupport && conversation.ChatType == ChatType.Sales)
+                    isAuthorized = true;
+                else if (isMaintenanceSupport && conversation.ChatType == ChatType.Maintenance)
+                    isAuthorized = true;
+
+                if (!isAuthorized)
+                {
+                    throw new UnauthorizedAccessException("You are not authorized to send messages in this conversation type");
+                }
+            }
+
+            // If support staff is sending and AdminId is null, assign them to the conversation
+            if (!isCustomer && string.IsNullOrEmpty(conversation.AdminId))
+            {
+                conversation.AdminId = senderId;
+                conversation.UpdatedAt = DateTime.UtcNow;
+                await _unitOfWork.ChatConversations.UpdateAsync(conversation, cancellationToken);
+            }
+
+            var message = new ChatMessage
+            {
+                ConversationId = conversationId,
+                SenderId = senderId,
+                MessageType = "Image",
+                ImageFilePath = imageFilePath,
+                ImageFileName = imageFileName,
+                ImageFileSize = imageFileSize,
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.ChatMessages.CreateAsync(message, cancellationToken);
+
+            // Update conversation
+            conversation.LastMessageAt = DateTime.UtcNow;
+            conversation.LastMessagePreview = "Image";
+            conversation.UpdatedAt = DateTime.UtcNow;
+
+            await _unitOfWork.ChatConversations.UpdateAsync(conversation, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            var messageDTO = await MapToMessageDTOAsync(message, cancellationToken);
+
+            // Determine recipient
+            var recipientId = conversation.CustomerId == senderId ? conversation.AdminId : conversation.CustomerId;
+
+            // Send via SignalR
+            await _hubContext.Clients.Group($"Conversation_{conversationId}").SendAsync("ReceiveMessage", messageDTO);
+
+            // Send notification if recipient is offline
+            if (!string.IsNullOrEmpty(recipientId))
+            {
+                try
+                {
+                    var sender = await _unitOfWork.Users.GetByIdAsync(senderId, cancellationToken);
+                    var senderName = sender != null ? $"{sender.FirstName} {sender.LastName}".Trim() : "Someone";
+                    
+                    await _notificationService.CreateNotificationAsync(
+                        recipientId,
+                        "New Image Message",
+                        $"{senderName} sent an image",
+                        "Chat",
+                        "Medium",
+                        null,
+                        null,
+                        true, // Mobile push
+                        new Dictionary<string, object> { { "conversationId", conversationId }, { "messageId", message.Id } },
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send notification for image message");
+                }
+            }
+
+            _logger.LogInformation("Image message sent. MessageId: {MessageId}, ConversationId: {ConversationId}", 
+                message.Id, conversationId);
+
+            return messageDTO;
+        }
+
         public async Task<IEnumerable<ChatMessageResponseDTO>> GetMessagesAsync(long conversationId, string userId, List<string> userRoles, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default)
         {
             var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
@@ -499,7 +610,10 @@ namespace SoitMed.Services
             var isAdmin = userRoles.Contains(UserRoles.Admin);
             var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
             var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
-            var isCustomer = userRoles.Contains("Customer");
+            // Customer can be "Customer", "Doctor", or "Technician"
+            var isCustomer = userRoles.Contains("Customer") || 
+                            userRoles.Contains("Doctor") || 
+                            userRoles.Contains("Technician");
 
             // Security check
             if (isSuperAdmin)
@@ -547,8 +661,51 @@ namespace SoitMed.Services
             return result;
         }
 
-        public async Task MarkMessagesAsReadAsync(long conversationId, string userId, CancellationToken cancellationToken = default)
+        public async Task MarkMessagesAsReadAsync(long conversationId, string userId, List<string> userRoles, CancellationToken cancellationToken = default)
         {
+            // Verify user has access to this conversation
+            var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
+            if (conversation == null)
+                throw new ArgumentException("Conversation not found", nameof(conversationId));
+
+            var isSuperAdmin = userRoles.Contains(UserRoles.SuperAdmin);
+            var isAdmin = userRoles.Contains(UserRoles.Admin);
+            var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
+            var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
+            // Customer can be "Customer", "Doctor", or "Technician"
+            var isCustomer = userRoles.Contains("Customer") || 
+                            userRoles.Contains("Doctor") || 
+                            userRoles.Contains("Technician");
+
+            // Authorization check
+            bool hasAccess = false;
+            if (isSuperAdmin)
+            {
+                hasAccess = true;
+            }
+            else if (isCustomer)
+            {
+                // Customer can only mark messages as read in their own conversations
+                hasAccess = conversation.CustomerId == userId;
+            }
+            else
+            {
+                // Support staff can mark messages as read in conversations of their type or assigned to them
+                if (isAdmin && conversation.ChatType == ChatType.Support)
+                    hasAccess = true;
+                else if (isSalesSupport && conversation.ChatType == ChatType.Sales)
+                    hasAccess = true;
+                else if (isMaintenanceSupport && conversation.ChatType == ChatType.Maintenance)
+                    hasAccess = true;
+                else if (conversation.AdminId == userId)
+                    hasAccess = true;
+            }
+
+            if (!hasAccess)
+            {
+                throw new UnauthorizedAccessException("You are not authorized to mark messages as read in this conversation");
+            }
+
             await _unitOfWork.ChatMessages.MarkMessagesAsReadAsync(conversationId, userId, cancellationToken);
 
             // Notify other participants that messages were read
@@ -563,8 +720,51 @@ namespace SoitMed.Services
                 conversationId, userId);
         }
 
-        public async Task<int> GetUnreadCountAsync(long conversationId, string userId, CancellationToken cancellationToken = default)
+        public async Task<int> GetUnreadCountAsync(long conversationId, string userId, List<string> userRoles, CancellationToken cancellationToken = default)
         {
+            // Verify user has access to this conversation
+            var conversation = await _unitOfWork.ChatConversations.GetByIdAsync(conversationId, cancellationToken);
+            if (conversation == null)
+                throw new ArgumentException("Conversation not found", nameof(conversationId));
+
+            var isSuperAdmin = userRoles.Contains(UserRoles.SuperAdmin);
+            var isAdmin = userRoles.Contains(UserRoles.Admin);
+            var isSalesSupport = userRoles.Contains(UserRoles.SalesSupport);
+            var isMaintenanceSupport = userRoles.Contains(UserRoles.MaintenanceSupport);
+            // Customer can be "Customer", "Doctor", or "Technician"
+            var isCustomer = userRoles.Contains("Customer") || 
+                            userRoles.Contains("Doctor") || 
+                            userRoles.Contains("Technician");
+
+            // Authorization check
+            bool hasAccess = false;
+            if (isSuperAdmin)
+            {
+                hasAccess = true;
+            }
+            else if (isCustomer)
+            {
+                // Customer can only get unread count for their own conversations
+                hasAccess = conversation.CustomerId == userId;
+            }
+            else
+            {
+                // Support staff can get unread count for conversations of their type or assigned to them
+                if (isAdmin && conversation.ChatType == ChatType.Support)
+                    hasAccess = true;
+                else if (isSalesSupport && conversation.ChatType == ChatType.Sales)
+                    hasAccess = true;
+                else if (isMaintenanceSupport && conversation.ChatType == ChatType.Maintenance)
+                    hasAccess = true;
+                else if (conversation.AdminId == userId)
+                    hasAccess = true;
+            }
+
+            if (!hasAccess)
+            {
+                throw new UnauthorizedAccessException("You are not authorized to view unread count for this conversation");
+            }
+
             return await _unitOfWork.ChatMessages.GetUnreadCountAsync(conversationId, userId, cancellationToken);
         }
 
@@ -601,18 +801,18 @@ namespace SoitMed.Services
             }
         }
 
-        private async Task<ChatConversationResponseDTO> MapToConversationDTOAsync(ChatConversation conversation, CancellationToken cancellationToken)
+        private async Task<ChatConversationResponseDTO> MapToConversationDTOAsync(ChatConversation conversation, string? userId = null, CancellationToken cancellationToken = default)
         {
             var customer = await _unitOfWork.Users.GetByIdAsync(conversation.CustomerId, cancellationToken);
-            ApplicationUser? admin = null;
+            ApplicationUser? Admin = null;
             if (!string.IsNullOrEmpty(conversation.AdminId))
             {
-                admin = await _unitOfWork.Users.GetByIdAsync(conversation.AdminId, cancellationToken);
+                Admin = await _unitOfWork.Users.GetByIdAsync(conversation.AdminId, cancellationToken);
             }
 
-            // Get unread count (for the current user - we'll need to pass userId, but for now use admin or customer)
-            var currentUserId = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            // Get unread count for the specified user (or current user from context if not provided)
             int unreadCount = 0;
+            var currentUserId = userId ?? _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!string.IsNullOrEmpty(currentUserId))
             {
                 unreadCount = await _unitOfWork.ChatMessages.GetUnreadCountAsync(conversation.Id, currentUserId, cancellationToken);
@@ -639,7 +839,7 @@ namespace SoitMed.Services
                 CustomerEmail = customer?.Email,
                 CustomerImageUrl = customerImageUrl,
                 AdminId = conversation.AdminId,
-                AdminName = admin != null ? $"{admin.FirstName} {admin.LastName}".Trim() : null,
+                AdminName = Admin != null ? $"{Admin.FirstName} {Admin.LastName}".Trim() : null,
                 ChatType = conversation.ChatType,
                 ChatTypeName = conversation.ChatType switch
                 {
@@ -673,6 +873,17 @@ namespace SoitMed.Services
                 }
             }
 
+            string? imageFileUrl = null;
+            if (message.MessageType == "Image" && !string.IsNullOrEmpty(message.ImageFilePath))
+            {
+                // Build full URL for image file
+                var request = _httpContextAccessor.HttpContext?.Request;
+                if (request != null)
+                {
+                    imageFileUrl = $"{request.Scheme}://{request.Host}/{message.ImageFilePath.Replace('\\', '/')}";
+                }
+            }
+
             return new ChatMessageResponseDTO
             {
                 Id = message.Id,
@@ -684,6 +895,10 @@ namespace SoitMed.Services
                 VoiceFilePath = message.VoiceFilePath,
                 VoiceFileUrl = voiceFileUrl,
                 VoiceDuration = message.VoiceDuration,
+                ImageFilePath = message.ImageFilePath,
+                ImageFileUrl = imageFileUrl,
+                ImageFileName = message.ImageFileName,
+                ImageFileSize = message.ImageFileSize,
                 IsRead = message.IsRead,
                 ReadAt = message.ReadAt,
                 CreatedAt = message.CreatedAt
