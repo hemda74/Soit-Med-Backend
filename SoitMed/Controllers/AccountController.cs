@@ -202,7 +202,7 @@ namespace SoitMed.Controllers
 			}
 		}
 
-		[HttpPost("superadmin-update-password")]
+		[HttpPost("superAdmin-update-password")]
 		[Authorize(Roles = "SuperAdmin")]
 		public async Task<IActionResult> SuperAdminUpdatePassword(SuperAdminPasswordUpdateDTO passwordUpdateDTO)
 		{

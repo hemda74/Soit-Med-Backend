@@ -35,7 +35,7 @@ namespace SoitMed.Controllers
         /// <param name="createDto">Task creation data</param>
         /// <returns>Created task details</returns>
         [HttpPost]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> CreateTask([FromBody] CreateWeeklyPlanTaskDTO createDto)
         {
             try
@@ -76,7 +76,7 @@ namespace SoitMed.Controllers
         /// <param name="id">Task ID</param>
         /// <returns>Task details</returns>
         [HttpGet("{id}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> GetTask(long id)
         {
             try
@@ -111,7 +111,7 @@ namespace SoitMed.Controllers
         /// <param name="weeklyPlanId">Weekly plan ID</param>
         /// <returns>List of tasks</returns>
         [HttpGet("by-plan/{weeklyPlanId}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> GetTasksByPlan(long weeklyPlanId)
         {
             try
@@ -149,7 +149,7 @@ namespace SoitMed.Controllers
         /// <param name="updateDto">Task update data</param>
         /// <returns>Updated task details</returns>
         [HttpPut("{id}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> UpdateTask(long id, [FromBody] UpdateWeeklyPlanTaskDTO updateDto)
         {
             try
@@ -193,7 +193,7 @@ namespace SoitMed.Controllers
         /// <param name="id">Task ID</param>
         /// <returns>Success message</returns>
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> DeleteTask(long id)
         {
             try

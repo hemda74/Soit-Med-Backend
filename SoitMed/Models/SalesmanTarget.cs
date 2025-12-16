@@ -22,12 +22,12 @@ namespace SoitMed.Models
     /// <summary>
     /// Represents targets set by managers (money) or salesmen themselves (visits/offers/deals)
     /// </summary>
-    public class SalesmanTarget : BaseEntity
+    public class SalesManTarget : BaseEntity
     {
         /// <summary>
-        /// Salesman ID - null for team targets
+        /// SalesMan ID - null for team targets
         /// </summary>
-        public string? SalesmanId { get; set; }
+        public string? SalesManId { get; set; }
 
         /// <summary>
         /// Type of target: Money (set by manager) or Activity (set by salesman)
@@ -100,7 +100,7 @@ namespace SoitMed.Models
         public string? Notes { get; set; }
         
         // Navigation Properties
-        public virtual ApplicationUser? Salesman { get; set; }
+        public virtual ApplicationUser? SalesMan { get; set; }
         public virtual ApplicationUser? Manager { get; set; }
     }
 }

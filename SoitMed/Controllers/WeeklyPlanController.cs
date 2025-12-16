@@ -73,7 +73,7 @@ namespace SoitMed.Controllers
                 if (hasFilters)
                 {
                     // Salesmen can only filter by date, not by employee or viewed status
-                    if (userRole == "Salesman")
+                    if (userRole == "SalesMan")
                     {
                         if (!string.IsNullOrEmpty(employeeId) || isViewed.HasValue)
                         {
@@ -105,7 +105,7 @@ namespace SoitMed.Controllers
                     }
                     else if (userRole == "SalesManager" || userRole == "SuperAdmin")
                     {
-                        // Managers/admins can use all filters
+                        // Managers/Admins can use all filters
                         var filters = new WeeklyPlanFiltersDTO
                         {
                             EmployeeId = employeeId,
@@ -172,7 +172,7 @@ namespace SoitMed.Controllers
                 if (currentUser == null)
                     return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
 
-                var salesmen = await UserManager.GetUsersInRoleAsync("Salesman");
+                var salesmen = await UserManager.GetUsersInRoleAsync("SalesMan");
                 
                 var salesmenList = salesmen.Select(u => new
                 {

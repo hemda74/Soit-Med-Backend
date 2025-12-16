@@ -135,8 +135,8 @@ namespace SoitMed.Controllers
             // Validate requestor exists
             if (repairRequestDTO.DoctorId.HasValue)
             {
-                var doctor = await context.Doctors.FindAsync(repairRequestDTO.DoctorId.Value);
-                if (doctor == null)
+                var Doctor = await context.Doctors.FindAsync(repairRequestDTO.DoctorId.Value);
+                if (Doctor == null)
                 {
                     return NotFound($"Doctor with ID {repairRequestDTO.DoctorId} not found");
                 }
@@ -144,8 +144,8 @@ namespace SoitMed.Controllers
 
             if (repairRequestDTO.TechnicianId.HasValue)
             {
-                var technician = await context.Technicians.FindAsync(repairRequestDTO.TechnicianId.Value);
-                if (technician == null)
+                var Technician = await context.Technicians.FindAsync(repairRequestDTO.TechnicianId.Value);
+                if (Technician == null)
                 {
                     return NotFound($"Technician with ID {repairRequestDTO.TechnicianId} not found");
                 }
@@ -172,7 +172,7 @@ namespace SoitMed.Controllers
 
             await context.SaveChangesAsync();
 
-            // Auto-assign to engineers in the hospital's governorate
+            // Auto-assign to Engineers in the hospital's governorate
             await AutoAssignToEngineer(repairRequest.Id, equipment.Hospital.Location);
 
             return Ok($"Repair request for equipment '{equipment.Name}' created successfully");
@@ -218,8 +218,8 @@ namespace SoitMed.Controllers
 
             if (updateDTO.AssignedEngineerId.HasValue)
             {
-                var engineer = await context.Engineers.FindAsync(updateDTO.AssignedEngineerId.Value);
-                if (engineer == null)
+                var Engineer = await context.Engineers.FindAsync(updateDTO.AssignedEngineerId.Value);
+                if (Engineer == null)
                 {
                     return NotFound($"Engineer with ID {updateDTO.AssignedEngineerId} not found");
                 }
@@ -278,18 +278,18 @@ namespace SoitMed.Controllers
             return Ok(pendingRequests);
         }
 
-        [HttpGet("engineer/{engineerId}")]
+        [HttpGet("Engineer/{EngineerId}")]
         [Authorize(Roles = "SuperAdmin,Admin,Engineer")]
-        public async Task<IActionResult> GetEngineerRepairRequests(int engineerId)
+        public async Task<IActionResult> GetEngineerRepairRequests(int EngineerId)
         {
-            var engineer = await context.Engineers.FindAsync(engineerId);
-            if (engineer == null)
+            var Engineer = await context.Engineers.FindAsync(EngineerId);
+            if (Engineer == null)
             {
-                return NotFound($"Engineer with ID {engineerId} not found");
+                return NotFound($"Engineer with ID {EngineerId} not found");
             }
 
             var repairRequests = await context.RepairRequests
-                .Where(rr => rr.AssignedEngineerId == engineerId && rr.IsActive)
+                .Where(rr => rr.AssignedEngineerId == EngineerId && rr.IsActive)
                 .Include(rr => rr.Equipment)
                 .ThenInclude(e => e.Hospital)
                 .Include(rr => rr.RequestingDoctor)
@@ -323,7 +323,7 @@ namespace SoitMed.Controllers
 
             return Ok(new
             {
-                Engineer = engineer.Name,
+                Engineer = Engineer.Name,
                 RequestCount = repairRequests.Count,
                 Requests = repairRequests
             });
@@ -331,7 +331,7 @@ namespace SoitMed.Controllers
 
         private async Task AutoAssignToEngineer(int repairRequestId, string hospitalLocation)
         {
-            // Find engineers in governorates that match the hospital location
+            // Find Engineers in governorates that match the hospital location
             // This is a simplified matching - in reality, you'd have a more sophisticated location mapping
             var availableEngineers = await context.Engineers
                 .Include(e => e.EngineerGovernorates)
@@ -343,8 +343,8 @@ namespace SoitMed.Controllers
 
             if (availableEngineers.Any())
             {
-                // Simple round-robin assignment - assign to engineer with least active requests
-                var engineerWorkloads = await context.RepairRequests
+                // Simple round-robin assignment - assign to Engineer with least active requests
+                var EngineerWorkloads = await context.RepairRequests
                     .Where(rr => rr.AssignedEngineerId.HasValue && 
                                 rr.Status != RepairStatus.Completed && 
                                 rr.Status != RepairStatus.Cancelled)
@@ -353,7 +353,7 @@ namespace SoitMed.Controllers
                     .ToListAsync();
 
                 var selectedEngineer = availableEngineers
-                    .OrderBy(e => engineerWorkloads.FirstOrDefault(w => w.EngineerId == e.EngineerId)?.Count ?? 0)
+                    .OrderBy(e => EngineerWorkloads.FirstOrDefault(w => w.EngineerId == e.EngineerId)?.Count ?? 0)
                     .First();
 
                 var repairRequest = await context.RepairRequests.FindAsync(repairRequestId);

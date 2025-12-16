@@ -56,7 +56,7 @@ namespace SoitMed.Controllers
         {
             try
             {
-                var salesmen = await UserManager.GetUsersInRoleAsync("Salesman");
+                var salesmen = await UserManager.GetUsersInRoleAsync("SalesMan");
 
                 if (!string.IsNullOrWhiteSpace(q))
                 {
@@ -349,7 +349,7 @@ namespace SoitMed.Controllers
         /// Get offer by ID
         /// </summary>
         [HttpGet("{id}")]
-        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman,Customer,Doctor,Technician")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,SalesMan,Customer,Doctor,Technician")]
         public async Task<IActionResult> GetOffer(long id)
         {
             try
@@ -597,7 +597,7 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet("{offerId}/equipment")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin")]
         public async Task<IActionResult> GetEquipment(long offerId)
         {
             try
@@ -648,7 +648,7 @@ namespace SoitMed.Controllers
         /// Get equipment image URL (returns path)
         /// </summary>
         [HttpGet("{offerId}/equipment/{equipmentId}/image")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin")]
         public async Task<IActionResult> GetEquipmentImage(long offerId, long equipmentId)
         {
             try
@@ -686,7 +686,7 @@ namespace SoitMed.Controllers
         /// Get equipment image file directly (returns file stream)
         /// </summary>
         [HttpGet("{offerId}/equipment/{equipmentId}/image-file")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin")]
         public async Task<IActionResult> GetEquipmentImageFile(long offerId, long equipmentId)
         {
             try
@@ -802,21 +802,21 @@ namespace SoitMed.Controllers
             }
         }
 
-        // Send to Salesman
+        // Send to SalesMan
         [HttpPost("{offerId}/send-to-salesman")]
         [Authorize(Roles = "SalesSupport,SalesManager")]
-        public async Task<IActionResult> SendToSalesman(long offerId)
+        public async Task<IActionResult> SendToSalesMan(long offerId)
         {
-            var result = await _offerService.SendToSalesmanAsync(offerId, GetCurrentUserId());
+            var result = await _offerService.SendToSalesManAsync(offerId, GetCurrentUserId());
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Sent"));
         }
 
         /// <summary>
-        /// Assign or reassign offer to a Salesman
+        /// Assign or reassign offer to a SalesMan
         /// </summary>
         [HttpPut("{offerId}/assign-to-salesman")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> AssignOfferToSalesman(long offerId, [FromBody] AssignOfferToSalesmanDTO assignDto)
+        public async Task<IActionResult> AssignOfferToSalesMan(long offerId, [FromBody] AssignOfferToSalesManDTO assignDto)
         {
             try
             {
@@ -826,7 +826,7 @@ namespace SoitMed.Controllers
                 }
 
                 var userId = GetCurrentUserId();
-                var result = await _offerService.AssignOfferToSalesmanAsync(offerId, assignDto.SalesmanId, userId);
+                var result = await _offerService.AssignOfferToSalesManAsync(offerId, assignDto.SalesManId, userId);
 
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer assigned to salesman successfully"));
             }
@@ -843,28 +843,28 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet("assigned-to-me")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> GetAssignedOffers()
         {
-            var result = await _offerService.GetOffersBySalesmanAsync(GetCurrentUserId());
+            var result = await _offerService.GetOffersBySalesManAsync(GetCurrentUserId());
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Retrieved"));
         }
 
         /// <summary>
         /// Get offers assigned to a specific salesman (Manager/SuperAdmin only)
         /// </summary>
-        [HttpGet("by-salesman/{salesmanId}")]
+        [HttpGet("by-SalesMan/{salesmanId}")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> GetOffersBySalesman(string salesmanId)
+        public async Task<IActionResult> GetOffersBySalesMan(string salesmanId)
         {
             try
             {
-                var result = await _offerService.GetOffersBySalesmanAsync(salesmanId);
-                return Ok(ResponseHelper.CreateSuccessResponse(result, "Salesman offers retrieved successfully"));
+                var result = await _offerService.GetOffersBySalesManAsync(salesmanId);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "SalesMan offers retrieved successfully"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving offers for salesman {SalesmanId}", salesmanId);
+                _logger.LogError(ex, "Error retrieving offers for salesman {SalesManId}", salesmanId);
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving salesman offers"));
             }
         }
@@ -909,7 +909,7 @@ namespace SoitMed.Controllers
                     return StatusCode(403, ResponseHelper.CreateErrorResponse("Access denied. Only SalesManager and SuperAdmin can access this endpoint."));
                 }
 
-                _logger.LogInformation("GetAllOffersWithFilters - User {UserId} ({UserName}) with roles [{Roles}] accessing all offers. Filters: Status={Status}, SalesmanId={SalesmanId}, Page={Page}, PageSize={PageSize}",
+                _logger.LogInformation("GetAllOffersWithFilters - User {UserId} ({UserName}) with roles [{Roles}] accessing all offers. Filters: Status={Status}, SalesManId={SalesManId}, Page={Page}, PageSize={PageSize}",
                     currentUserId, user.UserName, string.Join(", ", userRoles), status ?? "all", salesmanId ?? "all", page, pageSize);
 
                 var result = await _offerService.GetAllOffersWithFiltersAsync(
@@ -967,7 +967,7 @@ namespace SoitMed.Controllers
         /// Record client response to an offer (Accept/Reject)
         /// </summary>
         [HttpPost("{offerId}/client-response")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin,SalesSupport,Customer,Doctor,Technician")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin,SalesSupport,Customer,Doctor,Technician")]
         public async Task<IActionResult> RecordClientResponse(long offerId, [FromBody] RecordClientResponseDTO dto)
         {
             try
@@ -1111,7 +1111,7 @@ namespace SoitMed.Controllers
         /// Mark offer as completed
         /// </summary>
         [HttpPost("{offerId}/complete")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> CompleteOffer(long offerId, [FromBody] CompleteOfferDTO dto)
         {
             try
@@ -1135,10 +1135,10 @@ namespace SoitMed.Controllers
 
         /// <summary>
         /// Mark offer as needing modification
-        /// Salesman can request modifications for offers assigned to them (on behalf of clients)
+        /// SalesMan can request modifications for offers assigned to them (on behalf of clients)
         /// </summary>
         [HttpPost("{offerId}/needs-modification")]
-        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,SalesMan")]
         public async Task<IActionResult> MarkAsNeedsModification(long offerId, [FromBody] NeedsModificationDTO dto)
         {
             try
