@@ -28,7 +28,7 @@ namespace SoitMed.Controllers
         /// Create a new request workflow (e.g., salesman sending an offer to sales support)
         /// </summary>
         [HttpPost]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> CreateRequestWorkflow([FromBody] CreateWorkflowRequestDto request, CancellationToken cancellationToken = default)
         {
             try
@@ -63,7 +63,7 @@ namespace SoitMed.Controllers
         /// Get requests sent by the current user
         /// </summary>
         [HttpGet("sent")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> GetSentRequests([FromQuery] RequestStatus? status = null, CancellationToken cancellationToken = default)
         {
             try

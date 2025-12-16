@@ -33,7 +33,7 @@ namespace SoitMed.Controllers
         public async Task<IActionResult> SearchClients(
             [FromQuery] string? searchTerm = null,
             [FromQuery] string? classification = null,
-            [FromQuery] string? assignedSalesmanId = null,
+            [FromQuery] string? assignedSalesManId = null,
             [FromQuery] string? city = null,
             [FromQuery] int? governorateId = null,
             [FromQuery] List<string>? equipmentCategories = null,
@@ -53,7 +53,7 @@ namespace SoitMed.Controllers
                 {
                     Query = searchTerm ?? string.Empty,
                     Classification = classification,
-                    AssignedSalesmanId = assignedSalesmanId,
+                    AssignedSalesManId = assignedSalesManId,
                     City = city,
                     GovernorateId = governorateId,
                     EquipmentCategories = equipmentCategories,
@@ -62,8 +62,8 @@ namespace SoitMed.Controllers
                 };
 
                 // Debug logging
-                _logger.LogInformation("SearchClients called with: Query={Query}, Classification={Classification}, AssignedSalesmanId={AssignedSalesmanId}, City={City}, GovernorateId={GovernorateId}, EquipmentCategories={EquipmentCategories}, Page={Page}, PageSize={PageSize}",
-                    searchDto.Query, searchDto.Classification, searchDto.AssignedSalesmanId, searchDto.City, searchDto.GovernorateId, 
+                _logger.LogInformation("SearchClients called with: Query={Query}, Classification={Classification}, AssignedSalesManId={AssignedSalesManId}, City={City}, GovernorateId={GovernorateId}, EquipmentCategories={EquipmentCategories}, Page={Page}, PageSize={PageSize}",
+                    searchDto.Query, searchDto.Classification, searchDto.AssignedSalesManId, searchDto.City, searchDto.GovernorateId, 
                     searchDto.EquipmentCategories != null ? string.Join(",", searchDto.EquipmentCategories) : "null", searchDto.Page, searchDto.PageSize);
 
                 // Validate search parameters
@@ -265,7 +265,7 @@ namespace SoitMed.Controllers
         /// Get complete client profile with history (NEW - matches plan)
         /// </summary>
         [HttpGet("{id}/profile")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> GetClientProfile(long id)
         {
             try
