@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SoitMed.DTO
 {
-    public class CreateSalesmanWithImageDTO
+    public class CreateSalesManWithImageDTO
     {
         [Required(ErrorMessage = "Email is required")]
         [EmailAddress(ErrorMessage = "Please provide a valid email address")]
@@ -35,18 +35,18 @@ namespace SoitMed.DTO
         public string? AltText { get; set; }
     }
 
-    public class CreatedSalesmanWithImageResponseDTO
+    public class CreatedSalesManWithImageResponseDTO
     {
         public string UserId { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public string? DepartmentName { get; set; }
         public DateTime CreatedAt { get; set; }
-        public SalesmanImageInfo? ProfileImage { get; set; }
+        public SalesManImageInfo? ProfileImage { get; set; }
         public string Message { get; set; } = string.Empty;
     }
 
-    public class SalesmanImageInfo
+    public class SalesManImageInfo
     {
         public int Id { get; set; }
         public string FileName { get; set; } = string.Empty;

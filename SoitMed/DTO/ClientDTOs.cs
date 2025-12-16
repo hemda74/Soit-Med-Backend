@@ -135,7 +135,7 @@ namespace SoitMed.DTO
     {
         public string Query { get; set; } = string.Empty;
         public string? Classification { get; set; } // A, B, C, D
-        public string? AssignedSalesmanId { get; set; }
+        public string? AssignedSalesManId { get; set; }
         public string? City { get; set; }
         public int? GovernorateId { get; set; }
         public List<string>? EquipmentCategories { get; set; } // List of equipment category names

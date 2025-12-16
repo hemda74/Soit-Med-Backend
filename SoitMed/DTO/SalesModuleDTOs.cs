@@ -343,7 +343,7 @@ namespace SoitMed.DTO
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public bool IsSalesManagerApproved { get; set; }
-        public bool CanSendToSalesman { get; set; }
+        public bool CanSendToSalesMan { get; set; }
         public string? PdfPath { get; set; }
         public DateTime? PdfGeneratedAt { get; set; }
         // Additional fields from SalesOffer model
@@ -539,8 +539,8 @@ namespace SoitMed.DTO
         public long? OfferId { get; set; }
         public long ClientId { get; set; }
         public string ClientName { get; set; } = string.Empty;
-        public string SalesmanId { get; set; } = string.Empty;
-        public string SalesmanName { get; set; } = string.Empty;
+        public string SalesManId { get; set; } = string.Empty;
+        public string SalesManName { get; set; } = string.Empty;
         public decimal DealValue { get; set; }
         public decimal TotalValue { get; set; } // Alias for DealValue for mobile compatibility
         public DateTime ClosedDate { get; set; }
@@ -632,10 +632,10 @@ namespace SoitMed.DTO
         public string AssignedTo { get; set; } = string.Empty;
     }
 
-    public class AssignOfferToSalesmanDTO
+    public class AssignOfferToSalesManDTO
     {
         [Required]
-        public string SalesmanId { get; set; } = string.Empty;
+        public string SalesManId { get; set; } = string.Empty;
     }
 
     public class UpdateOfferRequestStatusDTO
@@ -699,7 +699,7 @@ namespace SoitMed.DTO
         public string Type { get; set; } = string.Empty; // Accepted, Completed, Sent, Rejected
         public string Description { get; set; } = string.Empty;
         public string? ClientName { get; set; }
-        public string? SalesmanName { get; set; }
+        public string? SalesManName { get; set; }
         public decimal TotalAmount { get; set; }
         public DateTime Timestamp { get; set; }
     }
