@@ -10,7 +10,7 @@ namespace SoitMed.Models
     public class OfferRequest : BaseEntity
     {
         [Required]
-        public string RequestedBy { get; set; } // Salesman ID
+        public string RequestedBy { get; set; } // SalesMan ID
 
         [Required]
         public long ClientId { get; set; }

@@ -17,7 +17,7 @@ namespace SoitMed.Models
         public long ClientId { get; set; }
         
         [Required]
-        public string SalesmanId { get; set; } = string.Empty;
+        public string SalesManId { get; set; } = string.Empty;
         
         [Required]
         [Column(TypeName = "decimal(18,2)")]
@@ -68,7 +68,7 @@ namespace SoitMed.Models
         public string? SuperAdminComments { get; set; }
         #endregion
 
-        #region Salesman Report
+        #region SalesMan Report
         [MaxLength(5000)]
         public string? ReportText { get; set; }
         
@@ -90,7 +90,7 @@ namespace SoitMed.Models
         #region Navigation Properties
         public virtual SalesOffer? Offer { get; set; }
         public virtual Client Client { get; set; } = null!;
-        public virtual ApplicationUser Salesman { get; set; } = null!;
+        public virtual ApplicationUser SalesMan { get; set; } = null!;
         public virtual ApplicationUser? ManagerApprover { get; set; }
         public virtual ApplicationUser? SuperAdminApprover { get; set; }
         #endregion
@@ -151,7 +151,7 @@ namespace SoitMed.Models
         /// </summary>
         public void MarkClientAccountCreated()
         {
-            Status = DealStatus.AwaitingSalesmanReport;
+            Status = DealStatus.AwaitingSalesManReport;
             UpdatedAt = DateTime.UtcNow;
         }
 
@@ -209,7 +209,7 @@ namespace SoitMed.Models
         }
 
         /// <summary>
-        /// Checks if deal needs super admin approval
+        /// Checks if deal needs super Admin approval
         /// </summary>
         public bool NeedsSuperAdminApproval()
         {
@@ -222,7 +222,7 @@ namespace SoitMed.Models
         public bool IsApproved()
         {
             return Status == DealStatus.Approved || Status == DealStatus.AwaitingClientAccountCreation 
-                || Status == DealStatus.AwaitingSalesmanReport || Status == DealStatus.SentToLegal 
+                || Status == DealStatus.AwaitingSalesManReport || Status == DealStatus.SentToLegal 
                 || Status == DealStatus.Success;
         }
 
@@ -245,7 +245,7 @@ namespace SoitMed.Models
         public const string RejectedBySuperAdmin = "RejectedBySuperAdmin";
         public const string Approved = "Approved";
         public const string AwaitingClientAccountCreation = "AwaitingClientAccountCreation";
-        public const string AwaitingSalesmanReport = "AwaitingSalesmanReport";
+        public const string AwaitingSalesManReport = "AwaitingSalesManReport";
         public const string SentToLegal = "SentToLegal";
         public const string Failed = "Failed";
         public const string Success = "Success";
@@ -253,7 +253,7 @@ namespace SoitMed.Models
         public static readonly string[] AllStatuses = { 
             PendingManagerApproval, RejectedByManager, PendingSuperAdminApproval, 
             RejectedBySuperAdmin, Approved, AwaitingClientAccountCreation, 
-            AwaitingSalesmanReport, SentToLegal, Failed, Success 
+            AwaitingSalesManReport, SentToLegal, Failed, Success 
         };
     }
 

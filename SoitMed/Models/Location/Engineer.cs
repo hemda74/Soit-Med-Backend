@@ -23,7 +23,7 @@ namespace SoitMed.Models.Location
 		public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 		public bool IsActive { get; set; } = true;
 
-        // Optional: Link to ApplicationUser if engineers are also system users
+        // Optional: Link to ApplicationUser if Engineers are also system users
         public string? UserId { get; set; }
         
         [ForeignKey("UserId")]
@@ -32,7 +32,7 @@ namespace SoitMed.Models.Location
         // Navigation property for many-to-many relationship with Governorates
         public virtual ICollection<EngineerGovernorate> EngineerGovernorates { get; set; } = new List<EngineerGovernorate>();
         
-        // Navigation property for repair requests assigned to this engineer
+        // Navigation property for repair requests assigned to this Engineer
         public virtual ICollection<Equipment.RepairRequest> AssignedRepairRequests { get; set; } = new List<Equipment.RepairRequest>();
     }
 }

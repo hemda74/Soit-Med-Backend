@@ -28,7 +28,7 @@ namespace SoitMed.Models.Hospital
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public bool IsActive { get; set; } = true;
 
-        // Optional: Link to ApplicationUser if technicians are also system users
+        // Optional: Link to ApplicationUser if Technicians are also system users
         public string? UserId { get; set; }
         
         [ForeignKey("UserId")]

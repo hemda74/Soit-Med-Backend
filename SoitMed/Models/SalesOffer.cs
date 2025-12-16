@@ -22,7 +22,7 @@ namespace SoitMed.Models
         public string CreatedBy { get; set; } = string.Empty; // Sales Support ID
         
         [Required]
-        public string AssignedTo { get; set; } = string.Empty; // Salesman ID
+        public string AssignedTo { get; set; } = string.Empty; // SalesMan ID
         #endregion
 
         #region Offer Details
@@ -98,7 +98,7 @@ namespace SoitMed.Models
         public virtual OfferRequest? OfferRequest { get; set; }
         public virtual Client Client { get; set; } = null!;
         public virtual ApplicationUser Creator { get; set; } = null!;
-        public virtual ApplicationUser Salesman { get; set; } = null!;
+        public virtual ApplicationUser SalesMan { get; set; } = null!;
         public virtual SalesDeal? Deal { get; set; }
         public virtual ICollection<OfferEquipment> Equipment { get; set; } = new List<OfferEquipment>();
         public virtual OfferTerms? Terms { get; set; }
@@ -205,7 +205,7 @@ namespace SoitMed.Models
         }
 
         /// <summary>
-        /// Approves the offer by SalesManager and sends it to Salesman
+        /// Approves the offer by SalesManager and sends it to SalesMan
         /// </summary>
         public void ApproveBySalesManager(string salesManagerId, string? comments = null)
         {
