@@ -91,7 +91,7 @@ namespace SoitMed.Services
 
                 // Authorization is already checked at controller level
                 // Here we just ensure the client exists and return the profile
-                // The controller's [Authorize(Roles="Salesman,SalesManager,SuperAdmin")] handles role check
+                // The controller's [Authorize(Roles="SalesMan,SalesManager,SuperAdmin")] handles role check
                 // For data filtering, check if client is assigned to user when needed
 
                 // Load sequentially to avoid DbContext concurrency issues (same DbContext instance)
@@ -268,9 +268,9 @@ namespace SoitMed.Services
                 }
 
                 // Filter by assigned salesman
-                if (!string.IsNullOrWhiteSpace(searchDto.AssignedSalesmanId))
+                if (!string.IsNullOrWhiteSpace(searchDto.AssignedSalesManId))
                 {
-                    baseQuery = baseQuery.Where(c => c.AssignedTo == searchDto.AssignedSalesmanId);
+                    baseQuery = baseQuery.Where(c => c.AssignedTo == searchDto.AssignedSalesManId);
                 }
 
                 // Filter by city

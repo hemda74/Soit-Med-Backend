@@ -293,7 +293,7 @@ namespace SoitMed.Services
 
                 foreach (var progress in progresses)
                 {
-                    // Check authorization - SuperAdmin and SalesManager can see all progress, Salesman can only see their own
+                    // Check authorization - SuperAdmin and SalesManager can see all progress, SalesMan can only see their own
                     if (userRole == "SuperAdmin" || userRole == "SalesManager" || progress.EmployeeId == userId)
                     {
                         result.Add(await MapToResponseDTO(progress));

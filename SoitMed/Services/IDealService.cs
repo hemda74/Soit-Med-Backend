@@ -14,7 +14,7 @@ namespace SoitMed.Services
         Task<List<DealResponseDTO>> GetDealsAsync(string? status, string? salesmanId, string userId, string userRole);
         Task<List<DealResponseDTO>> GetDealsByClientAsync(long clientId);
         Task<List<DealResponseDTO>> GetDealsByClientAsync(long clientId, string userId, string userRole);
-        Task<List<DealResponseDTO>> GetDealsBySalesmanAsync(string salesmanId);
+        Task<List<DealResponseDTO>> GetDealsBySalesManAsync(string salesmanId);
         Task<List<DealResponseDTO>> GetDealsByStatusAsync(string status);
         Task<DealResponseDTO> UpdateDealAsync(long dealId, CreateDealDTO updateDealDto, string userId);
         #endregion
@@ -24,8 +24,8 @@ namespace SoitMed.Services
         Task<DealResponseDTO> SuperAdminApprovalAsync(long dealId, ApproveDealDTO approvalDto, string superAdminId);
         Task<List<DealResponseDTO>> GetPendingManagerApprovalsAsync();
         Task<List<DealResponseDTO>> GetPendingSuperAdminApprovalsAsync();
-        Task<DealResponseDTO> MarkClientAccountCreatedAsync(long dealId, string adminId);
-        Task<DealResponseDTO> SubmitSalesmanReportAsync(long dealId, string reportText, string? reportAttachments, string salesmanId);
+        Task<DealResponseDTO> MarkClientAccountCreatedAsync(long dealId, string AdminId);
+        Task<DealResponseDTO> SubmitSalesManReportAsync(long dealId, string reportText, string? reportAttachments, string salesmanId);
         Task<List<DealResponseDTO>> GetDealsForLegalAsync();
         #endregion
 

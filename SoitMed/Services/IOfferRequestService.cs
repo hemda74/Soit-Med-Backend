@@ -12,7 +12,7 @@ namespace SoitMed.Services
         Task<OfferRequestResponseDTO> CreateOfferRequestAsync(CreateOfferRequestDTO createDto, string userId);
         Task<OfferRequestResponseDTO?> GetOfferRequestAsync(long requestId, string userId, string userRole);
         Task<List<OfferRequestResponseDTO>> GetOfferRequestsAsync(string? status, string? requestedBy, string userId, string userRole);
-        Task<List<OfferRequestResponseDTO>> GetOfferRequestsBySalesmanAsync(string salesmanId, string? status);
+        Task<List<OfferRequestResponseDTO>> GetOfferRequestsBySalesManAsync(string salesmanId, string? status);
         Task<List<OfferRequestResponseDTO>> GetOfferRequestsAssignedToAsync(string supportId, string? status);
         Task<OfferRequestResponseDTO> AssignToSupportAsync(long requestId, string supportId, string userId);
         Task<OfferRequestResponseDTO> UpdateStatusAsync(long requestId, string status, string? notes, string userId);

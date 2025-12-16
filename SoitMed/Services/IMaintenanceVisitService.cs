@@ -4,10 +4,10 @@ namespace SoitMed.Services
 {
     public interface IMaintenanceVisitService
     {
-        Task<MaintenanceVisitResponseDTO> CreateVisitAsync(CreateMaintenanceVisitDTO dto, string engineerId);
+        Task<MaintenanceVisitResponseDTO> CreateVisitAsync(CreateMaintenanceVisitDTO dto, string EngineerId);
         Task<MaintenanceVisitResponseDTO?> GetVisitAsync(int id);
         Task<IEnumerable<MaintenanceVisitResponseDTO>> GetVisitsByRequestAsync(int maintenanceRequestId);
-        Task<IEnumerable<MaintenanceVisitResponseDTO>> GetVisitsByEngineerAsync(string engineerId);
+        Task<IEnumerable<MaintenanceVisitResponseDTO>> GetVisitsByEngineerAsync(string EngineerId);
         Task<EquipmentDTO?> GetEquipmentByQRCodeAsync(string qrCode);
         Task<EquipmentDTO?> GetEquipmentBySerialCodeAsync(string serialCode);
     }

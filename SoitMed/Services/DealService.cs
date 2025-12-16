@@ -46,7 +46,7 @@ namespace SoitMed.Services
                 {
                     OfferId = createDealDto.OfferId,
                     ClientId = createDealDto.ClientId,
-                    SalesmanId = salesmanId,
+                    SalesManId = salesmanId,
                     DealValue = createDealDto.DealValue,
                     ClosedDate = DateTime.UtcNow,
                     PaymentTerms = createDealDto.PaymentTerms,
@@ -100,11 +100,11 @@ namespace SoitMed.Services
 
                 // Check authorization:
                 // - SuperAdmin and SalesManager can view any deal
-                // - Salesman can only view their own deals
-                if (userRole != "SuperAdmin" && userRole != "SalesManager" && deal.SalesmanId != userId)
+                // - SalesMan can only view their own deals
+                if (userRole != "SuperAdmin" && userRole != "SalesManager" && deal.SalesManId != userId)
                 {
-                    _logger.LogWarning("Unauthorized access attempt - UserId: {UserId}, UserRole: {UserRole}, DealId: {DealId}, DealSalesmanId: {DealSalesmanId}",
-                        userId, userRole, dealId, deal.SalesmanId);
+                    _logger.LogWarning("Unauthorized access attempt - UserId: {UserId}, UserRole: {UserRole}, DealId: {DealId}, DealSalesManId: {DealSalesManId}",
+                        userId, userRole, dealId, deal.SalesManId);
                     throw new UnauthorizedAccessException("You don't have permission to view this deal");
                 }
 
@@ -128,12 +128,12 @@ namespace SoitMed.Services
                     query = query.Where(d => d.Status == status);
 
                 if (!string.IsNullOrEmpty(salesmanId))
-                    query = query.Where(d => d.SalesmanId == salesmanId);
+                    query = query.Where(d => d.SalesManId == salesmanId);
 
                 // Apply authorization
-                if (userRole == "Salesman")
+                if (userRole == "SalesMan")
                 {
-                    query = query.Where(d => d.SalesmanId == userId);
+                    query = query.Where(d => d.SalesManId == userId);
                 }
                 // SalesManager and SuperAdmin can see all
 
@@ -163,8 +163,8 @@ namespace SoitMed.Services
 
                 foreach (var deal in deals)
                 {
-                    // Check authorization - SuperAdmin and SalesManager can see all deals, Salesman can only see their own
-                    if (userRole == "SuperAdmin" || userRole == "SalesManager" || deal.SalesmanId == userId)
+                    // Check authorization - SuperAdmin and SalesManager can see all deals, SalesMan can only see their own
+                    if (userRole == "SuperAdmin" || userRole == "SalesManager" || deal.SalesManId == userId)
                     {
                         result.Add(await MapToDealResponseDTO(deal));
                     }
@@ -200,11 +200,11 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<List<DealResponseDTO>> GetDealsBySalesmanAsync(string salesmanId)
+        public async Task<List<DealResponseDTO>> GetDealsBySalesManAsync(string salesmanId)
         {
             try
             {
-                var deals = await _unitOfWork.SalesDeals.GetDealsBySalesmanAsync(salesmanId);
+                var deals = await _unitOfWork.SalesDeals.GetDealsBySalesManAsync(salesmanId);
                 var result = new List<DealResponseDTO>();
 
                 foreach (var deal in deals)
@@ -216,7 +216,7 @@ namespace SoitMed.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting deals by salesman. SalesmanId: {SalesmanId}", salesmanId);
+                _logger.LogError(ex, "Error getting deals by salesman. SalesManId: {SalesManId}", salesmanId);
                 throw;
             }
         }
@@ -357,14 +357,14 @@ namespace SoitMed.Services
                 await _unitOfWork.SalesDeals.UpdateAsync(deal);
                 await _unitOfWork.SaveChangesAsync();
 
-                _logger.LogInformation("Super admin approval processed for deal. DealId: {DealId}, Approved: {Approved}", 
+                _logger.LogInformation("Super Admin approval processed for deal. DealId: {DealId}, Approved: {Approved}", 
                     dealId, approvalDto.Approved);
 
                 return await MapToDealResponseDTO(deal);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing super admin approval. DealId: {DealId}", dealId);
+                _logger.LogError(ex, "Error processing super Admin approval. DealId: {DealId}", dealId);
                 throw;
             }
         }
@@ -443,7 +443,7 @@ namespace SoitMed.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting pending super admin approvals");
+                _logger.LogError(ex, "Error getting pending super Admin approvals");
                 throw;
             }
         }
@@ -538,7 +538,7 @@ namespace SoitMed.Services
         private async Task<DealResponseDTO> MapToDealResponseDTO(SalesDeal deal)
         {
             var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
-            var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
+            var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
             var managerApprover = !string.IsNullOrEmpty(deal.ManagerApprovedBy) 
                 ? await _unitOfWork.Users.GetByIdAsync(deal.ManagerApprovedBy) : null;
             var superAdminApprover = !string.IsNullOrEmpty(deal.SuperAdminApprovedBy) 
@@ -552,7 +552,7 @@ namespace SoitMed.Services
                 managerApproved = string.IsNullOrEmpty(deal.ManagerRejectionReason);
             }
 
-            // Determine super admin approval status
+            // Determine super Admin approval status
             bool? superAdminApproved = null;
             if (deal.SuperAdminApprovedAt.HasValue)
             {
@@ -566,8 +566,8 @@ namespace SoitMed.Services
                 OfferId = deal.OfferId,
                 ClientId = deal.ClientId,
                 ClientName = client?.Name ?? "Unknown Client",
-                SalesmanId = deal.SalesmanId,
-                SalesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Unknown Salesman",
+                SalesManId = deal.SalesManId,
+                SalesManName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Unknown SalesMan",
                 DealValue = deal.DealValue,
                 TotalValue = deal.DealValue, // Alias for mobile compatibility
                 ClosedDate = deal.ClosedDate,
@@ -606,8 +606,8 @@ namespace SoitMed.Services
                 var clientName = client?.Name ?? "Unknown Client";
 
                 // Get salesman info
-                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
-                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : "Unknown Salesman";
+                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
+                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : "Unknown SalesMan";
 
                 // Get all Sales Managers
                 var managers = await _userManager.GetUsersInRoleAsync("SalesManager");
@@ -701,8 +701,8 @@ namespace SoitMed.Services
                 var clientName = client?.Name ?? "Unknown Client";
 
                 // Get salesman info
-                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
-                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : "Unknown Salesman";
+                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
+                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : "Unknown SalesMan";
 
                 // Get manager who approved
                 var manager = deal.ManagerApprovedBy != null 
@@ -784,7 +784,7 @@ namespace SoitMed.Services
                     {
                         _logger.LogError(notifEx, "❌ Failed to send notification to Super Admin {SuperAdminId} ({SuperAdminName}) for Deal: {DealId}. Error: {Error}", 
                             superAdmin.Id, superAdmin.UserName, deal.Id, notifEx.Message);
-                        // Continue with other super admins even if one fails
+                        // Continue with other super Admins even if one fails
                     }
                 }
 
@@ -792,12 +792,12 @@ namespace SoitMed.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending super admin approval notifications for Deal: {DealId}", deal.Id);
+                _logger.LogError(ex, "Error sending super Admin approval notifications for Deal: {DealId}", deal.Id);
                 // Don't fail the whole operation if notification fails
             }
         }
 
-        public async Task<DealResponseDTO> MarkClientAccountCreatedAsync(long dealId, string adminId)
+        public async Task<DealResponseDTO> MarkClientAccountCreatedAsync(long dealId, string AdminId)
         {
             try
             {
@@ -813,9 +813,9 @@ namespace SoitMed.Services
                 await _unitOfWork.SaveChangesAsync();
 
                 // Notify salesman to submit report
-                await SendSalesmanReportNotificationAsync(deal);
+                await SendSalesManReportNotificationAsync(deal);
 
-                _logger.LogInformation("Client account marked as created for Deal: {DealId} by Admin: {AdminId}", dealId, adminId);
+                _logger.LogInformation("Client account marked as created for Deal: {DealId} by Admin: {AdminId}", dealId, AdminId);
                 return await MapToDealResponseDTO(deal);
             }
             catch (Exception ex)
@@ -825,7 +825,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<DealResponseDTO> SubmitSalesmanReportAsync(long dealId, string reportText, string? reportAttachments, string salesmanId)
+        public async Task<DealResponseDTO> SubmitSalesManReportAsync(long dealId, string reportText, string? reportAttachments, string salesmanId)
         {
             try
             {
@@ -833,10 +833,10 @@ namespace SoitMed.Services
                 if (deal == null)
                     throw new ArgumentException("Deal not found", nameof(dealId));
 
-                if (deal.Status != "AwaitingSalesmanReport")
+                if (deal.Status != "AwaitingSalesManReport")
                     throw new InvalidOperationException($"Deal is not awaiting salesman report. Current status: {deal.Status}");
 
-                if (deal.SalesmanId != salesmanId)
+                if (deal.SalesManId != salesmanId)
                     throw new UnauthorizedAccessException("Only the assigned salesman can submit the report");
 
                 if (string.IsNullOrWhiteSpace(reportText))
@@ -849,7 +849,7 @@ namespace SoitMed.Services
                 // Notify legal managers
                 await SendLegalNotificationAsync(deal);
 
-                _logger.LogInformation("Salesman report submitted for Deal: {DealId} by Salesman: {SalesmanId}", dealId, salesmanId);
+                _logger.LogInformation("SalesMan report submitted for Deal: {DealId} by SalesMan: {SalesManId}", dealId, salesmanId);
                 return await MapToDealResponseDTO(deal);
             }
             catch (Exception ex)
@@ -887,8 +887,8 @@ namespace SoitMed.Services
                 var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
                 var clientName = client?.Name ?? "Unknown Client";
 
-                var admins = await _userManager.GetUsersInRoleAsync("Admin");
-                var activeAdmins = admins.Where(a => a.IsActive).ToList();
+                var Admins = await _userManager.GetUsersInRoleAsync("Admin");
+                var activeAdmins = Admins.Where(a => a.IsActive).ToList();
 
                 if (!activeAdmins.Any())
                 {
@@ -908,12 +908,12 @@ namespace SoitMed.Services
                     ["status"] = deal.Status
                 };
 
-                foreach (var admin in activeAdmins)
+                foreach (var Admin in activeAdmins)
                 {
                     try
                     {
                         await _notificationService.CreateNotificationAsync(
-                            admin.Id,
+                            Admin.Id,
                             notificationTitle,
                             notificationMessage,
                             "Deal",
@@ -927,7 +927,7 @@ namespace SoitMed.Services
                     }
                     catch (Exception notifEx)
                     {
-                        _logger.LogError(notifEx, "Failed to send notification to Admin {AdminId} for Deal: {DealId}", admin.Id, deal.Id);
+                        _logger.LogError(notifEx, "Failed to send notification to Admin {AdminId} for Deal: {DealId}", Admin.Id, deal.Id);
                     }
                 }
 
@@ -953,17 +953,17 @@ namespace SoitMed.Services
             }
         }
 
-        private async Task SendSalesmanReportNotificationAsync(SalesDeal deal)
+        private async Task SendSalesManReportNotificationAsync(SalesDeal deal)
         {
             try
             {
                 var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
                 var clientName = client?.Name ?? "Unknown Client";
 
-                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
+                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
                 if (salesman == null || !salesman.IsActive)
                 {
-                    _logger.LogWarning("Salesman {SalesmanId} not found or inactive for Deal: {DealId}", deal.SalesmanId, deal.Id);
+                    _logger.LogWarning("SalesMan {SalesManId} not found or inactive for Deal: {DealId}", deal.SalesManId, deal.Id);
                     return;
                 }
 
@@ -979,7 +979,7 @@ namespace SoitMed.Services
                 };
 
                 await _notificationService.CreateNotificationAsync(
-                    deal.SalesmanId,
+                    deal.SalesManId,
                     notificationTitle,
                     notificationMessage,
                     "Deal",

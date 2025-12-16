@@ -238,7 +238,7 @@ namespace SoitMed.Services
             await _unitOfWork.SparePartRequests.UpdateAsync(request);
             await _unitOfWork.SaveChangesAsync();
 
-            // Notify engineer
+            // Notify Engineer
             var maintenanceRequest = await _unitOfWork.MaintenanceRequests.GetByIdAsync(request.MaintenanceRequestId);
             if (maintenanceRequest?.AssignedToEngineerId != null)
             {

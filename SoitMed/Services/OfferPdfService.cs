@@ -326,7 +326,7 @@ namespace SoitMed.Services
                     ["deliveryTerms"] = "Delivery Terms",
                     ["warranty"] = "Warranty Terms",
                     ["validUntil"] = "Valid Until",
-                    ["salesman"] = "Salesman"
+                    ["salesman"] = "SalesMan"
                 },
                 ["ar"] = new Dictionary<string, string>
                 {
