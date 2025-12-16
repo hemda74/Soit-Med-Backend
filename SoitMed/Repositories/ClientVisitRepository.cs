@@ -21,7 +21,7 @@ namespace SoitMed.Repositories
                 query = query.Where(v => v.VisitDate <= endDate.Value);
 
             if (!string.IsNullOrEmpty(salesmanId))
-                query = query.Where(v => v.SalesmanId == salesmanId);
+                query = query.Where(v => v.SalesManId == salesmanId);
 
             if (!string.IsNullOrEmpty(status))
                 query = query.Where(v => v.Status == status);
@@ -33,10 +33,10 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<IEnumerable<ClientVisit>> GetSalesmanVisitsAsync(string salesmanId, DateTime? startDate = null, DateTime? endDate = null, int page = 1, int pageSize = 20)
+        public async Task<IEnumerable<ClientVisit>> GetSalesManVisitsAsync(string salesmanId, DateTime? startDate = null, DateTime? endDate = null, int page = 1, int pageSize = 20)
         {
             var query = _context.ClientVisits
-                .Where(v => v.SalesmanId == salesmanId);
+                .Where(v => v.SalesManId == salesmanId);
 
             if (startDate.HasValue)
                 query = query.Where(v => v.VisitDate >= startDate.Value);

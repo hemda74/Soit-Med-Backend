@@ -10,16 +10,16 @@ namespace SoitMed.Repositories
         {
         }
 
-        public async Task<DoctorHospital?> GetByDoctorAndHospitalAsync(int doctorId, string hospitalId, CancellationToken cancellationToken = default)
+        public async Task<DoctorHospital?> GetByDoctorAndHospitalAsync(int DoctorId, string hospitalId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .FirstOrDefaultAsync(dh => dh.DoctorId == doctorId && dh.HospitalId == hospitalId, cancellationToken);
+                .FirstOrDefaultAsync(dh => dh.DoctorId == DoctorId && dh.HospitalId == hospitalId, cancellationToken);
         }
 
-        public async Task<IEnumerable<DoctorHospital>> GetByDoctorIdAsync(int doctorId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<DoctorHospital>> GetByDoctorIdAsync(int DoctorId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .Where(dh => dh.DoctorId == doctorId && dh.IsActive)
+                .Where(dh => dh.DoctorId == DoctorId && dh.IsActive)
                 .Include(dh => dh.Hospital)
                 .ToListAsync(cancellationToken);
         }
@@ -32,10 +32,10 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<bool> ExistsByDoctorAndHospitalAsync(int doctorId, string hospitalId, CancellationToken cancellationToken = default)
+        public async Task<bool> ExistsByDoctorAndHospitalAsync(int DoctorId, string hospitalId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .AnyAsync(dh => dh.DoctorId == doctorId && dh.HospitalId == hospitalId && dh.IsActive, cancellationToken);
+                .AnyAsync(dh => dh.DoctorId == DoctorId && dh.HospitalId == hospitalId && dh.IsActive, cancellationToken);
         }
 
         public async Task<DoctorHospital?> FirstOrDefaultAsync(System.Linq.Expressions.Expression<System.Func<DoctorHospital, bool>> predicate, CancellationToken cancellationToken = default)

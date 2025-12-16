@@ -26,22 +26,22 @@ namespace SoitMed.Repositories
                 .FirstOrDefaultAsync(c => c.CustomerId == customerId && c.ChatType == chatType && c.IsActive, cancellationToken);
         }
 
-        public async Task<IEnumerable<ChatConversation>> GetAdminConversationsAsync(string adminId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<ChatConversation>> GetAdminConversationsAsync(string AdminId, CancellationToken cancellationToken = default)
         {
             return await _context.ChatConversations
                 .Include(c => c.Customer)
                 .Include(c => c.Admin)
-                .Where(c => c.AdminId == adminId && c.IsActive)
+                .Where(c => c.AdminId == AdminId && c.IsActive)
                 .OrderByDescending(c => c.LastMessageAt)
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<ChatConversation>> GetAdminConversationsByTypeAsync(string adminId, ChatType chatType, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<ChatConversation>> GetAdminConversationsByTypeAsync(string AdminId, ChatType chatType, CancellationToken cancellationToken = default)
         {
             return await _context.ChatConversations
                 .Include(c => c.Customer)
                 .Include(c => c.Admin)
-                .Where(c => c.AdminId == adminId && c.ChatType == chatType && c.IsActive)
+                .Where(c => c.AdminId == AdminId && c.ChatType == chatType && c.IsActive)
                 .OrderByDescending(c => c.LastMessageAt)
                 .ToListAsync(cancellationToken);
         }

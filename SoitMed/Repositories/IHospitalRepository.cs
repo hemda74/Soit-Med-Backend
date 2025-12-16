@@ -14,6 +14,6 @@ namespace SoitMed.Repositories
         Task<Hospital?> GetHospitalWithEquipmentAsync(string hospitalId, CancellationToken cancellationToken = default);
         Task<Hospital?> GetHospitalWithAllDetailsAsync(string hospitalId, CancellationToken cancellationToken = default);
         Task<IEnumerable<Hospital>> GetHospitalsWithDoctorsAsync(CancellationToken cancellationToken = default);
-        Task<bool> IsHospitalAssignedToDoctorAsync(string hospitalId, int doctorId, CancellationToken cancellationToken = default);
+        Task<bool> IsHospitalAssignedToDoctorAsync(string hospitalId, int DoctorId, CancellationToken cancellationToken = default);
     }
 }

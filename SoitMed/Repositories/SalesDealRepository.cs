@@ -29,11 +29,11 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<SalesDeal>> GetDealsBySalesmanAsync(string salesmanId)
+        public async Task<List<SalesDeal>> GetDealsBySalesManAsync(string salesmanId)
         {
             return await _context.SalesDeals
                 .AsNoTracking()
-                .Where(d => d.SalesmanId == salesmanId)
+                .Where(d => d.SalesManId == salesmanId)
                 .OrderByDescending(d => d.CreatedAt)
                 .ToListAsync();
         }
@@ -90,7 +90,7 @@ namespace SoitMed.Repositories
         {
             return await _context.SalesDeals
                 .Include(d => d.Client)
-                .Include(d => d.Salesman)
+                .Include(d => d.SalesMan)
                 .Include(d => d.Offer)
                 .Include(d => d.ManagerApprover)
                 .Include(d => d.SuperAdminApprover)
@@ -139,11 +139,11 @@ namespace SoitMed.Repositories
                 .SumAsync(d => d.DealValue);
         }
 
-        public async Task<decimal> GetTotalDealValueBySalesmanAsync(string salesmanId)
+        public async Task<decimal> GetTotalDealValueBySalesManAsync(string salesmanId)
         {
             return await _context.SalesDeals
                 .AsNoTracking()
-                .Where(d => d.SalesmanId == salesmanId && d.Status == "Success")
+                .Where(d => d.SalesManId == salesmanId && d.Status == "Success")
                 .SumAsync(d => d.DealValue);
         }
 

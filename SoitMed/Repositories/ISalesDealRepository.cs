@@ -8,7 +8,7 @@ namespace SoitMed.Repositories
     public interface ISalesDealRepository : IBaseRepository<SalesDeal>
     {
         Task<List<SalesDeal>> GetDealsByClientIdAsync(long clientId);
-        Task<List<SalesDeal>> GetDealsBySalesmanAsync(string salesmanId);
+        Task<List<SalesDeal>> GetDealsBySalesManAsync(string salesmanId);
         Task<List<SalesDeal>> GetDealsByStatusAsync(string status);
         Task<List<SalesDeal>> GetPendingApprovalsForManagerAsync();
         Task<List<SalesDeal>> GetPendingApprovalsForSuperAdminAsync();
@@ -20,7 +20,7 @@ namespace SoitMed.Repositories
         Task<List<SalesDeal>> GetDealsNeedingLegalReviewAsync();
         Task<int> GetDealCountByStatusAsync(string status);
         Task<decimal> GetTotalDealValueByStatusAsync(string status);
-        Task<decimal> GetTotalDealValueBySalesmanAsync(string salesmanId);
+        Task<decimal> GetTotalDealValueBySalesManAsync(string salesmanId);
         Task<List<SalesDeal>> GetSuccessfulDealsAsync();
         Task<List<SalesDeal>> GetFailedDealsAsync();
         Task<List<SalesDeal>> GetDealsByRejectionReasonAsync(string rejectionReason);

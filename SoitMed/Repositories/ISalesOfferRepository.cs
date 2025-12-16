@@ -11,7 +11,7 @@ namespace SoitMed.Repositories
     {
         IQueryable<SalesOffer> GetQueryable();
         Task<List<SalesOffer>> GetOffersByClientIdAsync(long clientId);
-        Task<List<SalesOffer>> GetOffersBySalesmanAsync(string salesmanId);
+        Task<List<SalesOffer>> GetOffersBySalesManAsync(string salesmanId);
         Task<List<SalesOffer>> GetOffersByStatusAsync(string status);
         Task<List<SalesOffer>> GetOffersByCreatorAsync(string creatorId);
         Task<List<SalesOffer>> GetExpiredOffersAsync();
@@ -25,7 +25,7 @@ namespace SoitMed.Repositories
         
         // Optimized methods that load related data in a single query
         Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
-            GetOffersBySalesmanWithRelatedDataAsync(string salesmanId);
+            GetOffersBySalesManWithRelatedDataAsync(string salesmanId);
         Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
             GetOffersByClientIdWithRelatedDataAsync(long clientId);
         Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
