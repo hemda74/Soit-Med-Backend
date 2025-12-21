@@ -438,5 +438,143 @@ namespace SoitMed.Controllers
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving legal deals"));
             }
         }
+
+        /// <summary>
+        /// Submit first salesman review
+        /// </summary>
+        [HttpPost("{id}/submit-first-review")]
+        [Authorize(Roles = "SalesMan")]
+        public async Task<IActionResult> SubmitFirstSalesManReview(long id, [FromBody] SubmitReviewDTO reviewDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                }
+
+                var userId = GetCurrentUserId();
+                var result = await _dealService.SubmitFirstSalesManReviewAsync(id, reviewDto.ReviewText, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "First review submitted successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for submitting first review");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for submitting first review");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access for submitting first review");
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting first review");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while submitting first review"));
+            }
+        }
+
+        /// <summary>
+        /// Submit second salesman review
+        /// </summary>
+        [HttpPost("{id}/submit-second-review")]
+        [Authorize(Roles = "SalesMan")]
+        public async Task<IActionResult> SubmitSecondSalesManReview(long id, [FromBody] SubmitReviewDTO reviewDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                }
+
+                var userId = GetCurrentUserId();
+                var result = await _dealService.SubmitSecondSalesManReviewAsync(id, reviewDto.ReviewText, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Second review submitted successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for submitting second review");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for submitting second review");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access for submitting second review");
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting second review");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while submitting second review"));
+            }
+        }
+
+        /// <summary>
+        /// Set client username and password (by Admin)
+        /// </summary>
+        [HttpPost("{id}/set-credentials")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
+        public async Task<IActionResult> SetClientCredentials(long id, [FromBody] SetClientCredentialsDTO credentialsDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                }
+
+                var userId = GetCurrentUserId();
+                var result = await _dealService.SetClientCredentialsAsync(id, credentialsDto.Username, credentialsDto.Password, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Client credentials set successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for setting credentials");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for setting credentials");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting client credentials");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while setting client credentials"));
+            }
+        }
+
+        /// <summary>
+        /// Get deals awaiting reviews and account setup
+        /// </summary>
+        [HttpGet("awaiting-reviews-and-setup")]
+        [Authorize(Roles = "SalesMan,Admin,SuperAdmin")]
+        public async Task<IActionResult> GetDealsAwaitingReviewsAndAccountSetup()
+        {
+            try
+            {
+                var result = await _dealService.GetDealsAwaitingReviewsAndAccountSetupAsync();
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Deals retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving deals awaiting reviews and account setup");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving deals"));
+            }
+        }
     }
 }

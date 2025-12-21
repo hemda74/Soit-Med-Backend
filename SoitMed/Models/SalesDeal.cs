@@ -78,6 +78,35 @@ namespace SoitMed.Models
         public DateTime? ReportSubmittedAt { get; set; }
         #endregion
 
+        #region Salesmen Reviews (for Legal Team)
+        // Second salesman ID (from offer's AssignedTo if different from primary)
+        public string? SecondSalesManId { get; set; }
+        
+        // First salesman review
+        [MaxLength(5000)]
+        public string? FirstSalesManReview { get; set; }
+        
+        public DateTime? FirstSalesManReviewSubmittedAt { get; set; }
+        
+        // Second salesman review
+        [MaxLength(5000)]
+        public string? SecondSalesManReview { get; set; }
+        
+        public DateTime? SecondSalesManReviewSubmittedAt { get; set; }
+        #endregion
+
+        #region Client Account Credentials
+        [MaxLength(200)]
+        public string? ClientUsername { get; set; }
+        
+        [MaxLength(500)] // Encrypted password
+        public string? ClientPassword { get; set; }
+        
+        public DateTime? ClientCredentialsSetAt { get; set; }
+        
+        public string? ClientCredentialsSetBy { get; set; }
+        #endregion
+
         #region Legal and Completion
         public DateTime? SentToLegalAt { get; set; }
         
@@ -104,7 +133,7 @@ namespace SoitMed.Models
             ManagerApprovedBy = managerId;
             ManagerApprovedAt = DateTime.UtcNow;
             ManagerComments = comments;
-            Status = DealStatus.PendingSuperAdminApproval;
+            Status = DealStatus.AwaitingSalesmenReviewsAndAccountSetup;
             UpdatedAt = DateTime.UtcNow;
         }
 
@@ -222,8 +251,8 @@ namespace SoitMed.Models
         public bool IsApproved()
         {
             return Status == DealStatus.Approved || Status == DealStatus.AwaitingClientAccountCreation 
-                || Status == DealStatus.AwaitingSalesManReport || Status == DealStatus.SentToLegal 
-                || Status == DealStatus.Success;
+                || Status == DealStatus.AwaitingSalesManReport || Status == DealStatus.AwaitingSalesmenReviewsAndAccountSetup
+                || Status == DealStatus.SentToLegal || Status == DealStatus.Success;
         }
 
         /// <summary>
@@ -232,6 +261,74 @@ namespace SoitMed.Models
         public bool IsRejected()
         {
             return Status == DealStatus.RejectedByManager || Status == DealStatus.RejectedBySuperAdmin || Status == DealStatus.Failed;
+        }
+
+        /// <summary>
+        /// Submit first salesman review
+        /// </summary>
+        public void SubmitFirstSalesManReview(string reviewText)
+        {
+            if (Status != DealStatus.AwaitingSalesmenReviewsAndAccountSetup)
+                throw new InvalidOperationException($"Deal is not awaiting salesmen reviews. Current status: {Status}");
+
+            FirstSalesManReview = reviewText;
+            FirstSalesManReviewSubmittedAt = DateTime.UtcNow;
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Submit second salesman review
+        /// </summary>
+        public void SubmitSecondSalesManReview(string reviewText)
+        {
+            if (Status != DealStatus.AwaitingSalesmenReviewsAndAccountSetup)
+                throw new InvalidOperationException($"Deal is not awaiting salesmen reviews. Current status: {Status}");
+
+            SecondSalesManReview = reviewText;
+            SecondSalesManReviewSubmittedAt = DateTime.UtcNow;
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Set client username and password (by Admin)
+        /// </summary>
+        public void SetClientCredentials(string username, string encryptedPassword, string adminId)
+        {
+            if (Status != DealStatus.AwaitingSalesmenReviewsAndAccountSetup)
+                throw new InvalidOperationException($"Deal is not awaiting account setup. Current status: {Status}");
+
+            ClientUsername = username;
+            ClientPassword = encryptedPassword;
+            ClientCredentialsSetBy = adminId;
+            ClientCredentialsSetAt = DateTime.UtcNow;
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Check if all salesmen reviews and credentials are ready, then send to legal
+        /// </summary>
+        public bool CheckAndSendToLegalIfReady()
+        {
+            if (Status != DealStatus.AwaitingSalesmenReviewsAndAccountSetup)
+                return false;
+
+            // Check if both reviews are submitted
+            bool firstReviewReady = !string.IsNullOrWhiteSpace(FirstSalesManReview);
+            bool secondReviewReady = !string.IsNullOrWhiteSpace(SecondSalesManReview) || SecondSalesManId == null;
+            
+            // Check if credentials are set
+            bool credentialsReady = !string.IsNullOrWhiteSpace(ClientUsername) && !string.IsNullOrWhiteSpace(ClientPassword);
+
+            // If all conditions are met, send to legal
+            if (firstReviewReady && secondReviewReady && credentialsReady)
+            {
+                Status = DealStatus.SentToLegal;
+                SentToLegalAt = DateTime.UtcNow;
+                UpdatedAt = DateTime.UtcNow;
+                return true;
+            }
+
+            return false;
         }
         #endregion
     }
@@ -246,6 +343,7 @@ namespace SoitMed.Models
         public const string Approved = "Approved";
         public const string AwaitingClientAccountCreation = "AwaitingClientAccountCreation";
         public const string AwaitingSalesManReport = "AwaitingSalesManReport";
+        public const string AwaitingSalesmenReviewsAndAccountSetup = "AwaitingSalesmenReviewsAndAccountSetup";
         public const string SentToLegal = "SentToLegal";
         public const string Failed = "Failed";
         public const string Success = "Success";
@@ -253,7 +351,7 @@ namespace SoitMed.Models
         public static readonly string[] AllStatuses = { 
             PendingManagerApproval, RejectedByManager, PendingSuperAdminApproval, 
             RejectedBySuperAdmin, Approved, AwaitingClientAccountCreation, 
-            AwaitingSalesManReport, SentToLegal, Failed, Success 
+            AwaitingSalesManReport, AwaitingSalesmenReviewsAndAccountSetup, SentToLegal, Failed, Success 
         };
     }
 

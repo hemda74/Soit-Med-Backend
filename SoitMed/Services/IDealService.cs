@@ -27,6 +27,10 @@ namespace SoitMed.Services
         Task<DealResponseDTO> MarkClientAccountCreatedAsync(long dealId, string AdminId);
         Task<DealResponseDTO> SubmitSalesManReportAsync(long dealId, string reportText, string? reportAttachments, string salesmanId);
         Task<List<DealResponseDTO>> GetDealsForLegalAsync();
+        Task<DealResponseDTO> SubmitFirstSalesManReviewAsync(long dealId, string reviewText, string salesmanId);
+        Task<DealResponseDTO> SubmitSecondSalesManReviewAsync(long dealId, string reviewText, string salesmanId);
+        Task<DealResponseDTO> SetClientCredentialsAsync(long dealId, string username, string password, string adminId);
+        Task<List<DealResponseDTO>> GetDealsAwaitingReviewsAndAccountSetupAsync();
         #endregion
 
         #region Deal Completion
