@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Http;
 
 namespace SoitMed.DTO
 {
@@ -262,5 +263,41 @@ namespace SoitMed.DTO
         
         [JsonPropertyName("updatedAt")]
         public DateTime UpdatedAt { get; set; }
+        
+        [JsonPropertyName("nationalId")]
+        public string? NationalId { get; set; }
+        
+        [JsonPropertyName("nationalIdFrontImage")]
+        public string? NationalIdFrontImage { get; set; }
+        
+        [JsonPropertyName("nationalIdBackImage")]
+        public string? NationalIdBackImage { get; set; }
+        
+        [JsonPropertyName("taxCardNumber")]
+        public string? TaxCardNumber { get; set; }
+        
+        [JsonPropertyName("taxCardImage")]
+        public string? TaxCardImage { get; set; }
+        
+        [JsonPropertyName("legalDocumentsSubmittedAt")]
+        public DateTime? LegalDocumentsSubmittedAt { get; set; }
+    }
+
+    public class SubmitClientLegalDocumentsDTO
+    {
+        [Required(ErrorMessage = "National ID is required")]
+        [MaxLength(50)]
+        public string NationalId { get; set; } = string.Empty;
+        
+        [Required(ErrorMessage = "National ID front image is required")]
+        public IFormFile NationalIdFrontImage { get; set; } = null!;
+        
+        [Required(ErrorMessage = "National ID back image is required")]
+        public IFormFile NationalIdBackImage { get; set; } = null!;
+        
+        [MaxLength(50)]
+        public string? TaxCardNumber { get; set; }
+        
+        public IFormFile? TaxCardImage { get; set; }
     }
 }

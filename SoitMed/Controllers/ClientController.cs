@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Hosting;
 using SoitMed.Common;
 using SoitMed.DTO;
 using SoitMed.Models.Identity;
@@ -16,17 +17,20 @@ namespace SoitMed.Controllers
         private readonly IClientService _clientService;
         private readonly IValidationService _validationService;
         private readonly ILogger<ClientController> _logger;
+        private readonly IWebHostEnvironment _environment;
 
         public ClientController(
             IClientService clientService, 
             IValidationService validationService,
             ILogger<ClientController> logger, 
-            UserManager<ApplicationUser> userManager) 
+            UserManager<ApplicationUser> userManager,
+            IWebHostEnvironment environment) 
             : base(userManager)
         {
             _clientService = clientService;
             _validationService = validationService;
             _logger = logger;
+            _environment = environment;
         }
 
         [HttpGet("search")]
@@ -289,6 +293,117 @@ namespace SoitMed.Controllers
             {
                 _logger.LogError(ex, "Error getting client profile for client {ClientId}", id);
                 return StatusCode(500, CreateErrorResponse("حدث خطأ في جلب ملف العميل"));
+            }
+        }
+
+        /// <summary>
+        /// Submit client legal documents (National ID and Tax Card)
+        /// </summary>
+        [HttpPost("{id}/submit-legal-documents")]
+        [Consumes("multipart/form-data")]
+        [Authorize(Roles = "Customer,Doctor,Technician")]
+        public async Task<IActionResult> SubmitClientLegalDocuments(long id, [FromForm] SubmitClientLegalDocumentsDTO documentsDto)
+        {
+            try
+            {
+                var currentUser = await GetCurrentUserAsync();
+                if (currentUser == null)
+                    return Unauthorized(CreateErrorResponse("غير مصرح لك"));
+
+                // Verify client exists
+                var client = await _clientService.GetClientAsync(id);
+                if (client == null)
+                    return NotFound(CreateErrorResponse("العميل غير موجود"));
+
+                // Validate files
+                if (documentsDto.NationalIdFrontImage == null || documentsDto.NationalIdFrontImage.Length == 0)
+                    return BadRequest(CreateErrorResponse("صورة الهوية الأمامية مطلوبة"));
+
+                if (documentsDto.NationalIdBackImage == null || documentsDto.NationalIdBackImage.Length == 0)
+                    return BadRequest(CreateErrorResponse("صورة الهوية الخلفية مطلوبة"));
+
+                // Validate file types
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                var frontExt = Path.GetExtension(documentsDto.NationalIdFrontImage.FileName).ToLowerInvariant();
+                var backExt = Path.GetExtension(documentsDto.NationalIdBackImage.FileName).ToLowerInvariant();
+                
+                if (!allowedExtensions.Contains(frontExt) || !allowedExtensions.Contains(backExt))
+                    return BadRequest(CreateErrorResponse("نوع الملف غير مدعوم. يرجى استخدام JPG, PNG, أو GIF"));
+
+                // Validate file sizes (max 5MB each)
+                if (documentsDto.NationalIdFrontImage.Length > 5 * 1024 * 1024 || 
+                    documentsDto.NationalIdBackImage.Length > 5 * 1024 * 1024)
+                    return BadRequest(CreateErrorResponse("حجم الملف يتجاوز 5 ميجابايت"));
+
+                // Validate tax card image if provided
+                string? taxCardImagePath = null;
+                if (documentsDto.TaxCardImage != null && documentsDto.TaxCardImage.Length > 0)
+                {
+                    var taxExt = Path.GetExtension(documentsDto.TaxCardImage.FileName).ToLowerInvariant();
+                    if (!allowedExtensions.Contains(taxExt))
+                        return BadRequest(CreateErrorResponse("نوع ملف البطاقة الضريبية غير مدعوم"));
+
+                    if (documentsDto.TaxCardImage.Length > 5 * 1024 * 1024)
+                        return BadRequest(CreateErrorResponse("حجم ملف البطاقة الضريبية يتجاوز 5 ميجابايت"));
+                }
+
+                // Create directory for client documents
+                var clientDocumentsFolder = Path.Combine(_environment.WebRootPath, "client-documents", id.ToString());
+                Directory.CreateDirectory(clientDocumentsFolder);
+
+                // Upload National ID front image
+                var frontFileName = $"national-id-front-{Guid.NewGuid()}{frontExt}";
+                var frontFilePath = Path.Combine(clientDocumentsFolder, frontFileName);
+                var frontRelativePath = Path.Combine("client-documents", id.ToString(), frontFileName).Replace('\\', '/');
+                using (var stream = new FileStream(frontFilePath, FileMode.Create))
+                {
+                    await documentsDto.NationalIdFrontImage.CopyToAsync(stream);
+                }
+
+                // Upload National ID back image
+                var backFileName = $"national-id-back-{Guid.NewGuid()}{backExt}";
+                var backFilePath = Path.Combine(clientDocumentsFolder, backFileName);
+                var backRelativePath = Path.Combine("client-documents", id.ToString(), backFileName).Replace('\\', '/');
+                using (var stream = new FileStream(backFilePath, FileMode.Create))
+                {
+                    await documentsDto.NationalIdBackImage.CopyToAsync(stream);
+                }
+
+                // Upload Tax Card image if provided
+                if (documentsDto.TaxCardImage != null && documentsDto.TaxCardImage.Length > 0)
+                {
+                    var taxExt = Path.GetExtension(documentsDto.TaxCardImage.FileName).ToLowerInvariant();
+                    var taxFileName = $"tax-card-{Guid.NewGuid()}{taxExt}";
+                    var taxFilePath = Path.Combine(clientDocumentsFolder, taxFileName);
+                    taxCardImagePath = Path.Combine("client-documents", id.ToString(), taxFileName).Replace('\\', '/');
+                    using (var stream = new FileStream(taxFilePath, FileMode.Create))
+                    {
+                        await documentsDto.TaxCardImage.CopyToAsync(stream);
+                    }
+                }
+
+                // Save to database
+                var result = await _clientService.SubmitClientLegalDocumentsAsync(
+                    id,
+                    documentsDto.NationalId,
+                    frontRelativePath,
+                    backRelativePath,
+                    documentsDto.TaxCardNumber,
+                    taxCardImagePath,
+                    currentUser.Id
+                );
+
+                return Ok(CreateSuccessResponse(result, "تم إرسال المستندات القانونية بنجاح"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for submitting legal documents");
+                return BadRequest(CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting legal documents for client {ClientId}", id);
+                return StatusCode(500, CreateErrorResponse("حدث خطأ في إرسال المستندات القانونية"));
             }
         }
     }

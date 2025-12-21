@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
 using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Location;
@@ -14,11 +15,13 @@ namespace SoitMed.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ClientService> _logger;
+        private readonly IWebHostEnvironment _environment;
 
-        public ClientService(IUnitOfWork unitOfWork, ILogger<ClientService> logger) 
+        public ClientService(IUnitOfWork unitOfWork, ILogger<ClientService> logger, IWebHostEnvironment environment) 
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _environment = environment;
         }
 
         #region Client Management
@@ -524,7 +527,13 @@ namespace SoitMed.Services
                 CreatedBy = client.CreatedBy,
                 AssignedTo = client.AssignedTo,
                 CreatedAt = client.CreatedAt,
-                UpdatedAt = client.UpdatedAt
+                UpdatedAt = client.UpdatedAt,
+                NationalId = client.NationalId,
+                NationalIdFrontImage = client.NationalIdFrontImage,
+                NationalIdBackImage = client.NationalIdBackImage,
+                TaxCardNumber = client.TaxCardNumber,
+                TaxCardImage = client.TaxCardImage,
+                LegalDocumentsSubmittedAt = client.LegalDocumentsSubmittedAt
             };
         }
 
@@ -577,6 +586,47 @@ namespace SoitMed.Services
                 Status = deal.Status
             };
         }
+
+        #region Legal Documents
+
+        public async Task<ClientResponseDTO> SubmitClientLegalDocumentsAsync(
+            long clientId, 
+            string nationalId, 
+            string nationalIdFrontImagePath, 
+            string nationalIdBackImagePath, 
+            string? taxCardNumber, 
+            string? taxCardImagePath, 
+            string userId)
+        {
+            try
+            {
+                var client = await _unitOfWork.Clients.GetByIdAsync(clientId);
+                if (client == null)
+                    throw new ArgumentException("Client not found", nameof(clientId));
+
+                // Update client with legal documents
+                client.NationalId = nationalId;
+                client.NationalIdFrontImage = nationalIdFrontImagePath;
+                client.NationalIdBackImage = nationalIdBackImagePath;
+                client.TaxCardNumber = taxCardNumber;
+                client.TaxCardImage = taxCardImagePath;
+                client.LegalDocumentsSubmittedAt = DateTime.UtcNow;
+                client.UpdatedAt = DateTime.UtcNow;
+
+                await _unitOfWork.Clients.UpdateAsync(client);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Legal documents submitted for Client: {ClientId} by User: {UserId}", clientId, userId);
+                return MapToClientResponseDTO(client);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting legal documents for Client: {ClientId}", clientId);
+                throw;
+            }
+        }
+
+        #endregion
 
         #endregion
     }

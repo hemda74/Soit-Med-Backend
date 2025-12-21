@@ -92,6 +92,25 @@ namespace SoitMed.Models
         public string? InterestedEquipmentCategories { get; set; } // JSON array of equipment categories
         #endregion
 
+        #region Legal Documents (Required for Deal Processing)
+        [MaxLength(50)]
+        public string? NationalId { get; set; } // National ID number
+        
+        [MaxLength(500)]
+        public string? NationalIdFrontImage { get; set; } // Path to front image of National ID
+        
+        [MaxLength(500)]
+        public string? NationalIdBackImage { get; set; } // Path to back image of National ID
+        
+        [MaxLength(50)]
+        public string? TaxCardNumber { get; set; } // Tax card number (optional)
+        
+        [MaxLength(500)]
+        public string? TaxCardImage { get; set; } // Path to tax card image (optional)
+        
+        public DateTime? LegalDocumentsSubmittedAt { get; set; } // When documents were submitted
+        #endregion
+
         #region System Information
         [Required]
         public string CreatedBy { get; set; } = string.Empty;
