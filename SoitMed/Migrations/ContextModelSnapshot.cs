@@ -367,6 +367,9 @@ namespace SoitMed.Migrations
                     b.Property<DateTime?>("LastContactDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("LegalDocumentsSubmittedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Location")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -375,6 +378,18 @@ namespace SoitMed.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NationalId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("NationalIdBackImage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("NationalIdFrontImage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime?>("NextContactDate")
                         .HasColumnType("datetime2");
@@ -412,6 +427,14 @@ namespace SoitMed.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("TaxCardImage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("TaxCardNumber")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
@@ -2760,8 +2783,22 @@ namespace SoitMed.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<DateTime?>("ClientCredentialsSetAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ClientCredentialsSetBy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<long>("ClientId")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("ClientPassword")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ClientUsername")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<DateTime>("ClosedDate")
                         .HasColumnType("datetime2");
@@ -2784,6 +2821,13 @@ namespace SoitMed.Migrations
                         .HasColumnType("nvarchar(2000)");
 
                     b.Property<DateTime?>("ExpectedDeliveryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FirstSalesManReview")
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("FirstSalesManReviewSubmittedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("ManagerApprovedAt")
@@ -2825,6 +2869,16 @@ namespace SoitMed.Migrations
                     b.Property<string>("SalesManId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("SecondSalesManId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SecondSalesManReview")
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SecondSalesManReviewSubmittedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("SentToLegalAt")
                         .HasColumnType("datetime2");
