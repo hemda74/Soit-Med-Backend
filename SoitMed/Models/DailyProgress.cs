@@ -4,9 +4,9 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace SoitMed.Models
 {
     /// <summary>
-    /// Individual task within a weekly plan
+    /// Daily progress notes added by salesman
     /// </summary>
-    public class WeeklyPlanTask
+    public class DailyProgress
     {
         [Key]
         public int Id { get; set; }
@@ -15,15 +15,14 @@ namespace SoitMed.Models
         public int WeeklyPlanId { get; set; }
 
         [Required]
-        [MaxLength(300)]
-        public string Title { get; set; } = string.Empty;
+        public DateOnly ProgressDate { get; set; }
 
-        [MaxLength(1000)]
-        public string? Description { get; set; }
+        [Required]
+        [MaxLength(2000)]
+        public string Notes { get; set; } = string.Empty;
 
-        public bool IsCompleted { get; set; } = false;
-
-        public int DisplayOrder { get; set; } = 0;
+        [MaxLength(500)]
+        public string? TasksWorkedOn { get; set; } // Comma-separated task IDs
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
