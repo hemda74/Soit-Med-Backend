@@ -27,7 +27,7 @@ namespace SoitMed.Models
 
         [Required]
         [MaxLength(50)]
-        public string FromRole { get; set; } = string.Empty; // "Salesman"
+        public string FromRole { get; set; } = string.Empty; // "SalesMan"
 
         [Required]
         [MaxLength(50)]

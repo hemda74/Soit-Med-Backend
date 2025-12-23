@@ -1,6 +1,7 @@
 using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Location;
+using SoitMed.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +20,8 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "SuperAdmin,Admin,SalesManager,SalesSupport")]
+        [Authorize]
+        [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin")]
         public async Task<IActionResult> GetGovernorates()
         {
             var governorates = await context.Governorates
@@ -37,7 +39,8 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet("{id}")]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize]
+        [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin")]
         public async Task<IActionResult> GetGovernorate(int id)
         {
             var governorate = await context.Governorates
@@ -62,8 +65,8 @@ namespace SoitMed.Controllers
             return Ok(response);
         }
 
-        // Required API endpoint: GET /governorates/{id}/engineers
-        [HttpGet("{id}/engineers")]
+        // Required API endpoint: GET /governorates/{id}/Engineers
+        [HttpGet("{id}/Engineers")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetGovernorateEngineers(int id)
         {
@@ -78,7 +81,7 @@ namespace SoitMed.Controllers
                 return NotFound($"Governorate with ID {id} not found");
             }
 
-            var engineers = governorate.EngineerGovernorates
+            var Engineers = governorate.EngineerGovernorates
                 .Where(eg => eg.IsActive && eg.Engineer.IsActive)
                 .Select(eg => new
                 {
@@ -93,8 +96,8 @@ namespace SoitMed.Controllers
             return Ok(new
             {
                 Governorate = governorate.Name,
-                EngineerCount = engineers.Count(),
-                Engineers = engineers
+                EngineerCount = Engineers.Count(),
+                Engineers = Engineers
             });
         }
 
@@ -169,7 +172,7 @@ namespace SoitMed.Controllers
 
             if (governorate.EngineerGovernorates.Any(eg => eg.IsActive))
             {
-                return BadRequest($"Cannot delete governorate '{governorate.Name}' because it has active engineers assigned to it");
+                return BadRequest($"Cannot delete governorate '{governorate.Name}' because it has active Engineers assigned to it");
             }
 
             context.Governorates.Remove(governorate);
@@ -179,9 +182,9 @@ namespace SoitMed.Controllers
         }
 
         // Engineer assignment endpoints
-        [HttpPost("{governorateId}/engineers/{engineerId}")]
+        [HttpPost("{governorateId}/Engineers/{EngineerId}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> AssignEngineerToGovernorate(int governorateId, int engineerId)
+        public async Task<IActionResult> AssignEngineerToGovernorate(int governorateId, int EngineerId)
         {
             var governorate = await context.Governorates.FindAsync(governorateId);
             if (governorate == null)
@@ -189,21 +192,21 @@ namespace SoitMed.Controllers
                 return NotFound($"Governorate with ID {governorateId} not found");
             }
 
-            var engineer = await context.Engineers.FindAsync(engineerId);
-            if (engineer == null)
+            var Engineer = await context.Engineers.FindAsync(EngineerId);
+            if (Engineer == null)
             {
-                return NotFound($"Engineer with ID {engineerId} not found");
+                return NotFound($"Engineer with ID {EngineerId} not found");
             }
 
             // Check if assignment already exists
             var existingAssignment = await context.EngineerGovernorates
-                .FirstOrDefaultAsync(eg => eg.EngineerId == engineerId && eg.GovernorateId == governorateId);
+                .FirstOrDefaultAsync(eg => eg.EngineerId == EngineerId && eg.GovernorateId == governorateId);
 
             if (existingAssignment != null)
             {
                 if (existingAssignment.IsActive)
                 {
-                    return BadRequest($"Engineer '{engineer.Name}' is already assigned to governorate '{governorate.Name}'");
+                    return BadRequest($"Engineer '{Engineer.Name}' is already assigned to governorate '{governorate.Name}'");
                 }
                 else
                 {
@@ -217,7 +220,7 @@ namespace SoitMed.Controllers
                 // Create new assignment
                 var assignment = new EngineerGovernorate
                 {
-                    EngineerId = engineerId,
+                    EngineerId = EngineerId,
                     GovernorateId = governorateId,
                     AssignedAt = DateTime.UtcNow,
                     IsActive = true
@@ -228,21 +231,21 @@ namespace SoitMed.Controllers
 
             await context.SaveChangesAsync();
 
-            return Ok($"Engineer '{engineer.Name}' assigned to governorate '{governorate.Name}' successfully");
+            return Ok($"Engineer '{Engineer.Name}' assigned to governorate '{governorate.Name}' successfully");
         }
 
-        [HttpDelete("{governorateId}/engineers/{engineerId}")]
+        [HttpDelete("{governorateId}/Engineers/{EngineerId}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> RemoveEngineerFromGovernorate(int governorateId, int engineerId)
+        public async Task<IActionResult> RemoveEngineerFromGovernorate(int governorateId, int EngineerId)
         {
             var assignment = await context.EngineerGovernorates
                 .Include(eg => eg.Engineer)
                 .Include(eg => eg.Governorate)
-                .FirstOrDefaultAsync(eg => eg.EngineerId == engineerId && eg.GovernorateId == governorateId && eg.IsActive);
+                .FirstOrDefaultAsync(eg => eg.EngineerId == EngineerId && eg.GovernorateId == governorateId && eg.IsActive);
 
             if (assignment == null)
             {
-                return NotFound($"Active assignment between engineer ID {engineerId} and governorate ID {governorateId} not found");
+                return NotFound($"Active assignment between Engineer ID {EngineerId} and governorate ID {governorateId} not found");
             }
 
             assignment.IsActive = false;

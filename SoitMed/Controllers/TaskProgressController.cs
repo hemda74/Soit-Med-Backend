@@ -37,7 +37,7 @@ namespace SoitMed.Controllers
         /// Create new progress for a task
         /// </summary>
         [HttpPost]
-        [Authorize(Roles = "Salesman,SalesManager")]
+        [Authorize(Roles = "SalesMan,SalesManager")]
         public async Task<IActionResult> CreateProgress([FromBody] CreateTaskProgressDTO createDto)
         {
             try
@@ -73,7 +73,7 @@ namespace SoitMed.Controllers
         /// Upload a voice description file for task progress
         /// </summary>
         [HttpPost("upload-voice")]
-        [Authorize(Roles = "Salesman,SalesManager")]
+        [Authorize(Roles = "SalesMan,SalesManager")]
         [RequestSizeLimit(20 * 1024 * 1024)]
         public async Task<IActionResult> UploadVoiceDescription([FromForm] IFormFile voiceFile)
         {
@@ -105,7 +105,7 @@ namespace SoitMed.Controllers
         /// Create progress and trigger offer request when client is interested
         /// </summary>
         [HttpPost("with-offer-request")]
-        [Authorize(Roles = "Salesman,SalesManager")]
+        [Authorize(Roles = "SalesMan,SalesManager")]
         public async Task<IActionResult> CreateProgressWithOfferRequest([FromBody] CreateTaskProgressWithOfferRequestDTO createDto)
         {
             try
@@ -141,7 +141,7 @@ namespace SoitMed.Controllers
         /// Get all task progress for the current user (role-based filtering)
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> GetAllProgress([FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
         {
             try
@@ -149,8 +149,8 @@ namespace SoitMed.Controllers
                 var userId = GetCurrentUserId();
                 var userRole = GetCurrentUserRole();
                 
-                // For Salesman, return only their own progress
-                if (userRole == "Salesman")
+                // For SalesMan, return only their own progress
+                if (userRole == "SalesMan")
                 {
                     var myProgress = await _taskProgressService.GetProgressesByEmployeeAsync(userId, startDate, endDate);
                     return Ok(ResponseHelper.CreateSuccessResponse(myProgress, "Task progress retrieved successfully"));
@@ -171,7 +171,7 @@ namespace SoitMed.Controllers
         /// Get all progress for a specific task
         /// </summary>
         [HttpGet("task/{taskId}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> GetProgressByTask(long taskId)
         {
             try
@@ -199,7 +199,7 @@ namespace SoitMed.Controllers
         /// Get all progress for a specific client (for client history)
         /// </summary>
         [HttpGet("by-client/{clientId}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> GetProgressByClient(long clientId)
         {
             try
@@ -227,7 +227,7 @@ namespace SoitMed.Controllers
         /// Update existing progress
         /// </summary>
         [HttpPut("{id}")]
-        [Authorize(Roles = "Salesman,SalesManager")]
+        [Authorize(Roles = "SalesMan,SalesManager")]
         public async Task<IActionResult> UpdateProgress(long id, [FromBody] CreateTaskProgressDTO updateDto)
         {
             try

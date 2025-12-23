@@ -93,8 +93,8 @@ namespace SoitMed.DTO
         public string? LegalSpecialty { get; set; } // Optional: contracts, compliance, etc.
     }
 
-    // Salesman creation DTO
-    public class CreateSalesmanDTO : BaseUserCreationDTO
+    // SalesMan creation DTO
+    public class CreateSalesManDTO : BaseUserCreationDTO
     {
         [MaxLength(100, ErrorMessage = "Territory cannot exceed 100 characters")]
         public string? Territory { get; set; } // Optional: sales territory

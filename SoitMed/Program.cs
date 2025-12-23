@@ -164,7 +164,13 @@ namespace SoitMed
                     options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"));
                 });
 
-                builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
+                builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+                {
+                    // Explicitly set claim types to ensure role-based authorization works correctly
+                    options.ClaimsIdentity.RoleClaimType = System.Security.Claims.ClaimTypes.Role;
+                    options.ClaimsIdentity.UserNameClaimType = System.Security.Claims.ClaimTypes.Name;
+                    options.ClaimsIdentity.UserIdClaimType = System.Security.Claims.ClaimTypes.NameIdentifier;
+                })
                     .AddEntityFrameworkStores<Context>()
                     .AddDefaultTokenProviders();
 
@@ -172,9 +178,10 @@ namespace SoitMed
                 builder.Services.AddScoped<IQRCodeService, QRCodeService>();
                 builder.Services.AddScoped<UserIdGenerationService>();
                 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-                builder.Services.AddScoped<ISalesmanStatisticsService, SalesmanStatisticsService>();
+                builder.Services.AddScoped<ISalesManStatisticsService, SalesManStatisticsService>();
                 builder.Services.AddScoped<IImageUploadService, ImageUploadService>();
                 builder.Services.AddScoped<IPdfUploadService, PdfUploadService>();
+                builder.Services.AddScoped<IOfferPdfService, OfferPdfService>();
                 builder.Services.AddScoped<IRoleBasedImageUploadService, RoleBasedImageUploadService>();
                 builder.Services.AddScoped<IVoiceUploadService, VoiceUploadService>();
                 builder.Services.AddScoped<IEmailService, EmailService>();
@@ -243,7 +250,10 @@ namespace SoitMed
                         ValidAudience = builder.Configuration["JWT:ValidAud"],
                         IssuerSigningKey =
                         new SymmetricSecurityKey(
-                            Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecritKey"] ?? ""))
+                            Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecritKey"] ?? "")),
+                        // Explicitly map role claims to ensure role-based authorization works
+                        RoleClaimType = System.Security.Claims.ClaimTypes.Role,
+                        NameClaimType = System.Security.Claims.ClaimTypes.Name
                     };
 
                     options.Events = new JwtBearerEvents
@@ -357,7 +367,7 @@ END";
                     }
                 }
 
-                // Ensure SalesmanTargets table has TargetType and TargetRevenue columns
+                // Ensure SalesManTargets table has TargetType and TargetRevenue columns
                 using (var scope = app.Services.CreateScope())
                 {
                     try
@@ -373,11 +383,11 @@ END";
 IF NOT EXISTS (
     SELECT 1 
     FROM sys.columns 
-    WHERE object_id = OBJECT_ID(N'[dbo].[SalesmanTargets]') 
+    WHERE object_id = OBJECT_ID(N'[dbo].[SalesManTargets]') 
     AND name = 'TargetType'
 )
 BEGIN
-    ALTER TABLE [dbo].[SalesmanTargets]
+    ALTER TABLE [dbo].[SalesManTargets]
     ADD [TargetType] INT NOT NULL DEFAULT 2;
 END";
                             await command.ExecuteNonQueryAsync();
@@ -390,23 +400,23 @@ END";
 IF NOT EXISTS (
     SELECT 1 
     FROM sys.columns 
-    WHERE object_id = OBJECT_ID(N'[dbo].[SalesmanTargets]') 
+    WHERE object_id = OBJECT_ID(N'[dbo].[SalesManTargets]') 
     AND name = 'TargetRevenue'
 )
 BEGIN
-    ALTER TABLE [dbo].[SalesmanTargets]
+    ALTER TABLE [dbo].[SalesManTargets]
     ADD [TargetRevenue] DECIMAL(18, 2) NULL;
 END";
                             await command.ExecuteNonQueryAsync();
                         }
                         
-                        logger.LogInformation("SalesmanTargets table columns verified/updated");
+                        logger.LogInformation("SalesManTargets table columns verified/updated");
                     }
                     catch (Exception guardEx)
                     {
                         var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
                         var startupLogger = loggerFactory.CreateLogger("StartupDbGuard");
-                        startupLogger.LogError(guardEx, "Failed to ensure SalesmanTargets columns exist");
+                        startupLogger.LogError(guardEx, "Failed to ensure SalesManTargets columns exist");
                     }
                 }
 

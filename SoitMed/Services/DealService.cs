@@ -46,14 +46,16 @@ namespace SoitMed.Services
                 {
                     OfferId = createDealDto.OfferId,
                     ClientId = createDealDto.ClientId,
-                    SalesmanId = salesmanId,
+                    SalesManId = salesmanId,
+                    // Set second salesman from offer if different
+                    SecondSalesManId = offer.AssignedTo != salesmanId ? offer.AssignedTo : null,
                     DealValue = createDealDto.DealValue,
                     ClosedDate = DateTime.UtcNow,
                     PaymentTerms = createDealDto.PaymentTerms,
                     DeliveryTerms = createDealDto.DeliveryTerms,
                     ExpectedDeliveryDate = createDealDto.ExpectedDeliveryDate,
                     Notes = createDealDto.Notes,
-                    Status = "PendingSuperAdminApproval"
+                    Status = "PendingManagerApproval"
                 };
 
                 await _unitOfWork.SalesDeals.CreateAsync(deal);
@@ -61,8 +63,8 @@ namespace SoitMed.Services
 
                 _logger.LogInformation("Deal created successfully. DealId: {DealId}, OfferId: {OfferId}", deal.Id, createDealDto.OfferId);
 
-                // Send notification to SuperAdmin for approval (deals now go directly to SuperAdmin approval)
-                await SendSuperAdminApprovalNotificationAsync(deal);
+                // Send notification to SalesManager for approval
+                await SendManagerApprovalNotificationAsync(deal);
 
                 return await MapToDealResponseDTO(deal);
             }
@@ -100,11 +102,11 @@ namespace SoitMed.Services
 
                 // Check authorization:
                 // - SuperAdmin and SalesManager can view any deal
-                // - Salesman can only view their own deals
-                if (userRole != "SuperAdmin" && userRole != "SalesManager" && deal.SalesmanId != userId)
+                // - SalesMan can only view their own deals
+                if (userRole != "SuperAdmin" && userRole != "SalesManager" && deal.SalesManId != userId)
                 {
-                    _logger.LogWarning("Unauthorized access attempt - UserId: {UserId}, UserRole: {UserRole}, DealId: {DealId}, DealSalesmanId: {DealSalesmanId}",
-                        userId, userRole, dealId, deal.SalesmanId);
+                    _logger.LogWarning("Unauthorized access attempt - UserId: {UserId}, UserRole: {UserRole}, DealId: {DealId}, DealSalesManId: {DealSalesManId}",
+                        userId, userRole, dealId, deal.SalesManId);
                     throw new UnauthorizedAccessException("You don't have permission to view this deal");
                 }
 
@@ -128,12 +130,12 @@ namespace SoitMed.Services
                     query = query.Where(d => d.Status == status);
 
                 if (!string.IsNullOrEmpty(salesmanId))
-                    query = query.Where(d => d.SalesmanId == salesmanId);
+                    query = query.Where(d => d.SalesManId == salesmanId);
 
                 // Apply authorization
-                if (userRole == "Salesman")
+                if (userRole == "SalesMan")
                 {
-                    query = query.Where(d => d.SalesmanId == userId);
+                    query = query.Where(d => d.SalesManId == userId);
                 }
                 // SalesManager and SuperAdmin can see all
 
@@ -163,8 +165,8 @@ namespace SoitMed.Services
 
                 foreach (var deal in deals)
                 {
-                    // Check authorization - SuperAdmin and SalesManager can see all deals, Salesman can only see their own
-                    if (userRole == "SuperAdmin" || userRole == "SalesManager" || deal.SalesmanId == userId)
+                    // Check authorization - SuperAdmin and SalesManager can see all deals, SalesMan can only see their own
+                    if (userRole == "SuperAdmin" || userRole == "SalesManager" || deal.SalesManId == userId)
                     {
                         result.Add(await MapToDealResponseDTO(deal));
                     }
@@ -200,11 +202,11 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<List<DealResponseDTO>> GetDealsBySalesmanAsync(string salesmanId)
+        public async Task<List<DealResponseDTO>> GetDealsBySalesManAsync(string salesmanId)
         {
             try
             {
-                var deals = await _unitOfWork.SalesDeals.GetDealsBySalesmanAsync(salesmanId);
+                var deals = await _unitOfWork.SalesDeals.GetDealsBySalesManAsync(salesmanId);
                 var result = new List<DealResponseDTO>();
 
                 foreach (var deal in deals)
@@ -216,7 +218,7 @@ namespace SoitMed.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting deals by salesman. SalesmanId: {SalesmanId}", salesmanId);
+                _logger.LogError(ex, "Error getting deals by salesman. SalesManId: {SalesManId}", salesmanId);
                 throw;
             }
         }
@@ -308,10 +310,11 @@ namespace SoitMed.Services
                 _logger.LogInformation("Manager approval processed for deal. DealId: {DealId}, Approved: {Approved}", 
                     dealId, approvalDto.Approved);
 
-                // If approved, send notification to Super Admins for next level approval
-                if (approvalDto.Approved && deal.Status == "PendingSuperAdminApproval")
+                // If approved, send notification to salesmen to add reviews and admin to set credentials
+                if (approvalDto.Approved && deal.Status == "AwaitingSalesmenReviewsAndAccountSetup")
                 {
-                    await SendSuperAdminApprovalNotificationAsync(deal);
+                    await SendSalesmenReviewsNotificationAsync(deal);
+                    await SendClientAccountSetupNotificationAsync(deal);
                 }
 
                 return await MapToDealResponseDTO(deal);
@@ -357,14 +360,14 @@ namespace SoitMed.Services
                 await _unitOfWork.SalesDeals.UpdateAsync(deal);
                 await _unitOfWork.SaveChangesAsync();
 
-                _logger.LogInformation("Super admin approval processed for deal. DealId: {DealId}, Approved: {Approved}", 
+                _logger.LogInformation("Super Admin approval processed for deal. DealId: {DealId}, Approved: {Approved}", 
                     dealId, approvalDto.Approved);
 
                 return await MapToDealResponseDTO(deal);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing super admin approval. DealId: {DealId}", dealId);
+                _logger.LogError(ex, "Error processing super Admin approval. DealId: {DealId}", dealId);
                 throw;
             }
         }
@@ -394,7 +397,43 @@ namespace SoitMed.Services
         {
             try
             {
+                // Get all deals first to debug
+                var context = _unitOfWork.GetContext();
+                var allDealsCount = await context.SalesDeals.AsNoTracking().CountAsync();
+                _logger.LogInformation("Total deals in database: {Count}", allDealsCount);
+                
                 var deals = await _unitOfWork.SalesDeals.GetPendingApprovalsForSuperAdminAsync();
+                
+                // Log for debugging
+                _logger.LogInformation("GetPendingSuperAdminApprovalsAsync: Found {Count} deals with pending status", deals.Count);
+                
+                if (deals.Count == 0 && allDealsCount > 0)
+                {
+                    // Log all deal statuses for debugging
+                    var allDeals = await context.SalesDeals
+                        .AsNoTracking()
+                        .Select(d => new { d.Id, d.Status, d.CreatedAt })
+                        .OrderByDescending(d => d.CreatedAt)
+                        .Take(50)
+                        .ToListAsync();
+                    
+                    var statusCounts = allDeals
+                        .GroupBy(d => d.Status ?? "NULL")
+                        .Select(g => new { Status = g.Key, Count = g.Count() })
+                        .ToList();
+                    
+                    _logger.LogWarning("No pending deals found. Total deals: {Total}, Status breakdown: {Statuses}",
+                        allDealsCount,
+                        string.Join(", ", statusCounts.Select(s => $"{s.Status}: {s.Count}")));
+                    
+                    // Log individual deal statuses for debugging
+                    foreach (var deal in allDeals.Take(20))
+                    {
+                        _logger.LogInformation("Deal - Id: {DealId}, Status: '{Status}', CreatedAt: {CreatedAt}", 
+                            deal.Id, deal.Status ?? "NULL", deal.CreatedAt);
+                    }
+                }
+                
                 var result = new List<DealResponseDTO>();
 
                 foreach (var deal in deals)
@@ -402,11 +441,12 @@ namespace SoitMed.Services
                     result.Add(await MapToDealResponseDTO(deal));
                 }
 
+                _logger.LogInformation("Returning {Count} deals to SuperAdmin", result.Count);
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting pending super admin approvals");
+                _logger.LogError(ex, "Error getting pending super Admin approvals");
                 throw;
             }
         }
@@ -501,11 +541,15 @@ namespace SoitMed.Services
         private async Task<DealResponseDTO> MapToDealResponseDTO(SalesDeal deal)
         {
             var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
-            var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
+            var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
+            var secondSalesman = !string.IsNullOrEmpty(deal.SecondSalesManId) 
+                ? await _unitOfWork.Users.GetByIdAsync(deal.SecondSalesManId) : null;
             var managerApprover = !string.IsNullOrEmpty(deal.ManagerApprovedBy) 
                 ? await _unitOfWork.Users.GetByIdAsync(deal.ManagerApprovedBy) : null;
             var superAdminApprover = !string.IsNullOrEmpty(deal.SuperAdminApprovedBy) 
                 ? await _unitOfWork.Users.GetByIdAsync(deal.SuperAdminApprovedBy) : null;
+            var credentialsSetBy = !string.IsNullOrEmpty(deal.ClientCredentialsSetBy) 
+                ? await _unitOfWork.Users.GetByIdAsync(deal.ClientCredentialsSetBy) : null;
 
             // Determine manager approval status
             bool? managerApproved = null;
@@ -515,7 +559,7 @@ namespace SoitMed.Services
                 managerApproved = string.IsNullOrEmpty(deal.ManagerRejectionReason);
             }
 
-            // Determine super admin approval status
+            // Determine super Admin approval status
             bool? superAdminApproved = null;
             if (deal.SuperAdminApprovedAt.HasValue)
             {
@@ -529,8 +573,8 @@ namespace SoitMed.Services
                 OfferId = deal.OfferId,
                 ClientId = deal.ClientId,
                 ClientName = client?.Name ?? "Unknown Client",
-                SalesmanId = deal.SalesmanId,
-                SalesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Unknown Salesman",
+                SalesManId = deal.SalesManId,
+                SalesManName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Unknown SalesMan",
                 DealValue = deal.DealValue,
                 TotalValue = deal.DealValue, // Alias for mobile compatibility
                 ClosedDate = deal.ClosedDate,
@@ -552,7 +596,18 @@ namespace SoitMed.Services
                 ReportText = deal.ReportText,
                 ReportAttachments = deal.ReportAttachments,
                 ReportSubmittedAt = deal.ReportSubmittedAt,
-                SentToLegalAt = deal.SentToLegalAt
+                SentToLegalAt = deal.SentToLegalAt,
+                // Salesmen reviews
+                SecondSalesManId = deal.SecondSalesManId,
+                SecondSalesManName = secondSalesman != null ? $"{secondSalesman.FirstName} {secondSalesman.LastName}" : null,
+                FirstSalesManReview = deal.FirstSalesManReview,
+                FirstSalesManReviewSubmittedAt = deal.FirstSalesManReviewSubmittedAt,
+                SecondSalesManReview = deal.SecondSalesManReview,
+                SecondSalesManReviewSubmittedAt = deal.SecondSalesManReviewSubmittedAt,
+                // Client credentials
+                ClientUsername = deal.ClientUsername,
+                ClientCredentialsSetAt = deal.ClientCredentialsSetAt,
+                ClientCredentialsSetByName = credentialsSetBy != null ? $"{credentialsSetBy.FirstName} {credentialsSetBy.LastName}" : null
             };
         }
 
@@ -569,8 +624,8 @@ namespace SoitMed.Services
                 var clientName = client?.Name ?? "Unknown Client";
 
                 // Get salesman info
-                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
-                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : "Unknown Salesman";
+                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
+                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : "Unknown SalesMan";
 
                 // Get all Sales Managers
                 var managers = await _userManager.GetUsersInRoleAsync("SalesManager");
@@ -664,8 +719,8 @@ namespace SoitMed.Services
                 var clientName = client?.Name ?? "Unknown Client";
 
                 // Get salesman info
-                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
-                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : "Unknown Salesman";
+                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
+                var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}".Trim() : "Unknown SalesMan";
 
                 // Get manager who approved
                 var manager = deal.ManagerApprovedBy != null 
@@ -747,7 +802,7 @@ namespace SoitMed.Services
                     {
                         _logger.LogError(notifEx, "❌ Failed to send notification to Super Admin {SuperAdminId} ({SuperAdminName}) for Deal: {DealId}. Error: {Error}", 
                             superAdmin.Id, superAdmin.UserName, deal.Id, notifEx.Message);
-                        // Continue with other super admins even if one fails
+                        // Continue with other super Admins even if one fails
                     }
                 }
 
@@ -755,12 +810,12 @@ namespace SoitMed.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending super admin approval notifications for Deal: {DealId}", deal.Id);
+                _logger.LogError(ex, "Error sending super Admin approval notifications for Deal: {DealId}", deal.Id);
                 // Don't fail the whole operation if notification fails
             }
         }
 
-        public async Task<DealResponseDTO> MarkClientAccountCreatedAsync(long dealId, string adminId)
+        public async Task<DealResponseDTO> MarkClientAccountCreatedAsync(long dealId, string AdminId)
         {
             try
             {
@@ -776,9 +831,9 @@ namespace SoitMed.Services
                 await _unitOfWork.SaveChangesAsync();
 
                 // Notify salesman to submit report
-                await SendSalesmanReportNotificationAsync(deal);
+                await SendSalesManReportNotificationAsync(deal);
 
-                _logger.LogInformation("Client account marked as created for Deal: {DealId} by Admin: {AdminId}", dealId, adminId);
+                _logger.LogInformation("Client account marked as created for Deal: {DealId} by Admin: {AdminId}", dealId, AdminId);
                 return await MapToDealResponseDTO(deal);
             }
             catch (Exception ex)
@@ -788,7 +843,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<DealResponseDTO> SubmitSalesmanReportAsync(long dealId, string reportText, string? reportAttachments, string salesmanId)
+        public async Task<DealResponseDTO> SubmitSalesManReportAsync(long dealId, string reportText, string? reportAttachments, string salesmanId)
         {
             try
             {
@@ -796,10 +851,10 @@ namespace SoitMed.Services
                 if (deal == null)
                     throw new ArgumentException("Deal not found", nameof(dealId));
 
-                if (deal.Status != "AwaitingSalesmanReport")
+                if (deal.Status != "AwaitingSalesManReport")
                     throw new InvalidOperationException($"Deal is not awaiting salesman report. Current status: {deal.Status}");
 
-                if (deal.SalesmanId != salesmanId)
+                if (deal.SalesManId != salesmanId)
                     throw new UnauthorizedAccessException("Only the assigned salesman can submit the report");
 
                 if (string.IsNullOrWhiteSpace(reportText))
@@ -812,7 +867,7 @@ namespace SoitMed.Services
                 // Notify legal managers
                 await SendLegalNotificationAsync(deal);
 
-                _logger.LogInformation("Salesman report submitted for Deal: {DealId} by Salesman: {SalesmanId}", dealId, salesmanId);
+                _logger.LogInformation("SalesMan report submitted for Deal: {DealId} by SalesMan: {SalesManId}", dealId, salesmanId);
                 return await MapToDealResponseDTO(deal);
             }
             catch (Exception ex)
@@ -843,6 +898,154 @@ namespace SoitMed.Services
             }
         }
 
+        public async Task<DealResponseDTO> SubmitFirstSalesManReviewAsync(long dealId, string reviewText, string salesmanId)
+        {
+            try
+            {
+                var deal = await _unitOfWork.SalesDeals.GetByIdAsync(dealId);
+                if (deal == null)
+                    throw new ArgumentException("Deal not found", nameof(dealId));
+
+                if (deal.Status != "AwaitingSalesmenReviewsAndAccountSetup")
+                    throw new InvalidOperationException($"Deal is not awaiting salesmen reviews. Current status: {deal.Status}");
+
+                if (deal.SalesManId != salesmanId)
+                    throw new UnauthorizedAccessException("Only the primary assigned salesman can submit the first review");
+
+                if (string.IsNullOrWhiteSpace(reviewText))
+                    throw new ArgumentException("Review text is required");
+
+                deal.SubmitFirstSalesManReview(reviewText);
+                await _unitOfWork.SalesDeals.UpdateAsync(deal);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Check if all conditions are met and send to legal
+                if (deal.CheckAndSendToLegalIfReady())
+                {
+                    await _unitOfWork.SalesDeals.UpdateAsync(deal);
+                    await _unitOfWork.SaveChangesAsync();
+                    await SendLegalNotificationAsync(deal);
+                    _logger.LogInformation("Deal automatically sent to legal after all reviews and credentials are ready. DealId: {DealId}", dealId);
+                }
+
+                _logger.LogInformation("First salesman review submitted for Deal: {DealId} by SalesMan: {SalesManId}", dealId, salesmanId);
+                return await MapToDealResponseDTO(deal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting first salesman review. DealId: {DealId}", dealId);
+                throw;
+            }
+        }
+
+        public async Task<DealResponseDTO> SubmitSecondSalesManReviewAsync(long dealId, string reviewText, string salesmanId)
+        {
+            try
+            {
+                var deal = await _unitOfWork.SalesDeals.GetByIdAsync(dealId);
+                if (deal == null)
+                    throw new ArgumentException("Deal not found", nameof(dealId));
+
+                if (deal.Status != "AwaitingSalesmenReviewsAndAccountSetup")
+                    throw new InvalidOperationException($"Deal is not awaiting salesmen reviews. Current status: {deal.Status}");
+
+                if (string.IsNullOrWhiteSpace(deal.SecondSalesManId))
+                    throw new InvalidOperationException("This deal does not have a second salesman assigned");
+
+                if (deal.SecondSalesManId != salesmanId)
+                    throw new UnauthorizedAccessException("Only the second assigned salesman can submit the second review");
+
+                if (string.IsNullOrWhiteSpace(reviewText))
+                    throw new ArgumentException("Review text is required");
+
+                deal.SubmitSecondSalesManReview(reviewText);
+                await _unitOfWork.SalesDeals.UpdateAsync(deal);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Check if all conditions are met and send to legal
+                if (deal.CheckAndSendToLegalIfReady())
+                {
+                    await _unitOfWork.SalesDeals.UpdateAsync(deal);
+                    await _unitOfWork.SaveChangesAsync();
+                    await SendLegalNotificationAsync(deal);
+                    _logger.LogInformation("Deal automatically sent to legal after all reviews and credentials are ready. DealId: {DealId}", dealId);
+                }
+
+                _logger.LogInformation("Second salesman review submitted for Deal: {DealId} by SalesMan: {SalesManId}", dealId, salesmanId);
+                return await MapToDealResponseDTO(deal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting second salesman review. DealId: {DealId}", dealId);
+                throw;
+            }
+        }
+
+        public async Task<DealResponseDTO> SetClientCredentialsAsync(long dealId, string username, string password, string adminId)
+        {
+            try
+            {
+                var deal = await _unitOfWork.SalesDeals.GetByIdAsync(dealId);
+                if (deal == null)
+                    throw new ArgumentException("Deal not found", nameof(dealId));
+
+                if (deal.Status != "AwaitingSalesmenReviewsAndAccountSetup")
+                    throw new InvalidOperationException($"Deal is not awaiting account setup. Current status: {deal.Status}");
+
+                if (string.IsNullOrWhiteSpace(username))
+                    throw new ArgumentException("Username is required");
+
+                if (string.IsNullOrWhiteSpace(password))
+                    throw new ArgumentException("Password is required");
+
+                // Encrypt password (using a simple approach - in production, use proper encryption)
+                // For now, we'll store it as-is, but in production you should use proper encryption
+                var encryptedPassword = password; // TODO: Implement proper password encryption
+
+                deal.SetClientCredentials(username, encryptedPassword, adminId);
+                await _unitOfWork.SalesDeals.UpdateAsync(deal);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Check if all conditions are met and send to legal
+                if (deal.CheckAndSendToLegalIfReady())
+                {
+                    await _unitOfWork.SalesDeals.UpdateAsync(deal);
+                    await _unitOfWork.SaveChangesAsync();
+                    await SendLegalNotificationAsync(deal);
+                    _logger.LogInformation("Deal automatically sent to legal after all reviews and credentials are ready. DealId: {DealId}", dealId);
+                }
+
+                _logger.LogInformation("Client credentials set for Deal: {DealId} by Admin: {AdminId}", dealId, adminId);
+                return await MapToDealResponseDTO(deal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting client credentials. DealId: {DealId}", dealId);
+                throw;
+            }
+        }
+
+        public async Task<List<DealResponseDTO>> GetDealsAwaitingReviewsAndAccountSetupAsync()
+        {
+            try
+            {
+                var deals = await _unitOfWork.SalesDeals.GetDealsByStatusAsync("AwaitingSalesmenReviewsAndAccountSetup");
+                var result = new List<DealResponseDTO>();
+
+                foreach (var deal in deals)
+                {
+                    result.Add(await MapToDealResponseDTO(deal));
+                }
+
+                return result.OrderByDescending(d => d.ManagerApprovedAt).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting deals awaiting reviews and account setup");
+                throw;
+            }
+        }
+
         private async Task SendClientAccountCreationNotificationAsync(SalesDeal deal)
         {
             try
@@ -850,8 +1053,8 @@ namespace SoitMed.Services
                 var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
                 var clientName = client?.Name ?? "Unknown Client";
 
-                var admins = await _userManager.GetUsersInRoleAsync("Admin");
-                var activeAdmins = admins.Where(a => a.IsActive).ToList();
+                var Admins = await _userManager.GetUsersInRoleAsync("Admin");
+                var activeAdmins = Admins.Where(a => a.IsActive).ToList();
 
                 if (!activeAdmins.Any())
                 {
@@ -871,12 +1074,12 @@ namespace SoitMed.Services
                     ["status"] = deal.Status
                 };
 
-                foreach (var admin in activeAdmins)
+                foreach (var Admin in activeAdmins)
                 {
                     try
                     {
                         await _notificationService.CreateNotificationAsync(
-                            admin.Id,
+                            Admin.Id,
                             notificationTitle,
                             notificationMessage,
                             "Deal",
@@ -890,7 +1093,7 @@ namespace SoitMed.Services
                     }
                     catch (Exception notifEx)
                     {
-                        _logger.LogError(notifEx, "Failed to send notification to Admin {AdminId} for Deal: {DealId}", admin.Id, deal.Id);
+                        _logger.LogError(notifEx, "Failed to send notification to Admin {AdminId} for Deal: {DealId}", Admin.Id, deal.Id);
                     }
                 }
 
@@ -916,17 +1119,17 @@ namespace SoitMed.Services
             }
         }
 
-        private async Task SendSalesmanReportNotificationAsync(SalesDeal deal)
+        private async Task SendSalesManReportNotificationAsync(SalesDeal deal)
         {
             try
             {
                 var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
                 var clientName = client?.Name ?? "Unknown Client";
 
-                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesmanId);
+                var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
                 if (salesman == null || !salesman.IsActive)
                 {
-                    _logger.LogWarning("Salesman {SalesmanId} not found or inactive for Deal: {DealId}", deal.SalesmanId, deal.Id);
+                    _logger.LogWarning("SalesMan {SalesManId} not found or inactive for Deal: {DealId}", deal.SalesManId, deal.Id);
                     return;
                 }
 
@@ -942,7 +1145,7 @@ namespace SoitMed.Services
                 };
 
                 await _notificationService.CreateNotificationAsync(
-                    deal.SalesmanId,
+                    deal.SalesManId,
                     notificationTitle,
                     notificationMessage,
                     "Deal",
@@ -1029,6 +1232,153 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending legal notification for Deal: {DealId}", deal.Id);
+            }
+        }
+
+        private async Task SendSalesmenReviewsNotificationAsync(SalesDeal deal)
+        {
+            try
+            {
+                var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
+                var clientName = client?.Name ?? "Unknown Client";
+
+                // Notify first salesman
+                var firstSalesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
+                if (firstSalesman != null && firstSalesman.IsActive)
+                {
+                    var notificationTitle = "Review Submission Required";
+                    var notificationMessage = $"Deal #{deal.Id} for client {clientName} has been approved by manager. Please submit your review for the legal team.";
+
+                    var metadata = new Dictionary<string, object>
+                    {
+                        ["dealId"] = deal.Id,
+                        ["clientName"] = clientName,
+                        ["dealValue"] = deal.DealValue,
+                        ["status"] = deal.Status
+                    };
+
+                    await _notificationService.CreateNotificationAsync(
+                        deal.SalesManId,
+                        notificationTitle,
+                        notificationMessage,
+                        "Deal",
+                        "High",
+                        null,
+                        null,
+                        true,
+                        metadata,
+                        CancellationToken.None
+                    );
+                }
+
+                // Notify second salesman if exists
+                if (!string.IsNullOrWhiteSpace(deal.SecondSalesManId))
+                {
+                    var secondSalesman = await _unitOfWork.Users.GetByIdAsync(deal.SecondSalesManId);
+                    if (secondSalesman != null && secondSalesman.IsActive)
+                    {
+                        var notificationTitle = "Review Submission Required";
+                        var notificationMessage = $"Deal #{deal.Id} for client {clientName} has been approved by manager. Please submit your review for the legal team.";
+
+                        var metadata = new Dictionary<string, object>
+                        {
+                            ["dealId"] = deal.Id,
+                            ["clientName"] = clientName,
+                            ["dealValue"] = deal.DealValue,
+                            ["status"] = deal.Status
+                        };
+
+                        await _notificationService.CreateNotificationAsync(
+                            deal.SecondSalesManId,
+                            notificationTitle,
+                            notificationMessage,
+                            "Deal",
+                            "High",
+                            null,
+                            null,
+                            true,
+                            metadata,
+                            CancellationToken.None
+                        );
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending salesmen reviews notification for Deal: {DealId}", deal.Id);
+            }
+        }
+
+        private async Task SendClientAccountSetupNotificationAsync(SalesDeal deal)
+        {
+            try
+            {
+                var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
+                var clientName = client?.Name ?? "Unknown Client";
+
+                var admins = await _userManager.GetUsersInRoleAsync("Admin");
+                var activeAdmins = admins.Where(a => a.IsActive).ToList();
+
+                if (!activeAdmins.Any())
+                {
+                    _logger.LogWarning("No active Admins found to notify for Deal: {DealId}", deal.Id);
+                    return;
+                }
+
+                var notificationTitle = "Client Account Setup Required";
+                var notificationMessage = $"Deal #{deal.Id} for client {clientName} (Value: {deal.DealValue:C}) has been approved. Please set the username and password for this client.";
+
+                var metadata = new Dictionary<string, object>
+                {
+                    ["dealId"] = deal.Id,
+                    ["clientId"] = deal.ClientId,
+                    ["clientName"] = clientName,
+                    ["dealValue"] = deal.DealValue,
+                    ["status"] = deal.Status
+                };
+
+                foreach (var admin in activeAdmins)
+                {
+                    try
+                    {
+                        await _notificationService.CreateNotificationAsync(
+                            admin.Id,
+                            notificationTitle,
+                            notificationMessage,
+                            "Deal",
+                            "High",
+                            null,
+                            null,
+                            true,
+                            metadata,
+                            CancellationToken.None
+                        );
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to send notification to Admin {AdminId} for Deal: {DealId}", admin.Id, deal.Id);
+                    }
+                }
+
+                // Also send to role group
+                try
+                {
+                    await _notificationService.SendNotificationToRoleGroupAsync(
+                        "Admin",
+                        notificationTitle,
+                        notificationMessage,
+                        metadata,
+                        CancellationToken.None
+                    );
+                }
+                catch (Exception broadcastEx)
+                {
+                    _logger.LogWarning(broadcastEx, "Failed to send broadcast to Admin role group");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending client account setup notification for Deal: {DealId}", deal.Id);
             }
         }
 

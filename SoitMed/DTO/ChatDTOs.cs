@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using SoitMed.Models.Enums;
 
 namespace SoitMed.DTO
 {
@@ -15,6 +16,8 @@ namespace SoitMed.DTO
         public string? CustomerImageUrl { get; set; }
         public string? AdminId { get; set; }
         public string? AdminName { get; set; }
+        public ChatType ChatType { get; set; }
+        public string ChatTypeName { get; set; } = string.Empty; // "Support", "Sales", "Maintenance"
         public DateTime LastMessageAt { get; set; }
         public string? LastMessagePreview { get; set; }
         public bool IsActive { get; set; }
@@ -31,6 +34,9 @@ namespace SoitMed.DTO
 
         [MaxLength(450)]
         public string? AdminId { get; set; } // Optional - can be auto-assigned
+
+        [Required]
+        public ChatType ChatType { get; set; } = ChatType.Support; // Support, Sales, or Maintenance
     }
 
     public class AssignConversationDTO
@@ -48,11 +54,15 @@ namespace SoitMed.DTO
         public long ConversationId { get; set; }
         public string SenderId { get; set; } = string.Empty;
         public string? SenderName { get; set; }
-        public string MessageType { get; set; } = "Text"; // "Text" or "Voice"
+        public string MessageType { get; set; } = "Text"; // "Text", "Voice", or "Image"
         public string? Content { get; set; }
         public string? VoiceFilePath { get; set; }
         public string? VoiceFileUrl { get; set; } // Full URL for accessing the file
         public int? VoiceDuration { get; set; }
+        public string? ImageFilePath { get; set; }
+        public string? ImageFileUrl { get; set; } // Full URL for accessing the image
+        public string? ImageFileName { get; set; }
+        public long? ImageFileSize { get; set; }
         public bool IsRead { get; set; }
         public DateTime? ReadAt { get; set; }
         public DateTime CreatedAt { get; set; }

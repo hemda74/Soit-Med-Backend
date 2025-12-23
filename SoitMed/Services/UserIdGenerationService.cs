@@ -17,7 +17,7 @@ namespace SoitMed.Services
 
         /// <summary>
         /// Generates a unique user ID in the format: FirstName_LastName_DepartmentName_Number
-        /// For users/technicians, uses Hospital name instead of Department name
+        /// For users/Technicians, uses Hospital name instead of Department name
         /// </summary>
         public async Task<string> GenerateUserIdAsync(string firstName, string lastName, string role, int? departmentId = null, string? hospitalId = null)
         {
@@ -30,7 +30,7 @@ namespace SoitMed.Services
             // Determine organization name based on role
             if (role == "Doctor" || role == "Technician")
             {
-                // For doctors and technicians, use hospital name
+                // For Doctors and Technicians, use hospital name
                 if (string.IsNullOrEmpty(hospitalId))
                 {
                     throw new ArgumentException("Hospital ID is required for Doctor and Technician roles");

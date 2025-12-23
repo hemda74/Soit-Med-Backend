@@ -76,10 +76,10 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<bool> IsHospitalAssignedToDoctorAsync(string hospitalId, int doctorId, CancellationToken cancellationToken = default)
+        public async Task<bool> IsHospitalAssignedToDoctorAsync(string hospitalId, int DoctorId, CancellationToken cancellationToken = default)
         {
             return await _context.DoctorHospitals
-                .AnyAsync(dh => dh.HospitalId == hospitalId && dh.DoctorId == doctorId && dh.IsActive, cancellationToken);
+                .AnyAsync(dh => dh.HospitalId == hospitalId && dh.DoctorId == DoctorId && dh.IsActive, cancellationToken);
         }
     }
 }

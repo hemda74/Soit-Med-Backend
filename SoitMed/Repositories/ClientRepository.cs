@@ -36,9 +36,9 @@ namespace SoitMed.Repositories
             }
 
             // Filter by assigned salesman
-            if (!string.IsNullOrWhiteSpace(searchDto.AssignedSalesmanId))
+            if (!string.IsNullOrWhiteSpace(searchDto.AssignedSalesManId))
             {
-                baseQuery = baseQuery.Where(c => c.AssignedTo == searchDto.AssignedSalesmanId);
+                baseQuery = baseQuery.Where(c => c.AssignedTo == searchDto.AssignedSalesManId);
             }
 
             // Filter by city

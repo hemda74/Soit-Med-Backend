@@ -40,7 +40,7 @@ namespace SoitMed.Models
         public string Status { get; set; } = VisitStatusConstants.Completed;
 
         [Required]
-        public string SalesmanId { get; set; } = string.Empty;
+        public string SalesManId { get; set; } = string.Empty;
 
         [MaxLength(2000)]
         public string? Attachments { get; set; } // JSON array of file paths

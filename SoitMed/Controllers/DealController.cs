@@ -33,7 +33,7 @@ namespace SoitMed.Controllers
         /// Create new deal
         /// </summary>
         [HttpPost]
-        [Authorize(Roles = "Salesman,SalesManager")]
+        [Authorize(Roles = "SalesMan,SalesManager")]
         public async Task<IActionResult> CreateDeal([FromBody] CreateDealDTO createDto)
         {
             try
@@ -64,7 +64,7 @@ namespace SoitMed.Controllers
         /// Get all deals
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin,Admin,admin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin,Admin")]
         public async Task<IActionResult> GetDeals([FromQuery] string? status = null, [FromQuery] string? salesmanId = null)
         {
             try
@@ -87,7 +87,7 @@ namespace SoitMed.Controllers
         /// Get deal by ID
         /// </summary>
         [HttpGet("{id}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin,Admin,admin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin,Admin")]
         public async Task<IActionResult> GetDeal(long id)
         {
             try
@@ -108,8 +108,8 @@ namespace SoitMed.Controllers
                 var userRoles = await UserManager.GetRolesAsync(user);
                 var userRole = userRoles.Contains("SuperAdmin") ? "SuperAdmin" 
                     : userRoles.Contains("SalesManager") ? "SalesManager"
-                    : userRoles.Contains("Salesman") ? "Salesman"
-                    : "Salesman"; // Default fallback
+                    : userRoles.Contains("SalesMan") ? "SalesMan"
+                    : "SalesMan"; // Default fallback
                 
                 _logger.LogInformation("GetDeal - UserId: {UserId}, UserName: {UserName}, Roles: [{Roles}], UserRole: {UserRole}, DealId: {DealId}",
                     userId, user.UserName, string.Join(", ", userRoles), userRole, id);
@@ -139,7 +139,7 @@ namespace SoitMed.Controllers
         /// Get deals by client
         /// </summary>
         [HttpGet("by-client/{clientId}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin,Admin,admin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin,Admin")]
         public async Task<IActionResult> GetDealsByClient(long clientId)
         {
             try
@@ -166,15 +166,15 @@ namespace SoitMed.Controllers
         /// <summary>
         /// Get deals by salesman
         /// </summary>
-        [HttpGet("by-salesman/{salesmanId}")]
+        [HttpGet("by-SalesMan/{salesmanId}")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> GetDealsBySalesman(string salesmanId, [FromQuery] string? status = null)
+        public async Task<IActionResult> GetDealsBySalesMan(string salesmanId, [FromQuery] string? status = null)
         {
             try
             {
-                var result = await _dealService.GetDealsBySalesmanAsync(salesmanId);
+                var result = await _dealService.GetDealsBySalesManAsync(salesmanId);
 
-                return Ok(ResponseHelper.CreateSuccessResponse(result, "Salesman deals retrieved successfully"));
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "SalesMan deals retrieved successfully"));
             }
             catch (Exception ex)
             {
@@ -217,7 +217,7 @@ namespace SoitMed.Controllers
         /// <summary>
         /// SuperAdmin approval for deal
         /// </summary>
-        [HttpPost("{id}/superadmin-approval")]
+        [HttpPost("{id}/superAdmin-approval")]
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> SuperAdminApproval(long id, [FromBody] ApproveDealDTO approvalDto)
         {
@@ -268,7 +268,7 @@ namespace SoitMed.Controllers
         /// <summary>
         /// Get pending SuperAdmin approvals
         /// </summary>
-        [HttpGet("pending-superadmin-approvals")]
+        [HttpGet("pending-superAdmin-approvals")]
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> GetPendingSuperAdminApprovals()
         {
@@ -351,7 +351,7 @@ namespace SoitMed.Controllers
         /// Mark client account as created (by Admin)
         /// </summary>
         [HttpPost("{id}/mark-account-created")]
-        [Authorize(Roles = "Admin,admin,SuperAdmin")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> MarkClientAccountCreated(long id)
         {
             try
@@ -382,8 +382,8 @@ namespace SoitMed.Controllers
         /// Submit salesman report
         /// </summary>
         [HttpPost("{id}/submit-report")]
-        [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> SubmitSalesmanReport(long id, [FromBody] SubmitReportDTO reportDto)
+        [Authorize(Roles = "SalesMan")]
+        public async Task<IActionResult> SubmitSalesManReport(long id, [FromBody] SubmitReportDTO reportDto)
         {
             try
             {
@@ -393,7 +393,7 @@ namespace SoitMed.Controllers
                 }
 
                 var userId = GetCurrentUserId();
-                var result = await _dealService.SubmitSalesmanReportAsync(id, reportDto.ReportText, reportDto.ReportAttachments, userId);
+                var result = await _dealService.SubmitSalesManReportAsync(id, reportDto.ReportText, reportDto.ReportAttachments, userId);
 
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Report submitted successfully"));
             }
@@ -436,6 +436,144 @@ namespace SoitMed.Controllers
             {
                 _logger.LogError(ex, "Error retrieving legal deals");
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving legal deals"));
+            }
+        }
+
+        /// <summary>
+        /// Submit first salesman review
+        /// </summary>
+        [HttpPost("{id}/submit-first-review")]
+        [Authorize(Roles = "SalesMan")]
+        public async Task<IActionResult> SubmitFirstSalesManReview(long id, [FromBody] SubmitReviewDTO reviewDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                }
+
+                var userId = GetCurrentUserId();
+                var result = await _dealService.SubmitFirstSalesManReviewAsync(id, reviewDto.ReviewText, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "First review submitted successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for submitting first review");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for submitting first review");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access for submitting first review");
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting first review");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while submitting first review"));
+            }
+        }
+
+        /// <summary>
+        /// Submit second salesman review
+        /// </summary>
+        [HttpPost("{id}/submit-second-review")]
+        [Authorize(Roles = "SalesMan")]
+        public async Task<IActionResult> SubmitSecondSalesManReview(long id, [FromBody] SubmitReviewDTO reviewDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                }
+
+                var userId = GetCurrentUserId();
+                var result = await _dealService.SubmitSecondSalesManReviewAsync(id, reviewDto.ReviewText, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Second review submitted successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for submitting second review");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for submitting second review");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access for submitting second review");
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting second review");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while submitting second review"));
+            }
+        }
+
+        /// <summary>
+        /// Set client username and password (by Admin)
+        /// </summary>
+        [HttpPost("{id}/set-credentials")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
+        public async Task<IActionResult> SetClientCredentials(long id, [FromBody] SetClientCredentialsDTO credentialsDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                }
+
+                var userId = GetCurrentUserId();
+                var result = await _dealService.SetClientCredentialsAsync(id, credentialsDto.Username, credentialsDto.Password, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Client credentials set successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for setting credentials");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for setting credentials");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting client credentials");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while setting client credentials"));
+            }
+        }
+
+        /// <summary>
+        /// Get deals awaiting reviews and account setup
+        /// </summary>
+        [HttpGet("awaiting-reviews-and-setup")]
+        [Authorize(Roles = "SalesMan,Admin,SuperAdmin")]
+        public async Task<IActionResult> GetDealsAwaitingReviewsAndAccountSetup()
+        {
+            try
+            {
+                var result = await _dealService.GetDealsAwaitingReviewsAndAccountSetupAsync();
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Deals retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving deals awaiting reviews and account setup");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving deals"));
             }
         }
     }

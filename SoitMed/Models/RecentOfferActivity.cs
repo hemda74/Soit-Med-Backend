@@ -24,7 +24,7 @@ namespace SoitMed.Models
         public string? ClientName { get; set; }
         
         [MaxLength(200)]
-        public string? SalesmanName { get; set; }
+        public string? SalesManName { get; set; }
         
         [Column(TypeName = "decimal(18,2)")]
         public decimal TotalAmount { get; set; }

@@ -69,8 +69,8 @@ namespace SoitMed.Repositories
         IInstallmentPlanRepository InstallmentPlans { get; }
         IRecentOfferActivityRepository RecentOfferActivities { get; }
 
-        // Salesman targets repository
-        ISalesmanTargetRepository SalesmanTargets { get; }
+        // SalesMan targets repository
+        ISalesManTargetRepository SalesManTargets { get; }
 
         // Products catalog repositories
         IProductRepository Products { get; }

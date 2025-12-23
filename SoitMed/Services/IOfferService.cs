@@ -13,13 +13,13 @@ namespace SoitMed.Services
         Task<OfferResponseDTO> CreateOfferWithItemsAsync(CreateOfferWithItemsDTO createOfferDto, string userId);
         Task<OfferResponseDTO?> GetOfferAsync(long offerId);
         Task<List<OfferResponseDTO>> GetOffersByClientAsync(long clientId);
-        Task<List<OfferResponseDTO>> GetOffersBySalesmanAsync(string salesmanId);
+        Task<List<OfferResponseDTO>> GetOffersBySalesManAsync(string salesmanId);
         Task<List<OfferResponseDTO>> GetOffersByStatusAsync(string status);
         Task<List<OfferResponseDTO>> GetOffersByCreatorAsync(string creatorId);
         Task<PaginatedOffersResponseDTO> GetAllOffersWithFiltersAsync(string? status, string? salesmanId, int page, int pageSize, DateTime? startDate, DateTime? endDate);
         Task<OfferResponseDTO> UpdateOfferAsync(long offerId, CreateOfferDTO updateOfferDto, string userId);
         Task<OfferResponseDTO> UpdateOfferBySalesManagerAsync(long offerId, UpdateOfferDTO updateDto, string userId);
-        Task<OfferResponseDTO> SendToSalesmanAsync(long offerId, string userId);
+        Task<OfferResponseDTO> SendToSalesManAsync(long offerId, string userId);
         Task<OfferResponseDTO> RecordClientResponseAsync(long offerId, string response, bool accepted, string userId);
         Task<OfferResponseDTO> CompleteOfferAsync(long offerId, string? completionNotes, string userId);
         Task<OfferResponseDTO> MarkAsNeedsModificationAsync(long offerId, string? reason, string userId);
@@ -28,7 +28,7 @@ namespace SoitMed.Services
         Task<int> UpdateExpiredOffersAsync();
         Task<List<OfferActivityDTO>> GetRecentActivityAsync(int limit = 20);
         Task<bool> DeleteOfferAsync(long offerId, string userId);
-        Task<OfferResponseDTO> AssignOfferToSalesmanAsync(long offerId, string salesmanId, string userId);
+        Task<OfferResponseDTO> AssignOfferToSalesManAsync(long offerId, string salesmanId, string userId);
         Task<OfferResponseDTO> SalesManagerApprovalAsync(long offerId, ApproveOfferDTO approvalDto, string salesManagerId);
         Task<List<OfferResponseDTO>> GetPendingSalesManagerApprovalsAsync();
         #endregion

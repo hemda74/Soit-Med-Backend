@@ -44,14 +44,15 @@ namespace SoitMed.Controllers
         /// Get all products with optional filters
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin,Doctor")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin,Doctor")]
         public async Task<IActionResult> GetAllProducts(
             [FromQuery] string? category = null,
+            [FromQuery] long? categoryId = null,
             [FromQuery] bool? inStock = null)
         {
             try
             {
-                var result = await _productService.GetAllProductsAsync(category, inStock);
+                var result = await _productService.GetAllProductsAsync(category, categoryId, inStock);
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Products retrieved successfully"));
             }
             catch (Exception ex)
@@ -65,7 +66,7 @@ namespace SoitMed.Controllers
         /// Get product by ID
         /// </summary>
         [HttpGet("{id}")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin,Doctor")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin,Doctor")]
         public async Task<IActionResult> GetProduct(long id)
         {
             try
@@ -88,7 +89,7 @@ namespace SoitMed.Controllers
         /// Get products by category
         /// </summary>
         [HttpGet("category/{category}")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin,Doctor")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin,Doctor")]
         public async Task<IActionResult> GetProductsByCategory(string category)
         {
             try
@@ -107,7 +108,7 @@ namespace SoitMed.Controllers
         /// Search products by name, model, provider, or description
         /// </summary>
         [HttpGet("search")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin,Doctor")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin,Doctor")]
         public async Task<IActionResult> SearchProducts([FromQuery] string q)
         {
             try

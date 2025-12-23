@@ -14,12 +14,12 @@ namespace SoitMed.Repositories
 
         // Hospital repositories
         private IHospitalRepository? _hospitals;
-        private IDoctorRepository? _doctors;
-        private ITechnicianRepository? _technicians;
-        private IDoctorHospitalRepository? _doctorHospitals;
+        private IDoctorRepository? _Doctors;
+        private ITechnicianRepository? _Technicians;
+        private IDoctorHospitalRepository? _DoctorHospitals;
 
         // Location repositories
-        private IEngineerRepository? _engineers;
+        private IEngineerRepository? _Engineers;
         private IGovernorateRepository? _governorates;
 
         // Equipment repositories
@@ -74,8 +74,8 @@ namespace SoitMed.Repositories
         private IInstallmentPlanRepository? _installmentPlans;
         private IRecentOfferActivityRepository? _recentOfferActivities;
 
-        // Salesman targets repository
-        private ISalesmanTargetRepository? _salesmanTargets;
+        // SalesMan targets repository
+        private ISalesManTargetRepository? _salesmanTargets;
 
         // Products catalog repositories
         private IProductRepository? _products;
@@ -99,17 +99,17 @@ namespace SoitMed.Repositories
             _hospitals ??= new HospitalRepository(_context);
 
         public IDoctorRepository Doctors => 
-            _doctors ??= new DoctorRepository(_context);
+            _Doctors ??= new DoctorRepository(_context);
 
         public ITechnicianRepository Technicians => 
-            _technicians ??= new TechnicianRepository(_context);
+            _Technicians ??= new TechnicianRepository(_context);
 
         public IDoctorHospitalRepository DoctorHospitals => 
-            _doctorHospitals ??= new DoctorHospitalRepository(_context);
+            _DoctorHospitals ??= new DoctorHospitalRepository(_context);
 
         // Location repositories
         public IEngineerRepository Engineers => 
-            _engineers ??= new EngineerRepository(_context);
+            _Engineers ??= new EngineerRepository(_context);
 
         public IGovernorateRepository Governorates => 
             _governorates ??= new GovernorateRepository(_context);
@@ -215,8 +215,8 @@ namespace SoitMed.Repositories
         public IRecentOfferActivityRepository RecentOfferActivities => 
             _recentOfferActivities ??= new RecentOfferActivityRepository(_context);
 
-        public ISalesmanTargetRepository SalesmanTargets => 
-            _salesmanTargets ??= new SalesmanTargetRepository(_context);
+        public ISalesManTargetRepository SalesManTargets => 
+            _salesmanTargets ??= new SalesManTargetRepository(_context);
 
         public IProductRepository Products => 
             _products ??= new ProductRepository(_context);

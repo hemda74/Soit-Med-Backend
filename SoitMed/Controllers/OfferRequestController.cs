@@ -33,7 +33,7 @@ namespace SoitMed.Controllers
         /// Create new offer request
         /// </summary>
         [HttpPost]
-        [Authorize(Roles = "Salesman,SalesManager,Customer,Doctor,Technician")]
+        [Authorize(Roles = "SalesMan,SalesManager,Customer,Doctor,Technician")]
         public async Task<IActionResult> CreateOfferRequest([FromBody] CreateOfferRequestDTO createDto)
         {
             try
@@ -64,7 +64,7 @@ namespace SoitMed.Controllers
         /// Get all offer requests
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "Salesman,SalesManager,SalesSupport,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SalesSupport,SuperAdmin")]
         public async Task<IActionResult> GetOfferRequests([FromQuery] string? status = null, [FromQuery] string? requestedBy = null)
         {
             try
@@ -87,13 +87,13 @@ namespace SoitMed.Controllers
         /// Get offer request by ID
         /// </summary>
         [HttpGet("{id}")]
-        [Authorize(Roles = "Salesman,SalesManager,SalesSupport,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SalesSupport,SuperAdmin")]
         public async Task<IActionResult> GetOfferRequest(long id)
         {
             try
             {
                 var userId = GetCurrentUserId();
-                var userRole = "Salesman"; // This should be replaced with actual role checking
+                var userRole = "SalesMan"; // This should be replaced with actual role checking
                 
                 var result = await _offerRequestService.GetOfferRequestAsync(id, userId, userRole);
 
@@ -182,15 +182,15 @@ namespace SoitMed.Controllers
         /// <summary>
         /// Get offer requests by salesman
         /// </summary>
-        [HttpGet("salesman/{salesmanId}")]
+        [HttpGet("SalesMan/{salesmanId}")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> GetOfferRequestsBySalesman(string salesmanId, [FromQuery] string? status = null)
+        public async Task<IActionResult> GetOfferRequestsBySalesMan(string salesmanId, [FromQuery] string? status = null)
         {
             try
             {
-                var result = await _offerRequestService.GetOfferRequestsBySalesmanAsync(salesmanId, status);
+                var result = await _offerRequestService.GetOfferRequestsBySalesManAsync(salesmanId, status);
 
-                return Ok(ResponseHelper.CreateSuccessResponse(result, "Salesman offer requests retrieved successfully"));
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "SalesMan offer requests retrieved successfully"));
             }
             catch (Exception ex)
             {
@@ -223,13 +223,13 @@ namespace SoitMed.Controllers
         /// Get my own offer requests (for salesmen)
         /// </summary>
         [HttpGet("my-requests")]
-        [Authorize(Roles = "Salesman,SalesManager")]
+        [Authorize(Roles = "SalesMan,SalesManager")]
         public async Task<IActionResult> GetMyOfferRequests([FromQuery] string? status = null)
         {
             try
             {
                 var userId = GetCurrentUserId();
-                var result = await _offerRequestService.GetOfferRequestsBySalesmanAsync(userId, status);
+                var result = await _offerRequestService.GetOfferRequestsBySalesManAsync(userId, status);
 
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "My offer requests retrieved successfully"));
             }

@@ -83,8 +83,8 @@ namespace SoitMed.Models
         public DbSet<InstallmentPlan> InstallmentPlans { get; set; }
         public DbSet<RecentOfferActivity> RecentOfferActivities { get; set; }
         
-        // Salesman targets and statistics
-        public DbSet<SalesmanTarget> SalesmanTargets { get; set; }
+        // SalesMan targets and statistics
+        public DbSet<SalesManTarget> SalesManTargets { get; set; }
         
         // Products catalog
         public DbSet<Product> Products { get; set; }
@@ -239,7 +239,7 @@ namespace SoitMed.Models
                 .Property(rr => rr.RepairCost)
                 .HasPrecision(18, 2);
 
-            // Ensure either doctor or technician is specified (not both)
+            // Ensure either Doctor or Technician is specified (not both)
             modelBuilder.Entity<RepairRequest>()
                 .ToTable(t => t.HasCheckConstraint("CK_RepairRequest_Requestor", 
                     "(DoctorId IS NOT NULL AND TechnicianId IS NULL) OR (DoctorId IS NULL AND TechnicianId IS NOT NULL)"));
@@ -432,7 +432,7 @@ namespace SoitMed.Models
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<SalesOffer>()
-                .HasOne(so => so.Salesman)
+                .HasOne(so => so.SalesMan)
                 .WithMany()
                 .HasForeignKey(so => so.AssignedTo)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -452,9 +452,9 @@ namespace SoitMed.Models
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<SalesDeal>()
-                .HasOne(sd => sd.Salesman)
+                .HasOne(sd => sd.SalesMan)
                 .WithMany()
-                .HasForeignKey(sd => sd.SalesmanId)
+                .HasForeignKey(sd => sd.SalesManId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<SalesDeal>()
@@ -484,7 +484,7 @@ namespace SoitMed.Models
                 .HasIndex(roa => roa.ActivityTimestamp);
 
             modelBuilder.Entity<SalesDeal>()
-                .HasIndex(sd => new { sd.Status, sd.SalesmanId });
+                .HasIndex(sd => new { sd.Status, sd.SalesManId });
 
             modelBuilder.Entity<SalesDeal>()
                 .HasIndex(sd => new { sd.Status, sd.ManagerApprovedBy });
@@ -514,22 +514,22 @@ namespace SoitMed.Models
                 .HasForeignKey(ip => ip.OfferId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // SalesmanTarget relationships
-            modelBuilder.Entity<SalesmanTarget>()
+            // SalesManTarget relationships
+            modelBuilder.Entity<SalesManTarget>()
                 .HasOne(st => st.Manager)
                 .WithMany()
                 .HasForeignKey(st => st.CreatedByManagerId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<SalesmanTarget>()
-                .HasOne(st => st.Salesman)
+            modelBuilder.Entity<SalesManTarget>()
+                .HasOne(st => st.SalesMan)
                 .WithMany()
-                .HasForeignKey(st => st.SalesmanId)
+                .HasForeignKey(st => st.SalesManId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Index for efficient queries
-            modelBuilder.Entity<SalesmanTarget>()
-                .HasIndex(st => new { st.SalesmanId, st.Year, st.Quarter })
+            modelBuilder.Entity<SalesManTarget>()
+                .HasIndex(st => new { st.SalesManId, st.Year, st.Quarter })
                 .IsUnique();
 
             // Product catalog indexes for efficient searching

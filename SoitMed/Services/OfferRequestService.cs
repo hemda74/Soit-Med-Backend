@@ -200,7 +200,7 @@ namespace SoitMed.Services
                     _logger.LogInformation("Starting notification process for assigned SalesSupport user");
                     
                     var salesman = await _unitOfWork.Users.GetByIdAsync(userId);
-                    var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Salesman";
+                    var salesmanName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "SalesMan";
                     
                     var notificationTitle = "New Offer Request";
                     var notificationMessage = $"{salesmanName} requested an offer for client: {client.Name}";
@@ -317,7 +317,7 @@ namespace SoitMed.Services
                 {
                     query = query.Where(or => or.AssignedTo == userId);
                 }
-                else if (userRole == "Salesman")
+                else if (userRole == "SalesMan")
                 {
                     query = query.Where(or => or.RequestedBy == userId);
                 }
@@ -340,7 +340,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<List<OfferRequestResponseDTO>> GetOfferRequestsBySalesmanAsync(string salesmanId, string? status)
+        public async Task<List<OfferRequestResponseDTO>> GetOfferRequestsBySalesManAsync(string salesmanId, string? status)
         {
             try
             {
@@ -560,7 +560,7 @@ namespace SoitMed.Services
                 var user = await _unitOfWork.Users.GetByIdAsync(userId);
                 if (user != null)
                 {
-                    var userRoles = new List<string> { "Salesman" }; // This should be replaced with actual role checking
+                    var userRoles = new List<string> { "SalesMan" }; // This should be replaced with actual role checking
                     if (userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin"))
                         return true;
                 }

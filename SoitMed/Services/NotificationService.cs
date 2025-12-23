@@ -254,7 +254,7 @@ namespace SoitMed.Services
                 OfferId = offerId,
                 DealId = dealId,
                 RequestType = requestType,
-                FromRole = "Salesman",
+                FromRole = "SalesMan",
                 ToRole = toRole,
                 FromUserId = fromUserId,
                 Status = RequestStatus.Pending,

@@ -2,6 +2,7 @@ using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Hospital;
 using SoitMed.Repositories;
+using SoitMed.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,8 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize]
+        [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin")]
         public async Task<IActionResult> GetHospitals()
         {
             var hospitals = await _unitOfWork.Hospitals.GetActiveHospitalsAsync();
@@ -42,7 +44,8 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet("{hospitalId}")]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize]
+        [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin")]
         public async Task<IActionResult> GetHospital(string hospitalId)
         {
             var hospital = await _unitOfWork.Hospitals.GetHospitalWithAllDetailsAsync(hospitalId);
@@ -139,7 +142,7 @@ namespace SoitMed.Controllers
 
             if (hospital.DoctorHospitals.Any(dh => dh.IsActive) || hospital.Technicians.Any())
             {
-                return BadRequest($"Cannot delete hospital '{hospital.Name}' because it has {hospital.DoctorHospitals.Count(dh => dh.IsActive)} doctors and {hospital.Technicians.Count()} technicians assigned to it");
+                return BadRequest($"Cannot delete hospital '{hospital.Name}' because it has {hospital.DoctorHospitals.Count(dh => dh.IsActive)} Doctors and {hospital.Technicians.Count()} Technicians assigned to it");
             }
 
             await _unitOfWork.Hospitals.DeleteAsync(hospital);
@@ -149,9 +152,9 @@ namespace SoitMed.Controllers
         }
 
         // Doctor management endpoints
-        [HttpPost("{hospitalId}/doctors")]
+        [HttpPost("{hospitalId}/Doctors")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> AddDoctor(string hospitalId, DoctorDTO doctorDTO)
+        public async Task<IActionResult> AddDoctor(string hospitalId, DoctorDTO DoctorDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -164,34 +167,34 @@ namespace SoitMed.Controllers
                 return NotFound($"Hospital with ID {hospitalId} not found");
             }
 
-            var doctor = new Doctor
+            var Doctor = new Doctor
             {
-                Name = doctorDTO.Name,
-                Specialty = doctorDTO.Specialty,
-                UserId = doctorDTO.UserId,
+                Name = DoctorDTO.Name,
+                Specialty = DoctorDTO.Specialty,
+                UserId = DoctorDTO.UserId,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            await _unitOfWork.Doctors.CreateAsync(doctor);
+            await _unitOfWork.Doctors.CreateAsync(Doctor);
             await _unitOfWork.SaveChangesAsync();
 
             // Create the many-to-many relationship
-            var doctorHospital = new DoctorHospital
+            var DoctorHospital = new DoctorHospital
             {
-                DoctorId = doctor.DoctorId,
+                DoctorId = Doctor.DoctorId,
                 HospitalId = hospitalId,
                 AssignedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            await _unitOfWork.DoctorHospitals.CreateAsync(doctorHospital);
+            await _unitOfWork.DoctorHospitals.CreateAsync(DoctorHospital);
             await _unitOfWork.SaveChangesAsync();
 
-            return Ok($"Doctor '{doctor.Name}' added to hospital '{hospital.Name}' successfully");
+            return Ok($"Doctor '{Doctor.Name}' added to hospital '{hospital.Name}' successfully");
         }
 
-        [HttpGet("{hospitalId}/doctors")]
+        [HttpGet("{hospitalId}/Doctors")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetHospitalDoctors(string hospitalId)
         {
@@ -202,7 +205,7 @@ namespace SoitMed.Controllers
                 return NotFound($"Hospital with ID {hospitalId} not found");
             }
 
-            var doctors = hospital.DoctorHospitals
+            var Doctors = hospital.DoctorHospitals
                 .Where(dh => dh.IsActive)
                 .Select(dh => new
                 {
@@ -218,15 +221,15 @@ namespace SoitMed.Controllers
             return Ok(new
             {
                 Hospital = hospital.Name,
-                DoctorCount = doctors.Count(),
-                Doctors = doctors
+                DoctorCount = Doctors.Count(),
+                Doctors = Doctors
             });
         }
 
         // Many-to-many relationship management endpoints
-        [HttpPost("{hospitalId}/doctors/{doctorId}")]
+        [HttpPost("{hospitalId}/Doctors/{DoctorId}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> AssignDoctorToHospital(string hospitalId, int doctorId)
+        public async Task<IActionResult> AssignDoctorToHospital(string hospitalId, int DoctorId)
         {
             var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(hospitalId);
             if (hospital == null)
@@ -234,62 +237,62 @@ namespace SoitMed.Controllers
                 return NotFound($"Hospital with ID {hospitalId} not found");
             }
 
-            var doctor = await _unitOfWork.Doctors.GetByIdAsync(doctorId);
-            if (doctor == null)
+            var Doctor = await _unitOfWork.Doctors.GetByIdAsync(DoctorId);
+            if (Doctor == null)
             {
-                return NotFound($"Doctor with ID {doctorId} not found");
+                return NotFound($"Doctor with ID {DoctorId} not found");
             }
 
             // Check if already assigned
-            if (await _unitOfWork.Doctors.IsDoctorAssignedToHospitalAsync(doctorId, hospitalId))
+            if (await _unitOfWork.Doctors.IsDoctorAssignedToHospitalAsync(DoctorId, hospitalId))
             {
-                return BadRequest($"Doctor '{doctor.Name}' is already assigned to hospital '{hospital.Name}'");
+                return BadRequest($"Doctor '{Doctor.Name}' is already assigned to hospital '{hospital.Name}'");
             }
 
-            var doctorHospital = new DoctorHospital
+            var DoctorHospital = new DoctorHospital
             {
-                DoctorId = doctorId,
+                DoctorId = DoctorId,
                 HospitalId = hospitalId,
                 AssignedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            await _unitOfWork.DoctorHospitals.CreateAsync(doctorHospital);
+            await _unitOfWork.DoctorHospitals.CreateAsync(DoctorHospital);
             await _unitOfWork.SaveChangesAsync();
 
-            return Ok($"Doctor '{doctor.Name}' assigned to hospital '{hospital.Name}' successfully");
+            return Ok($"Doctor '{Doctor.Name}' assigned to hospital '{hospital.Name}' successfully");
         }
 
-        [HttpDelete("{hospitalId}/doctors/{doctorId}")]
+        [HttpDelete("{hospitalId}/Doctors/{DoctorId}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> RemoveDoctorFromHospital(string hospitalId, int doctorId)
+        public async Task<IActionResult> RemoveDoctorFromHospital(string hospitalId, int DoctorId)
         {
-            var doctorHospital = await _unitOfWork.DoctorHospitals
-                .FirstOrDefaultAsync(dh => dh.DoctorId == doctorId && dh.HospitalId == hospitalId && dh.IsActive);
+            var DoctorHospital = await _unitOfWork.DoctorHospitals
+                .FirstOrDefaultAsync(dh => dh.DoctorId == DoctorId && dh.HospitalId == hospitalId && dh.IsActive);
 
-            if (doctorHospital == null)
+            if (DoctorHospital == null)
             {
-                return NotFound($"Doctor with ID {doctorId} is not assigned to hospital with ID {hospitalId}");
+                return NotFound($"Doctor with ID {DoctorId} is not assigned to hospital with ID {hospitalId}");
             }
 
-            doctorHospital.IsActive = false;
-            await _unitOfWork.DoctorHospitals.UpdateAsync(doctorHospital);
+            DoctorHospital.IsActive = false;
+            await _unitOfWork.DoctorHospitals.UpdateAsync(DoctorHospital);
             await _unitOfWork.SaveChangesAsync();
 
             return Ok($"Doctor removed from hospital successfully");
         }
 
-        [HttpGet("doctors/{doctorId}/hospitals")]
+        [HttpGet("Doctors/{DoctorId}/hospitals")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> GetDoctorHospitals(int doctorId)
+        public async Task<IActionResult> GetDoctorHospitals(int DoctorId)
         {
-            var doctor = await _unitOfWork.Doctors.GetDoctorWithHospitalsAsync(doctorId);
-            if (doctor == null)
+            var Doctor = await _unitOfWork.Doctors.GetDoctorWithHospitalsAsync(DoctorId);
+            if (Doctor == null)
             {
-                return NotFound($"Doctor with ID {doctorId} not found");
+                return NotFound($"Doctor with ID {DoctorId} not found");
             }
 
-            var hospitals = doctor.DoctorHospitals
+            var hospitals = Doctor.DoctorHospitals
                 .Where(dh => dh.IsActive)
                 .Select(dh => new HospitalSimpleDTO
                 {
@@ -302,9 +305,9 @@ namespace SoitMed.Controllers
             {
                 Doctor = new
                 {
-                    doctor.DoctorId,
-                    doctor.Name,
-                    doctor.Specialty
+                    Doctor.DoctorId,
+                    Doctor.Name,
+                    Doctor.Specialty
                 },
                 HospitalCount = hospitals.Count(),
                 Hospitals = hospitals
@@ -312,9 +315,9 @@ namespace SoitMed.Controllers
         }
 
         // Technician management endpoints
-        [HttpPost("{hospitalId}/technicians")]
+        [HttpPost("{hospitalId}/Technicians")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> AddTechnician(string hospitalId, TechnicianDTO technicianDTO)
+        public async Task<IActionResult> AddTechnician(string hospitalId, TechnicianDTO TechnicianDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -327,23 +330,23 @@ namespace SoitMed.Controllers
                 return NotFound($"Hospital with ID {hospitalId} not found");
             }
 
-            var technician = new Technician
+            var Technician = new Technician
             {
-                Name = technicianDTO.Name,
-                Department = technicianDTO.Department,
+                Name = TechnicianDTO.Name,
+                Department = TechnicianDTO.Department,
                 HospitalId = hospitalId,
-                UserId = technicianDTO.UserId,
+                UserId = TechnicianDTO.UserId,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            await _unitOfWork.Technicians.CreateAsync(technician);
+            await _unitOfWork.Technicians.CreateAsync(Technician);
             await _unitOfWork.SaveChangesAsync();
 
-            return Ok($"Technician '{technician.Name}' added to hospital '{hospital.Name}' successfully");
+            return Ok($"Technician '{Technician.Name}' added to hospital '{hospital.Name}' successfully");
         }
 
-        [HttpGet("{hospitalId}/technicians")]
+        [HttpGet("{hospitalId}/Technicians")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetHospitalTechnicians(string hospitalId)
         {
@@ -354,7 +357,7 @@ namespace SoitMed.Controllers
                 return NotFound($"Hospital with ID {hospitalId} not found");
             }
 
-            var technicians = hospital.Technicians.Select(t => new
+            var Technicians = hospital.Technicians.Select(t => new
             {
                 t.TechnicianId,
                 t.Name,
@@ -367,8 +370,8 @@ namespace SoitMed.Controllers
             return Ok(new
             {
                 Hospital = hospital.Name,
-                TechnicianCount = technicians.Count(),
-                Technicians = technicians
+                TechnicianCount = Technicians.Count(),
+                Technicians = Technicians
             });
         }
     }

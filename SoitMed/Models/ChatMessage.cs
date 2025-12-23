@@ -21,7 +21,7 @@ namespace SoitMed.Models
 
         [Required]
         [MaxLength(20)]
-        public string MessageType { get; set; } = "Text"; // "Text" or "Voice"
+        public string MessageType { get; set; } = "Text"; // "Text", "Voice", or "Image"
 
         [MaxLength(2000)]
         public string? Content { get; set; } // Text message content
@@ -30,6 +30,14 @@ namespace SoitMed.Models
         public string? VoiceFilePath { get; set; } // Path to voice file
 
         public int? VoiceDuration { get; set; } // Duration in seconds
+
+        [MaxLength(500)]
+        public string? ImageFilePath { get; set; } // Path to image file
+
+        [MaxLength(500)]
+        public string? ImageFileName { get; set; } // Original image file name
+
+        public long? ImageFileSize { get; set; } // Image file size in bytes
 
         public bool IsRead { get; set; } = false;
 

@@ -21,10 +21,10 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<MaintenanceRequest>> GetByEngineerIdAsync(string engineerId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<MaintenanceRequest>> GetByEngineerIdAsync(string EngineerId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .Where(mr => mr.AssignedToEngineerId == engineerId && mr.IsActive)
+                .Where(mr => mr.AssignedToEngineerId == EngineerId && mr.IsActive)
                 .Include(mr => mr.Customer)
                 .Include(mr => mr.Equipment)
                 .OrderByDescending(mr => mr.CreatedAt)

@@ -85,7 +85,7 @@ namespace SoitMed.Controllers
             }
         }
 
-        [HttpGet("engineer/my-assigned")]
+        [HttpGet("Engineer/my-assigned")]
         [Authorize(Roles = "Engineer")]
         public async Task<IActionResult> GetMyAssignedRequests()
         {
@@ -100,7 +100,7 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting engineer requests");
+                _logger.LogError(ex, "Error getting Engineer requests");
                 return ErrorResponse(ex.Message);
             }
         }

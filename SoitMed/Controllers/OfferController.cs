@@ -2,11 +2,15 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using SoitMed.Common;
 using SoitMed.DTO;
+using SoitMed.Models;
 using SoitMed.Models.Identity;
+using SoitMed.Repositories;
 using SoitMed.Services;
 using System.IO;
+using System.Security.Claims;
 
 namespace SoitMed.Controllers
 {
@@ -20,21 +24,27 @@ namespace SoitMed.Controllers
     {
         private readonly IOfferService _offerService;
         private readonly IOfferEquipmentImageService _equipmentImageService;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<OfferController> _logger;
         private readonly IWebHostEnvironment _environment;
+        private readonly IOfferPdfService _pdfService;
 
         public OfferController(
             IOfferService offerService,
             IOfferEquipmentImageService equipmentImageService,
+            IUnitOfWork unitOfWork,
             ILogger<OfferController> logger,
             UserManager<ApplicationUser> userManager,
-            IWebHostEnvironment environment) 
+            IWebHostEnvironment environment,
+            IOfferPdfService pdfService) 
             : base(userManager)
         {
             _offerService = offerService;
             _equipmentImageService = equipmentImageService;
+            _unitOfWork = unitOfWork;
             _logger = logger;
             _environment = environment;
+            _pdfService = pdfService;
         }
 
         /// <summary>
@@ -46,7 +56,7 @@ namespace SoitMed.Controllers
         {
             try
             {
-                var salesmen = await UserManager.GetUsersInRoleAsync("Salesman");
+                var salesmen = await UserManager.GetUsersInRoleAsync("SalesMan");
 
                 if (!string.IsNullOrWhiteSpace(q))
                 {
@@ -174,12 +184,82 @@ namespace SoitMed.Controllers
         {
             try
             {
-                var userId = GetCurrentUserId();
-                
-                // Try to parse userId as clientId (for customers, their userId often maps to clientId)
-                if (!long.TryParse(userId, out var clientId))
+                // Get user ID directly from JWT token claim (same as other controllers)
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
                 {
-                    return BadRequest(ResponseHelper.CreateErrorResponse("Invalid user ID format"));
+                    return BadRequest(ResponseHelper.CreateErrorResponse("User ID not found"));
+                }
+
+                // Get current user to find their client record
+                var currentUser = await _unitOfWork.Users.GetByIdAsync(userId);
+                if (currentUser == null)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("User not found"));
+                }
+
+                long clientId = 0;
+                Client? client = null;
+
+                // Try to find client by customer's email (case-insensitive)
+                var context = _unitOfWork.GetContext();
+                if (!string.IsNullOrEmpty(currentUser.Email))
+                {
+                    var userEmailLower = currentUser.Email.ToLower();
+                    _logger.LogInformation("Searching for client record for customer user {UserId} with email {Email}", 
+                        userId, currentUser.Email);
+                    
+                    // Try to find by Client.Email first
+                    client = await context.Clients
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.Email) && 
+                                                  c.Email.ToLower() == userEmailLower);
+
+                    // If not found, try ContactPersonEmail
+                    if (client == null)
+                    {
+                        _logger.LogInformation("Client not found by Email, trying ContactPersonEmail for {Email}", currentUser.Email);
+                        client = await context.Clients
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.ContactPersonEmail) && 
+                                                      c.ContactPersonEmail.ToLower() == userEmailLower);
+                    }
+                }
+
+                if (client != null)
+                {
+                    clientId = client.Id;
+                    _logger.LogInformation("Found client record for customer user {UserId} by email {Email}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                        userId, currentUser.Email, clientId, client.Name);
+                }
+                else
+                {
+                    // Try to find by user's full name
+                    var userFullName = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
+                    if (!string.IsNullOrEmpty(userFullName))
+                    {
+                        _logger.LogInformation("Client not found by email, trying to find by name: {Name}", userFullName);
+                        var namePattern = $"%{userFullName}%";
+                        client = await context.Clients
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, namePattern) ||
+                                                      (c.ContactPerson != null && EF.Functions.Like(c.ContactPerson, namePattern)));
+
+                        if (client != null)
+                        {
+                            clientId = client.Id;
+                            _logger.LogInformation("Found client record for customer user {UserId} by name {Name}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                                userId, userFullName, clientId, client.Name);
+                        }
+                    }
+                }
+
+                // If still not found, return empty list with a message
+                if (client == null || clientId == 0)
+                {
+                    _logger.LogWarning("Client record not found for customer user {UserId}. Email: {Email}, Name: {Name}", 
+                        userId, currentUser.Email, $"{currentUser.FirstName} {currentUser.LastName}");
+                    return Ok(ResponseHelper.CreateSuccessResponse(new List<OfferResponseDTO>(), "No client record found. Please contact support to link your account to a client record."));
                 }
 
                 var result = await _offerService.GetOffersByClientAsync(clientId);
@@ -191,8 +271,10 @@ namespace SoitMed.Controllers
                 }
 
                 // Only return offers that have been sent to the client (status = "Sent" or later)
+                // Include all statuses that are visible to customers after the offer has been sent
                 result = result.Where(o => 
                     o.Status == "Sent" || 
+                    o.Status == "UnderReview" ||
                     o.Status == "Accepted" || 
                     o.Status == "Rejected" || 
                     o.Status == "Completed").ToList();
@@ -267,21 +349,136 @@ namespace SoitMed.Controllers
         /// Get offer by ID
         /// </summary>
         [HttpGet("{id}")]
-        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman,Customer")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,SalesMan,Customer,Doctor,Technician")]
         public async Task<IActionResult> GetOffer(long id)
         {
             try
             {
-                var result = await _offerService.GetOfferAsync(id);
-                
-                if (result == null)
-                    return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("User ID not found"));
+                }
 
-                return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer retrieved successfully"));
+                var userRole = GetCurrentUserRole();
+                
+                // For customer roles, validate they can access this offer
+                if (!string.IsNullOrEmpty(userRole) && 
+                    (userRole.Equals("Customer", StringComparison.OrdinalIgnoreCase) ||
+                     userRole.Equals("Doctor", StringComparison.OrdinalIgnoreCase) ||
+                     userRole.Equals("Technician", StringComparison.OrdinalIgnoreCase)))
+                {
+                    // Get current user to find their client record
+                    var currentUser = await _unitOfWork.Users.GetByIdAsync(userId);
+                    if (currentUser == null)
+                    {
+                        return BadRequest(ResponseHelper.CreateErrorResponse("User not found"));
+                    }
+
+                    long clientId = 0;
+                    Client? client = null;
+
+                    // Try to find client by customer's email (case-insensitive)
+                    var context = _unitOfWork.GetContext();
+                    if (!string.IsNullOrEmpty(currentUser.Email))
+                    {
+                        var userEmailLower = currentUser.Email.ToLower();
+                        _logger.LogInformation("Searching for client record for customer user {UserId} with email {Email}", 
+                            userId, currentUser.Email);
+                        
+                        // Try to find by Client.Email first
+                        client = await context.Clients
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.Email) && 
+                                                      c.Email.ToLower() == userEmailLower);
+
+                        // If not found, try ContactPersonEmail
+                        if (client == null)
+                        {
+                            _logger.LogInformation("Client not found by Email, trying ContactPersonEmail for {Email}", currentUser.Email);
+                            client = await context.Clients
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.ContactPersonEmail) && 
+                                                          c.ContactPersonEmail.ToLower() == userEmailLower);
+                        }
+                    }
+
+                    if (client != null)
+                    {
+                        clientId = client.Id;
+                        _logger.LogInformation("Found client record for customer user {UserId} by email {Email}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                            userId, currentUser.Email, clientId, client.Name);
+                    }
+                    else
+                    {
+                        // Try to find by user's full name
+                        var userFullName = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
+                        if (!string.IsNullOrEmpty(userFullName))
+                        {
+                            _logger.LogInformation("Client not found by email, trying to find by name: {Name}", userFullName);
+                            var namePattern = $"%{userFullName}%";
+                            client = await context.Clients
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, namePattern) ||
+                                                          (c.ContactPerson != null && EF.Functions.Like(c.ContactPerson, namePattern)));
+
+                            if (client != null)
+                            {
+                                clientId = client.Id;
+                                _logger.LogInformation("Found client record for customer user {UserId} by name {Name}. ClientId: {ClientId}, ClientName: {ClientName}", 
+                                    userId, userFullName, clientId, client.Name);
+                            }
+                        }
+                    }
+
+                    if (clientId == 0)
+                    {
+                        _logger.LogWarning("Client record not found for customer user {UserId}. Email: {Email}, Name: {Name}", 
+                            userId, currentUser.Email, $"{currentUser.FirstName} {currentUser.LastName}");
+                        return BadRequest(ResponseHelper.CreateErrorResponse("Client record not found. Please contact support to link your account to a client record."));
+                    }
+
+                    // Get the offer and verify it belongs to this client
+                    var result = await _offerService.GetOfferAsync(id);
+                    
+                    if (result == null)
+                        return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
+
+                    // Verify the offer belongs to this client
+                    if (result.ClientId != clientId)
+                    {
+                        _logger.LogWarning("Customer {UserId} (ClientId: {ClientId}) attempted to access offer {OfferId} belonging to ClientId {OfferClientId}", 
+                            userId, clientId, id, result.ClientId);
+                        return Forbid();
+                    }
+
+                    // Only return offers that have been sent to the client
+                    if (result.Status != "Sent" && 
+                        result.Status != "Accepted" && 
+                        result.Status != "Rejected" && 
+                        result.Status != "Completed")
+                    {
+                        _logger.LogInformation("Customer {UserId} attempted to access offer {OfferId} with status {Status} (not yet sent)", 
+                            userId, id, result.Status);
+                        return NotFound(ResponseHelper.CreateErrorResponse("Offer not found or not yet sent"));
+                    }
+
+                    return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer retrieved successfully"));
+                }
+                else
+                {
+                    // For other roles (SalesSupport, SalesManager, etc.), allow access
+                    var result = await _offerService.GetOfferAsync(id);
+                    
+                    if (result == null)
+                        return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
+
+                    return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer retrieved successfully"));
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving offer");
+                _logger.LogError(ex, "Error retrieving offer {OfferId}", id);
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving offer"));
             }
         }
@@ -400,7 +597,7 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet("{offerId}/equipment")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin")]
         public async Task<IActionResult> GetEquipment(long offerId)
         {
             try
@@ -451,7 +648,7 @@ namespace SoitMed.Controllers
         /// Get equipment image URL (returns path)
         /// </summary>
         [HttpGet("{offerId}/equipment/{equipmentId}/image")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin")]
         public async Task<IActionResult> GetEquipmentImage(long offerId, long equipmentId)
         {
             try
@@ -489,7 +686,7 @@ namespace SoitMed.Controllers
         /// Get equipment image file directly (returns file stream)
         /// </summary>
         [HttpGet("{offerId}/equipment/{equipmentId}/image-file")]
-        [Authorize(Roles = "SalesSupport,SalesManager,Salesman,SuperAdmin")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin")]
         public async Task<IActionResult> GetEquipmentImageFile(long offerId, long equipmentId)
         {
             try
@@ -548,25 +745,78 @@ namespace SoitMed.Controllers
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Installment plan created"));
         }
 
-        // PDF Export
-      
-       
+        // PDF Export (On-demand generation, no storage)
+        /// <summary>
+        /// Generate and download PDF for an offer (generated on-demand, not stored)
+        /// </summary>
+        [HttpGet("{offerId}/pdf")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Customer,Doctor,Technician")]
+        public async Task<IActionResult> GetOfferPdf(long offerId, [FromQuery] string language = "en")
+        {
+            try
+            {
+                _logger.LogInformation("PDF generation requested for offer {OfferId} with language {Language}", offerId, language);
 
-        // Send to Salesman
+                // Validate language
+                if (language != "en" && language != "ar")
+                {
+                    _logger.LogWarning("Invalid language '{Language}' provided, defaulting to 'en'", language);
+                    language = "en";
+                }
+
+                // Generate PDF on-demand (no storage - streams directly to client)
+                // Note: PDFs appearing in wwwroot are from browser downloads, not server-side saving
+                var pdfBytes = await _pdfService.GenerateOfferPdfAsync(offerId, language);
+                
+                if (pdfBytes == null || pdfBytes.Length == 0)
+                {
+                    _logger.LogError("PDF generation returned empty bytes for offer {OfferId}", offerId);
+                    return StatusCode(500, ResponseHelper.CreateErrorResponse("PDF generation failed: empty result"));
+                }
+
+                _logger.LogInformation("PDF generated successfully for offer {OfferId} (size: {Size} bytes)", offerId, pdfBytes.Length);
+                
+                // Set response headers for better compatibility
+                Response.Headers.Add("Content-Disposition", $"inline; filename=\"Offer_{offerId}_{DateTime.UtcNow:yyyyMMddHHmmss}.pdf\"");
+                Response.Headers.Add("Cache-Control", "no-cache, no-store, must-revalidate");
+                Response.Headers.Add("Pragma", "no-cache");
+                Response.Headers.Add("Expires", "0");
+                
+                // Stream PDF directly to client - no file is saved on server
+                return File(pdfBytes, "application/pdf", $"Offer_{offerId}_{DateTime.UtcNow:yyyyMMddHHmmss}.pdf");
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for PDF generation. OfferId: {OfferId}", offerId);
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access attempt for PDF generation. OfferId: {OfferId}", offerId);
+                return StatusCode(403, ResponseHelper.CreateErrorResponse("You do not have permission to access this offer PDF"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating PDF for offer {OfferId}", offerId);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while generating PDF"));
+            }
+        }
+
+        // Send to SalesMan
         [HttpPost("{offerId}/send-to-salesman")]
         [Authorize(Roles = "SalesSupport,SalesManager")]
-        public async Task<IActionResult> SendToSalesman(long offerId)
+        public async Task<IActionResult> SendToSalesMan(long offerId)
         {
-            var result = await _offerService.SendToSalesmanAsync(offerId, GetCurrentUserId());
+            var result = await _offerService.SendToSalesManAsync(offerId, GetCurrentUserId());
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Sent"));
         }
 
         /// <summary>
-        /// Assign or reassign offer to a Salesman
+        /// Assign or reassign offer to a SalesMan
         /// </summary>
         [HttpPut("{offerId}/assign-to-salesman")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> AssignOfferToSalesman(long offerId, [FromBody] AssignOfferToSalesmanDTO assignDto)
+        public async Task<IActionResult> AssignOfferToSalesMan(long offerId, [FromBody] AssignOfferToSalesManDTO assignDto)
         {
             try
             {
@@ -576,7 +826,7 @@ namespace SoitMed.Controllers
                 }
 
                 var userId = GetCurrentUserId();
-                var result = await _offerService.AssignOfferToSalesmanAsync(offerId, assignDto.SalesmanId, userId);
+                var result = await _offerService.AssignOfferToSalesManAsync(offerId, assignDto.SalesManId, userId);
 
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Offer assigned to salesman successfully"));
             }
@@ -593,28 +843,28 @@ namespace SoitMed.Controllers
         }
 
         [HttpGet("assigned-to-me")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> GetAssignedOffers()
         {
-            var result = await _offerService.GetOffersBySalesmanAsync(GetCurrentUserId());
+            var result = await _offerService.GetOffersBySalesManAsync(GetCurrentUserId());
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Retrieved"));
         }
 
         /// <summary>
         /// Get offers assigned to a specific salesman (Manager/SuperAdmin only)
         /// </summary>
-        [HttpGet("by-salesman/{salesmanId}")]
+        [HttpGet("by-SalesMan/{salesmanId}")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> GetOffersBySalesman(string salesmanId)
+        public async Task<IActionResult> GetOffersBySalesMan(string salesmanId)
         {
             try
             {
-                var result = await _offerService.GetOffersBySalesmanAsync(salesmanId);
-                return Ok(ResponseHelper.CreateSuccessResponse(result, "Salesman offers retrieved successfully"));
+                var result = await _offerService.GetOffersBySalesManAsync(salesmanId);
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "SalesMan offers retrieved successfully"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving offers for salesman {SalesmanId}", salesmanId);
+                _logger.LogError(ex, "Error retrieving offers for salesman {SalesManId}", salesmanId);
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving salesman offers"));
             }
         }
@@ -659,7 +909,7 @@ namespace SoitMed.Controllers
                     return StatusCode(403, ResponseHelper.CreateErrorResponse("Access denied. Only SalesManager and SuperAdmin can access this endpoint."));
                 }
 
-                _logger.LogInformation("GetAllOffersWithFilters - User {UserId} ({UserName}) with roles [{Roles}] accessing all offers. Filters: Status={Status}, SalesmanId={SalesmanId}, Page={Page}, PageSize={PageSize}",
+                _logger.LogInformation("GetAllOffersWithFilters - User {UserId} ({UserName}) with roles [{Roles}] accessing all offers. Filters: Status={Status}, SalesManId={SalesManId}, Page={Page}, PageSize={PageSize}",
                     currentUserId, user.UserName, string.Join(", ", userRoles), status ?? "all", salesmanId ?? "all", page, pageSize);
 
                 var result = await _offerService.GetAllOffersWithFiltersAsync(
@@ -717,30 +967,143 @@ namespace SoitMed.Controllers
         /// Record client response to an offer (Accept/Reject)
         /// </summary>
         [HttpPost("{offerId}/client-response")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin,SalesSupport,Customer,Doctor,Technician")]
         public async Task<IActionResult> RecordClientResponse(long offerId, [FromBody] RecordClientResponseDTO dto)
         {
             try
             {
+                // Log the incoming request for debugging
+                _logger.LogInformation("RecordClientResponse called. OfferId: {OfferId}, UserId: {UserId}, DTO: Response={Response}, Accepted={Accepted}", 
+                    offerId, GetCurrentUserId(), dto?.Response, dto?.Accepted);
+
                 if (!ModelState.IsValid)
                 {
-                    return BadRequest(ValidationHelperService.FormatValidationErrors(ModelState));
+                    var validationErrors = ValidationHelperService.FormatValidationErrors(ModelState);
+                    _logger.LogWarning("ModelState validation failed for RecordClientResponse. OfferId: {OfferId}, Errors: {Errors}", 
+                        offerId, validationErrors);
+                    return BadRequest(validationErrors);
                 }
 
                 var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                {
+                    _logger.LogWarning("User ID not found in RecordClientResponse. OfferId: {OfferId}", offerId);
+                    return BadRequest(ResponseHelper.CreateErrorResponse("User ID not found"));
+                }
+
+                var userRole = GetCurrentUserRole();
+                
+                // For customer roles, validate they can respond to this offer
+                if (!string.IsNullOrEmpty(userRole) && 
+                    (userRole.Equals("Customer", StringComparison.OrdinalIgnoreCase) ||
+                     userRole.Equals("Doctor", StringComparison.OrdinalIgnoreCase) ||
+                     userRole.Equals("Technician", StringComparison.OrdinalIgnoreCase)))
+                {
+                    // Get current user to find their client record
+                    var currentUser = await _unitOfWork.Users.GetByIdAsync(userId);
+                    if (currentUser == null)
+                    {
+                        return BadRequest(ResponseHelper.CreateErrorResponse("User not found"));
+                    }
+
+                    long clientId = 0;
+                    Client? client = null;
+
+                    // Try to find client by customer's email (case-insensitive)
+                    var context = _unitOfWork.GetContext();
+                    if (!string.IsNullOrEmpty(currentUser.Email))
+                    {
+                        var userEmailLower = currentUser.Email.ToLower();
+                        
+                        // Try to find by Client.Email first
+                        client = await context.Clients
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.Email) && 
+                                                      c.Email.ToLower() == userEmailLower);
+
+                        // If not found, try ContactPersonEmail
+                        if (client == null)
+                        {
+                            client = await context.Clients
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(c => !string.IsNullOrEmpty(c.ContactPersonEmail) && 
+                                                          c.ContactPersonEmail.ToLower() == userEmailLower);
+                        }
+                    }
+
+                    if (client != null)
+                    {
+                        clientId = client.Id;
+                    }
+                    else
+                    {
+                        // Try to find by user's full name
+                        var userFullName = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
+                        if (!string.IsNullOrEmpty(userFullName))
+                        {
+                            var namePattern = $"%{userFullName}%";
+                            client = await context.Clients
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(c => EF.Functions.Like(c.Name, namePattern) ||
+                                                          (c.ContactPerson != null && EF.Functions.Like(c.ContactPerson, namePattern)));
+
+                            if (client != null)
+                            {
+                                clientId = client.Id;
+                            }
+                        }
+                    }
+
+                    if (clientId == 0)
+                    {
+                        _logger.LogWarning("Client record not found for customer user {UserId}. Email: {Email}, Name: {Name}", 
+                            userId, currentUser.Email, $"{currentUser.FirstName} {currentUser.LastName}");
+                        return BadRequest(ResponseHelper.CreateErrorResponse("Client record not found. Please contact support to link your account to a client record."));
+                    }
+
+                    // Get the offer and verify it belongs to this client
+                    var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                    if (offer == null)
+                    {
+                        return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
+                    }
+
+                    // Verify the offer belongs to this client
+                    if (offer.ClientId != clientId)
+                    {
+                        _logger.LogWarning("Customer {UserId} (ClientId: {ClientId}) attempted to respond to offer {OfferId} belonging to ClientId {OfferClientId}", 
+                            userId, clientId, offerId, offer.ClientId);
+                        return Forbid();
+                    }
+
+                    // Only allow response if offer status is "Sent"
+                    if (offer.Status != "Sent")
+                    {
+                        _logger.LogInformation("Customer {UserId} attempted to respond to offer {OfferId} with status {Status} (not in Sent status)", 
+                            userId, offerId, offer.Status);
+                        return BadRequest(ResponseHelper.CreateErrorResponse("You can only respond to offers that have been sent to you."));
+                    }
+                }
+
                 var result = await _offerService.RecordClientResponseAsync(offerId, dto.Response, dto.Accepted, userId);
 
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Client response recorded successfully"));
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Unauthorized access attempt for recording client response. OfferId: {OfferId}", offerId);
+                return StatusCode(403, ResponseHelper.CreateErrorResponse(ex.Message));
+            }
             catch (ArgumentException ex)
             {
-                _logger.LogWarning(ex, "Invalid request for recording client response. OfferId: {OfferId}", offerId);
+                _logger.LogWarning(ex, "Invalid request for recording client response. OfferId: {OfferId}, Error: {Error}", offerId, ex.Message);
                 return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error recording client response. OfferId: {OfferId}", offerId);
-                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while recording client response"));
+                _logger.LogError(ex, "Error recording client response. OfferId: {OfferId}, Error: {Error}, StackTrace: {StackTrace}", 
+                    offerId, ex.Message, ex.StackTrace);
+                return StatusCode(500, ResponseHelper.CreateErrorResponse($"An error occurred while recording client response: {ex.Message}"));
             }
         }
 
@@ -748,7 +1111,7 @@ namespace SoitMed.Controllers
         /// Mark offer as completed
         /// </summary>
         [HttpPost("{offerId}/complete")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> CompleteOffer(long offerId, [FromBody] CompleteOfferDTO dto)
         {
             try
@@ -772,10 +1135,10 @@ namespace SoitMed.Controllers
 
         /// <summary>
         /// Mark offer as needing modification
-        /// Salesman can request modifications for offers assigned to them (on behalf of clients)
+        /// SalesMan can request modifications for offers assigned to them (on behalf of clients)
         /// </summary>
         [HttpPost("{offerId}/needs-modification")]
-        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Salesman")]
+        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,SalesMan")]
         public async Task<IActionResult> MarkAsNeedsModification(long offerId, [FromBody] NeedsModificationDTO dto)
         {
             try

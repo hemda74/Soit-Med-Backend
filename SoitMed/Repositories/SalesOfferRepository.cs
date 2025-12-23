@@ -29,7 +29,7 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<SalesOffer>> GetOffersBySalesmanAsync(string salesmanId)
+        public async Task<List<SalesOffer>> GetOffersBySalesManAsync(string salesmanId)
         {
             return await _context.SalesOffers
                 .AsNoTracking()
@@ -122,7 +122,7 @@ namespace SoitMed.Repositories
             return await _context.SalesOffers
                 .Include(o => o.Client)
                 .Include(o => o.Creator)
-                .Include(o => o.Salesman)
+                .Include(o => o.SalesMan)
                 .Include(o => o.OfferRequest)
                 .FirstOrDefaultAsync(o => o.Id == offerId);
         }
@@ -170,7 +170,7 @@ namespace SoitMed.Repositories
 
         // OPTIMIZED: Single query to load offers with all related data (O(1) database queries instead of O(3))
         public async Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
-            GetOffersBySalesmanWithRelatedDataAsync(string salesmanId)
+            GetOffersBySalesManWithRelatedDataAsync(string salesmanId)
         {
             // Single query with joins to load everything at once
             var offers = await _context.SalesOffers

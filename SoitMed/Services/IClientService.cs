@@ -23,6 +23,10 @@ namespace SoitMed.Services
         Task<ClientResponseDTO> FindOrCreateClientAsync(FindOrCreateClientDTO findDto, string userId);
         Task<ClientStatisticsDTO> GetClientStatisticsAsync(string userId);
         #endregion
+
+        #region Legal Documents
+        Task<ClientResponseDTO> SubmitClientLegalDocumentsAsync(long clientId, string nationalId, string nationalIdFrontImagePath, string nationalIdBackImagePath, string? taxCardNumber, string? taxCardImagePath, string userId);
+        #endregion
     }
 }
 
