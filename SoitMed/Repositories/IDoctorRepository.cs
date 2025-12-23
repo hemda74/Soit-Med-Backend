@@ -12,7 +12,7 @@ namespace SoitMed.Repositories
         Task<Doctor?> GetDoctorWithHospitalsAsync(int id, CancellationToken cancellationToken = default);
         Task<Doctor?> GetDoctorWithRepairRequestsAsync(int id, CancellationToken cancellationToken = default);
         Task<bool> ExistsByUserIdAsync(string userId, CancellationToken cancellationToken = default);
-        Task<bool> IsDoctorAssignedToHospitalAsync(int doctorId, string hospitalId, CancellationToken cancellationToken = default);
+        Task<bool> IsDoctorAssignedToHospitalAsync(int DoctorId, string hospitalId, CancellationToken cancellationToken = default);
         Task<IEnumerable<Doctor>> GetDoctorsWithHospitalsAsync(CancellationToken cancellationToken = default);
     }
 }

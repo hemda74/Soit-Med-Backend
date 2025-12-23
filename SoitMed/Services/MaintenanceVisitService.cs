@@ -27,7 +27,7 @@ namespace SoitMed.Services
             _logger = logger;
         }
 
-        public async Task<MaintenanceVisitResponseDTO> CreateVisitAsync(CreateMaintenanceVisitDTO dto, string engineerId)
+        public async Task<MaintenanceVisitResponseDTO> CreateVisitAsync(CreateMaintenanceVisitDTO dto, string EngineerId)
         {
             try
             {
@@ -38,7 +38,7 @@ namespace SoitMed.Services
                 var visit = new MaintenanceVisit
                 {
                     MaintenanceRequestId = dto.MaintenanceRequestId,
-                    EngineerId = engineerId,
+                    EngineerId = EngineerId,
                     QRCode = dto.QRCode,
                     SerialCode = dto.SerialCode,
                     Report = dto.Report,
@@ -134,9 +134,9 @@ namespace SoitMed.Services
             return result;
         }
 
-        public async Task<IEnumerable<MaintenanceVisitResponseDTO>> GetVisitsByEngineerAsync(string engineerId)
+        public async Task<IEnumerable<MaintenanceVisitResponseDTO>> GetVisitsByEngineerAsync(string EngineerId)
         {
-            var visits = await _unitOfWork.MaintenanceVisits.GetByEngineerIdAsync(engineerId);
+            var visits = await _unitOfWork.MaintenanceVisits.GetByEngineerIdAsync(EngineerId);
             var result = new List<MaintenanceVisitResponseDTO>();
 
             foreach (var visit in visits)
@@ -193,14 +193,14 @@ namespace SoitMed.Services
 
         private async Task<MaintenanceVisitResponseDTO> MapToResponseDTO(MaintenanceVisit visit)
         {
-            var engineer = await _userManager.FindByIdAsync(visit.EngineerId);
+            var Engineer = await _userManager.FindByIdAsync(visit.EngineerId);
 
             return new MaintenanceVisitResponseDTO
             {
                 Id = visit.Id,
                 MaintenanceRequestId = visit.MaintenanceRequestId,
                 EngineerId = visit.EngineerId,
-                EngineerName = engineer?.UserName ?? "",
+                EngineerName = Engineer?.UserName ?? "",
                 QRCode = visit.QRCode,
                 SerialCode = visit.SerialCode,
                 Report = visit.Report,

@@ -7,12 +7,12 @@ using SoitMed.Repositories;
 
 namespace SoitMed.Services
 {
-    public class SalesmanStatisticsService : ISalesmanStatisticsService
+    public class SalesManStatisticsService : ISalesManStatisticsService
     {
         private readonly IUnitOfWork _unitOfWork;
-        private readonly ILogger<SalesmanStatisticsService> _logger;
+        private readonly ILogger<SalesManStatisticsService> _logger;
 
-        public SalesmanStatisticsService(IUnitOfWork unitOfWork, ILogger<SalesmanStatisticsService> logger)
+        public SalesManStatisticsService(IUnitOfWork unitOfWork, ILogger<SalesManStatisticsService> logger)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
@@ -20,11 +20,11 @@ namespace SoitMed.Services
 
         #region Statistics
 
-        public async Task<SalesmanStatisticsDTO> GetStatisticsAsync(string salesmanId, int year, int? quarter = null)
+        public async Task<SalesManStatisticsDTO> GetStatisticsAsync(string salesmanId, int year, int? quarter = null)
         {
             var salesman = await _unitOfWork.Users.GetByIdAsync(salesmanId);
             if (salesman == null)
-                throw new ArgumentException("Salesman not found", nameof(salesmanId));
+                throw new ArgumentException("SalesMan not found", nameof(salesmanId));
 
             var (startDate, endDate) = GetDateRangeForPeriod(year, quarter);
             
@@ -54,7 +54,7 @@ namespace SoitMed.Services
             // Get deal statistics - Filter in database
             var salesmanDeals = await context.SalesDeals
                 .AsNoTracking()
-                .Where(d => d.SalesmanId == salesmanId
+                .Where(d => d.SalesManId == salesmanId
                     && d.CreatedAt >= startDate
                     && d.CreatedAt < endDate)
                 .ToListAsync();
@@ -62,10 +62,10 @@ namespace SoitMed.Services
             var totalDeals = salesmanDeals.Count;
             var totalDealValue = salesmanDeals.Sum(d => d.DealValue);
 
-            return new SalesmanStatisticsDTO
+            return new SalesManStatisticsDTO
             {
-                SalesmanId = salesmanId,
-                SalesmanName = $"{salesman.FirstName} {salesman.LastName}",
+                SalesManId = salesmanId,
+                SalesManName = $"{salesman.FirstName} {salesman.LastName}",
                 Year = year,
                 Quarter = quarter,
                 TotalVisits = totalVisits,
@@ -81,9 +81,9 @@ namespace SoitMed.Services
             };
         }
 
-        public async Task<List<SalesmanStatisticsDTO>> GetAllSalesmenStatisticsAsync(int year, int? quarter = null)
+        public async Task<List<SalesManStatisticsDTO>> GetAllSalesmenStatisticsAsync(int year, int? quarter = null)
         {
-            var salesmen = await _unitOfWork.Users.GetUsersInRoleAsync("Salesman");
+            var salesmen = await _unitOfWork.Users.GetUsersInRoleAsync("SalesMan");
             var (startDate, endDate) = GetDateRangeForPeriod(year, quarter);
 
             // Use bulk queries for better performance - fetch all data at once
@@ -108,19 +108,19 @@ namespace SoitMed.Services
 
             var allDeals = await context.SalesDeals
                 .AsNoTracking()
-                .Where(d => salesmanIds.Contains(d.SalesmanId)
+                .Where(d => salesmanIds.Contains(d.SalesManId)
                     && d.CreatedAt >= startDate
                     && d.CreatedAt < endDate)
                 .ToListAsync();
 
             // Process statistics for each salesman from in-memory data
-            var statistics = new List<SalesmanStatisticsDTO>();
+            var statistics = new List<SalesManStatisticsDTO>();
 
             foreach (var salesman in salesmen)
             {
                 var visits = allVisits.Where(v => v.EmployeeId == salesman.Id).ToList();
                 var offers = allOffers.Where(o => o.AssignedTo == salesman.Id).ToList();
-                var deals = allDeals.Where(d => d.SalesmanId == salesman.Id).ToList();
+                var deals = allDeals.Where(d => d.SalesManId == salesman.Id).ToList();
 
                 var totalVisits = visits.Count;
                 var successfulVisits = visits.Count(v => v.VisitResult == "Interested");
@@ -135,10 +135,10 @@ namespace SoitMed.Services
                 var totalDeals = deals.Count;
                 var totalDealValue = deals.Sum(d => d.DealValue);
 
-                statistics.Add(new SalesmanStatisticsDTO
+                statistics.Add(new SalesManStatisticsDTO
                 {
-                    SalesmanId = salesman.Id,
-                    SalesmanName = $"{salesman.FirstName} {salesman.LastName}",
+                    SalesManId = salesman.Id,
+                    SalesManName = $"{salesman.FirstName} {salesman.LastName}",
                     Year = year,
                     Quarter = quarter,
                     TotalVisits = totalVisits,
@@ -161,7 +161,7 @@ namespace SoitMed.Services
 
         #region Targets
 
-        public async Task<SalesmanTargetDTO> CreateTargetAsync(CreateSalesmanTargetDTO dto, string? managerId, string? salesmanId = null)
+        public async Task<SalesManTargetDTO> CreateTargetAsync(CreateSalesManTargetDTO dto, string? managerId, string? salesmanId = null)
         {
             // Validate target type and permissions
             if (dto.TargetType == TargetType.Money && string.IsNullOrEmpty(managerId))
@@ -171,25 +171,25 @@ namespace SoitMed.Services
                 throw new UnauthorizedAccessException("Activity targets must be set by the salesman");
 
             // Validate salesman exists if individual target
-            var targetSalesmanId = dto.TargetType == TargetType.Activity ? salesmanId : dto.SalesmanId;
-            if (!dto.IsTeamTarget && !string.IsNullOrEmpty(targetSalesmanId))
+            var targetSalesManId = dto.TargetType == TargetType.Activity ? salesmanId : dto.SalesManId;
+            if (!dto.IsTeamTarget && !string.IsNullOrEmpty(targetSalesManId))
             {
-                var salesman = await _unitOfWork.Users.GetByIdAsync(targetSalesmanId);
+                var salesman = await _unitOfWork.Users.GetByIdAsync(targetSalesManId);
                 if (salesman == null)
-                    throw new ArgumentException("Salesman not found", nameof(targetSalesmanId));
+                    throw new ArgumentException("SalesMan not found", nameof(targetSalesManId));
             }
 
             // Check if target already exists for this period and type
-            var existingTargets = await _unitOfWork.SalesmanTargets.GetTargetsBySalesmanAsync(
-                targetSalesmanId, dto.Year, dto.Quarter);
+            var existingTargets = await _unitOfWork.SalesManTargets.GetTargetsBySalesManAsync(
+                targetSalesManId, dto.Year, dto.Quarter);
             
             var existingTarget = existingTargets.FirstOrDefault(t => t.TargetType == dto.TargetType);
             if (existingTarget != null)
                 throw new InvalidOperationException($"Target of type {dto.TargetType} already exists for this period");
 
-            var target = new SalesmanTarget
+            var target = new SalesManTarget
             {
-                SalesmanId = targetSalesmanId,
+                SalesManId = targetSalesManId,
                 TargetType = dto.TargetType,
                 CreatedByManagerId = dto.TargetType == TargetType.Money ? managerId : null,
                 Year = dto.Year,
@@ -204,7 +204,7 @@ namespace SoitMed.Services
                 Notes = dto.Notes
             };
 
-            await _unitOfWork.SalesmanTargets.CreateAsync(target);
+            await _unitOfWork.SalesManTargets.CreateAsync(target);
             await _unitOfWork.SaveChangesAsync();
 
             ApplicationUser? creator = null;
@@ -221,12 +221,12 @@ namespace SoitMed.Services
                 createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
             }
 
-            return new SalesmanTargetDTO
+            return new SalesManTargetDTO
             {
                 Id = target.Id,
-                SalesmanId = target.SalesmanId,
-                SalesmanName = target.SalesmanId != null 
-                    ? $"{target.Salesman?.FirstName} {target.Salesman?.LastName}" 
+                SalesManId = target.SalesManId,
+                SalesManName = target.SalesManId != null 
+                    ? $"{target.SalesMan?.FirstName} {target.SalesMan?.LastName}" 
                     : "Team",
                 Year = target.Year,
                 Quarter = target.Quarter,
@@ -241,13 +241,13 @@ namespace SoitMed.Services
                 Notes = target.Notes,
                 CreatedAt = target.CreatedAt,
                 CreatedByManagerName = dto.TargetType == TargetType.Money ? createdByName : null,
-                CreatedBySalesmanName = dto.TargetType == TargetType.Activity ? createdByName : null
+                CreatedBySalesManName = dto.TargetType == TargetType.Activity ? createdByName : null
             };
         }
 
-        public async Task<SalesmanTargetDTO> UpdateTargetAsync(long targetId, CreateSalesmanTargetDTO dto, string? currentUserId = null)
+        public async Task<SalesManTargetDTO> UpdateTargetAsync(long targetId, CreateSalesManTargetDTO dto, string? currentUserId = null)
         {
-            var target = await _unitOfWork.SalesmanTargets.GetByIdAsync(targetId);
+            var target = await _unitOfWork.SalesManTargets.GetByIdAsync(targetId);
             if (target == null)
                 throw new ArgumentException("Target not found", nameof(targetId));
 
@@ -265,10 +265,10 @@ namespace SoitMed.Services
                 if (string.IsNullOrEmpty(currentUserId))
                     throw new UnauthorizedAccessException("You must be logged in to update activity targets");
                 
-                if (string.IsNullOrEmpty(target.SalesmanId))
+                if (string.IsNullOrEmpty(target.SalesManId))
                     throw new UnauthorizedAccessException("This activity target is not associated with a salesman");
                 
-                if (target.SalesmanId != currentUserId)
+                if (target.SalesManId != currentUserId)
                     throw new UnauthorizedAccessException("Activity targets can only be updated by the salesman who created them");
             }
 
@@ -295,7 +295,7 @@ namespace SoitMed.Services
             if (dto.Notes != null)
                 target.Notes = dto.Notes;
 
-            await _unitOfWork.SalesmanTargets.UpdateAsync(target);
+            await _unitOfWork.SalesManTargets.UpdateAsync(target);
             await _unitOfWork.SaveChangesAsync();
 
             ApplicationUser? creator = null;
@@ -306,18 +306,18 @@ namespace SoitMed.Services
                 creator = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
                 createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
             }
-            else if (target.TargetType == TargetType.Activity && !string.IsNullOrEmpty(target.SalesmanId))
+            else if (target.TargetType == TargetType.Activity && !string.IsNullOrEmpty(target.SalesManId))
             {
-                creator = await _unitOfWork.Users.GetByIdAsync(target.SalesmanId);
+                creator = await _unitOfWork.Users.GetByIdAsync(target.SalesManId);
                 createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
             }
 
-            return new SalesmanTargetDTO
+            return new SalesManTargetDTO
             {
                 Id = target.Id,
-                SalesmanId = target.SalesmanId,
-                SalesmanName = target.SalesmanId != null 
-                    ? $"{target.Salesman?.FirstName} {target.Salesman?.LastName}" 
+                SalesManId = target.SalesManId,
+                SalesManName = target.SalesManId != null 
+                    ? $"{target.SalesMan?.FirstName} {target.SalesMan?.LastName}" 
                     : "Team",
                 Year = target.Year,
                 Quarter = target.Quarter,
@@ -332,24 +332,24 @@ namespace SoitMed.Services
                 Notes = target.Notes,
                 CreatedAt = target.CreatedAt,
                 CreatedByManagerName = target.TargetType == TargetType.Money ? createdByName : null,
-                CreatedBySalesmanName = target.TargetType == TargetType.Activity ? createdByName : null
+                CreatedBySalesManName = target.TargetType == TargetType.Activity ? createdByName : null
             };
         }
 
         public async Task<bool> DeleteTargetAsync(long targetId)
         {
-            var target = await _unitOfWork.SalesmanTargets.GetByIdAsync(targetId);
+            var target = await _unitOfWork.SalesManTargets.GetByIdAsync(targetId);
             if (target == null)
                 return false;
 
-            await _unitOfWork.SalesmanTargets.DeleteAsync(target);
+            await _unitOfWork.SalesManTargets.DeleteAsync(target);
             await _unitOfWork.SaveChangesAsync();
             return true;
         }
 
-        public async Task<SalesmanTargetDTO?> GetTargetAsync(long targetId)
+        public async Task<SalesManTargetDTO?> GetTargetAsync(long targetId)
         {
-            var target = await _unitOfWork.SalesmanTargets.GetByIdAsync(targetId);
+            var target = await _unitOfWork.SalesManTargets.GetByIdAsync(targetId);
             if (target == null)
                 return null;
 
@@ -361,18 +361,18 @@ namespace SoitMed.Services
                 creator = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
                 createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
             }
-            else if (target.TargetType == TargetType.Activity && !string.IsNullOrEmpty(target.SalesmanId))
+            else if (target.TargetType == TargetType.Activity && !string.IsNullOrEmpty(target.SalesManId))
             {
-                creator = await _unitOfWork.Users.GetByIdAsync(target.SalesmanId);
+                creator = await _unitOfWork.Users.GetByIdAsync(target.SalesManId);
                 createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
             }
 
-            return new SalesmanTargetDTO
+            return new SalesManTargetDTO
             {
                 Id = target.Id,
-                SalesmanId = target.SalesmanId,
-                SalesmanName = target.SalesmanId != null 
-                    ? $"{target.Salesman?.FirstName} {target.Salesman?.LastName}" 
+                SalesManId = target.SalesManId,
+                SalesManName = target.SalesManId != null 
+                    ? $"{target.SalesMan?.FirstName} {target.SalesMan?.LastName}" 
                     : "Team",
                 Year = target.Year,
                 Quarter = target.Quarter,
@@ -387,14 +387,14 @@ namespace SoitMed.Services
                 Notes = target.Notes,
                 CreatedAt = target.CreatedAt,
                 CreatedByManagerName = target.TargetType == TargetType.Money ? createdByName : null,
-                CreatedBySalesmanName = target.TargetType == TargetType.Activity ? createdByName : null
+                CreatedBySalesManName = target.TargetType == TargetType.Activity ? createdByName : null
             };
         }
 
-        public async Task<List<SalesmanTargetDTO>> GetTargetsForSalesmanAsync(string salesmanId, int year)
+        public async Task<List<SalesManTargetDTO>> GetTargetsForSalesManAsync(string salesmanId, int year)
         {
-            var targets = await _unitOfWork.SalesmanTargets.GetTargetsBySalesmanAsync(salesmanId, year);
-            var result = new List<SalesmanTargetDTO>();
+            var targets = await _unitOfWork.SalesManTargets.GetTargetsBySalesManAsync(salesmanId, year);
+            var result = new List<SalesManTargetDTO>();
 
             foreach (var target in targets)
             {
@@ -406,18 +406,18 @@ namespace SoitMed.Services
                     creator = await _unitOfWork.Users.GetByIdAsync(target.CreatedByManagerId);
                     createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
                 }
-                else if (target.TargetType == TargetType.Activity && !string.IsNullOrEmpty(target.SalesmanId))
+                else if (target.TargetType == TargetType.Activity && !string.IsNullOrEmpty(target.SalesManId))
                 {
-                    creator = await _unitOfWork.Users.GetByIdAsync(target.SalesmanId);
+                    creator = await _unitOfWork.Users.GetByIdAsync(target.SalesManId);
                     createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
                 }
 
-                result.Add(new SalesmanTargetDTO
+                result.Add(new SalesManTargetDTO
                 {
                     Id = target.Id,
-                    SalesmanId = target.SalesmanId,
-                    SalesmanName = target.SalesmanId != null 
-                        ? $"{target.Salesman?.FirstName} {target.Salesman?.LastName}" 
+                    SalesManId = target.SalesManId,
+                    SalesManName = target.SalesManId != null 
+                        ? $"{target.SalesMan?.FirstName} {target.SalesMan?.LastName}" 
                         : "Team",
                     Year = target.Year,
                     Quarter = target.Quarter,
@@ -432,16 +432,16 @@ namespace SoitMed.Services
                     Notes = target.Notes,
                     CreatedAt = target.CreatedAt,
                     CreatedByManagerName = target.TargetType == TargetType.Money ? createdByName : null,
-                    CreatedBySalesmanName = target.TargetType == TargetType.Activity ? createdByName : null
+                    CreatedBySalesManName = target.TargetType == TargetType.Activity ? createdByName : null
                 });
             }
 
             return result;
         }
 
-        public async Task<SalesmanTargetDTO?> GetTeamTargetAsync(int year, int? quarter = null)
+        public async Task<SalesManTargetDTO?> GetTeamTargetAsync(int year, int? quarter = null)
         {
-            var target = await _unitOfWork.SalesmanTargets.GetTeamTargetAsync(year, quarter);
+            var target = await _unitOfWork.SalesManTargets.GetTeamTargetAsync(year, quarter);
             if (target == null)
                 return null;
 
@@ -454,11 +454,11 @@ namespace SoitMed.Services
                 createdByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown";
             }
 
-            return new SalesmanTargetDTO
+            return new SalesManTargetDTO
             {
                 Id = target.Id,
-                SalesmanId = target.SalesmanId,
-                SalesmanName = "Team",
+                SalesManId = target.SalesManId,
+                SalesManName = "Team",
                 Year = target.Year,
                 Quarter = target.Quarter,
                 TargetType = target.TargetType,
@@ -472,7 +472,7 @@ namespace SoitMed.Services
                 Notes = target.Notes,
                 CreatedAt = target.CreatedAt,
                 CreatedByManagerName = target.TargetType == TargetType.Money ? createdByName : null,
-                CreatedBySalesmanName = null
+                CreatedBySalesManName = null
             };
         }
 
@@ -480,11 +480,11 @@ namespace SoitMed.Services
 
         #region Progress
 
-        public async Task<SalesmanProgressDTO> GetSalesmanProgressAsync(string salesmanId, int year, int? quarter = null)
+        public async Task<SalesManProgressDTO> GetSalesManProgressAsync(string salesmanId, int year, int? quarter = null)
         {
             var statistics = await GetStatisticsAsync(salesmanId, year, quarter);
-            var individualTargets = await _unitOfWork.SalesmanTargets.GetTargetsBySalesmanAsync(salesmanId, year, quarter);
-            var allTargets = await _unitOfWork.SalesmanTargets.GetAllTargetsForPeriodAsync(year, quarter);
+            var individualTargets = await _unitOfWork.SalesManTargets.GetTargetsBySalesManAsync(salesmanId, year, quarter);
+            var allTargets = await _unitOfWork.SalesManTargets.GetAllTargetsForPeriodAsync(year, quarter);
             var teamTargets = allTargets.Where(t => t.IsTeamTarget).ToList();
 
             var individualMoneyTarget = individualTargets.FirstOrDefault(t => t.TargetType == TargetType.Money);
@@ -493,15 +493,15 @@ namespace SoitMed.Services
             var teamActivityTarget = teamTargets.FirstOrDefault(t => t.TargetType == TargetType.Activity);
             
             // Convert to DTOs
-            SalesmanTargetDTO? individualMoneyTargetDto = null;
+            SalesManTargetDTO? individualMoneyTargetDto = null;
             if (individualMoneyTarget != null)
             {
                 var manager = await _unitOfWork.Users.GetByIdAsync(individualMoneyTarget.CreatedByManagerId);
-                individualMoneyTargetDto = new SalesmanTargetDTO
+                individualMoneyTargetDto = new SalesManTargetDTO
                 {
                     Id = individualMoneyTarget.Id,
-                    SalesmanId = individualMoneyTarget.SalesmanId,
-                    SalesmanName = "Individual",
+                    SalesManId = individualMoneyTarget.SalesManId,
+                    SalesManName = "Individual",
                     Year = individualMoneyTarget.Year,
                     Quarter = individualMoneyTarget.Quarter,
                     TargetType = individualMoneyTarget.TargetType,
@@ -520,15 +520,15 @@ namespace SoitMed.Services
                 };
             }
 
-            SalesmanTargetDTO? individualActivityTargetDto = null;
+            SalesManTargetDTO? individualActivityTargetDto = null;
             if (individualActivityTarget != null)
             {
-                var salesman = await _unitOfWork.Users.GetByIdAsync(individualActivityTarget.SalesmanId);
-                individualActivityTargetDto = new SalesmanTargetDTO
+                var salesman = await _unitOfWork.Users.GetByIdAsync(individualActivityTarget.SalesManId);
+                individualActivityTargetDto = new SalesManTargetDTO
                 {
                     Id = individualActivityTarget.Id,
-                    SalesmanId = individualActivityTarget.SalesmanId,
-                    SalesmanName = "Individual",
+                    SalesManId = individualActivityTarget.SalesManId,
+                    SalesManName = "Individual",
                     Year = individualActivityTarget.Year,
                     Quarter = individualActivityTarget.Quarter,
                     TargetType = individualActivityTarget.TargetType,
@@ -541,21 +541,21 @@ namespace SoitMed.Services
                     IsTeamTarget = individualActivityTarget.IsTeamTarget,
                     Notes = individualActivityTarget.Notes,
                     CreatedAt = individualActivityTarget.CreatedAt,
-                    CreatedBySalesmanName = salesman != null 
+                    CreatedBySalesManName = salesman != null 
                         ? $"{salesman.FirstName} {salesman.LastName}" 
                         : "Unknown"
                 };
             }
 
-            SalesmanTargetDTO? teamMoneyTargetDto = null;
+            SalesManTargetDTO? teamMoneyTargetDto = null;
             if (teamMoneyTarget != null)
             {
                 var manager = await _unitOfWork.Users.GetByIdAsync(teamMoneyTarget.CreatedByManagerId);
-                teamMoneyTargetDto = new SalesmanTargetDTO
+                teamMoneyTargetDto = new SalesManTargetDTO
                 {
                     Id = teamMoneyTarget.Id,
-                    SalesmanId = teamMoneyTarget.SalesmanId,
-                    SalesmanName = "Team",
+                    SalesManId = teamMoneyTarget.SalesManId,
+                    SalesManName = "Team",
                     Year = teamMoneyTarget.Year,
                     Quarter = teamMoneyTarget.Quarter,
                     TargetType = teamMoneyTarget.TargetType,
@@ -574,14 +574,14 @@ namespace SoitMed.Services
                 };
             }
 
-            SalesmanTargetDTO? teamActivityTargetDto = null;
+            SalesManTargetDTO? teamActivityTargetDto = null;
             if (teamActivityTarget != null)
             {
-                teamActivityTargetDto = new SalesmanTargetDTO
+                teamActivityTargetDto = new SalesManTargetDTO
                 {
                     Id = teamActivityTarget.Id,
-                    SalesmanId = teamActivityTarget.SalesmanId,
-                    SalesmanName = "Team",
+                    SalesManId = teamActivityTarget.SalesManId,
+                    SalesManName = "Team",
                     Year = teamActivityTarget.Year,
                     Quarter = teamActivityTarget.Quarter,
                     TargetType = teamActivityTarget.TargetType,
@@ -594,7 +594,7 @@ namespace SoitMed.Services
                     IsTeamTarget = teamActivityTarget.IsTeamTarget,
                     Notes = teamActivityTarget.Notes,
                     CreatedAt = teamActivityTarget.CreatedAt,
-                    CreatedBySalesmanName = null
+                    CreatedBySalesManName = null
                 };
             }
 
@@ -626,7 +626,7 @@ namespace SoitMed.Services
                 ? (decimal?)(statistics.TotalDealValue / moneyTargetToUse.TargetRevenue.Value * 100)
                 : null;
 
-            return new SalesmanProgressDTO
+            return new SalesManProgressDTO
             {
                 CurrentStatistics = statistics,
                 IndividualMoneyTarget = individualMoneyTargetDto,

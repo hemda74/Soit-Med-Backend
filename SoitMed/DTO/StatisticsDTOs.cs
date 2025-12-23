@@ -6,10 +6,10 @@ namespace SoitMed.DTO
     /// <summary>
     /// Statistics for a salesman for a specific period
     /// </summary>
-    public class SalesmanStatisticsDTO
+    public class SalesManStatisticsDTO
     {
-        public string SalesmanId { get; set; } = string.Empty;
-        public string SalesmanName { get; set; } = string.Empty;
+        public string SalesManId { get; set; } = string.Empty;
+        public string SalesManName { get; set; } = string.Empty;
         public int Year { get; set; }
         public int? Quarter { get; set; }
 
@@ -33,9 +33,9 @@ namespace SoitMed.DTO
     /// <summary>
     /// DTO for creating a new salesman target
     /// </summary>
-    public class CreateSalesmanTargetDTO
+    public class CreateSalesManTargetDTO
     {
-        public string? SalesmanId { get; set; } // null = team target
+        public string? SalesManId { get; set; } // null = team target
         public int Year { get; set; }
         
         [Range(1, 4)]
@@ -72,11 +72,11 @@ namespace SoitMed.DTO
     /// <summary>
     /// DTO for returning salesman target details
     /// </summary>
-    public class SalesmanTargetDTO
+    public class SalesManTargetDTO
     {
         public long Id { get; set; }
-        public string? SalesmanId { get; set; }
-        public string? SalesmanName { get; set; }
+        public string? SalesManId { get; set; }
+        public string? SalesManName { get; set; }
         public int Year { get; set; }
         public int? Quarter { get; set; }
         public TargetType TargetType { get; set; }
@@ -95,19 +95,19 @@ namespace SoitMed.DTO
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; }
         public string? CreatedByManagerName { get; set; }
-        public string? CreatedBySalesmanName { get; set; } // For self-set targets
+        public string? CreatedBySalesManName { get; set; } // For self-set targets
     }
 
     /// <summary>
     /// DTO for salesman progress showing current statistics against targets
     /// </summary>
-    public class SalesmanProgressDTO
+    public class SalesManProgressDTO
     {
-        public SalesmanStatisticsDTO CurrentStatistics { get; set; } = null!;
-        public SalesmanTargetDTO? IndividualMoneyTarget { get; set; }
-        public SalesmanTargetDTO? IndividualActivityTarget { get; set; }
-        public SalesmanTargetDTO? TeamMoneyTarget { get; set; }
-        public SalesmanTargetDTO? TeamActivityTarget { get; set; }
+        public SalesManStatisticsDTO CurrentStatistics { get; set; } = null!;
+        public SalesManTargetDTO? IndividualMoneyTarget { get; set; }
+        public SalesManTargetDTO? IndividualActivityTarget { get; set; }
+        public SalesManTargetDTO? TeamMoneyTarget { get; set; }
+        public SalesManTargetDTO? TeamActivityTarget { get; set; }
 
         // Progress Percentages (0-100)
         public decimal VisitsProgress { get; set; }

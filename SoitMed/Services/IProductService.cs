@@ -7,7 +7,7 @@ namespace SoitMed.Services
     /// </summary>
     public interface IProductService
     {
-        Task<List<ProductResponseDTO>> GetAllProductsAsync(string? category = null, bool? inStock = null);
+        Task<List<ProductResponseDTO>> GetAllProductsAsync(string? category = null, long? categoryId = null, bool? inStock = null);
         Task<ProductResponseDTO?> GetProductByIdAsync(long id);
         Task<List<ProductResponseDTO>> GetProductsByCategoryAsync(string category);
         Task<List<ProductResponseDTO>> SearchProductsAsync(string searchTerm);

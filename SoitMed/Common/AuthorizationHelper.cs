@@ -18,7 +18,7 @@ namespace SoitMed.Common
         /// </summary>
         public static class SalesRoles
         {
-            public const string Salesman = "Salesman";
+            public const string SalesMan = "SalesMan";
             public const string SalesManager = "SalesManager";
             public const string SalesSupport = "SalesSupport";
             public const string SuperAdmin = "SuperAdmin";

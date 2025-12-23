@@ -54,12 +54,12 @@ namespace SoitMed.Services
                 }
                 else if (customerRoles.Contains(UserRoles.Doctor))
                 {
-                    // Try to get hospital from doctor's hospitals
-                    var doctor = await _unitOfWork.Doctors.GetByUserIdAsync(customerId);
-                    if (doctor != null)
+                    // Try to get hospital from Doctor's hospitals
+                    var Doctor = await _unitOfWork.Doctors.GetByUserIdAsync(customerId);
+                    if (Doctor != null)
                     {
-                        var doctorHospital = await _unitOfWork.DoctorHospitals.GetFirstOrDefaultAsync(dh => dh.DoctorId == doctor.DoctorId);
-                        hospitalId = doctorHospital?.HospitalId;
+                        var DoctorHospital = await _unitOfWork.DoctorHospitals.GetFirstOrDefaultAsync(dh => dh.DoctorId == Doctor.DoctorId);
+                        hospitalId = DoctorHospital?.HospitalId;
                     }
                 }
 
@@ -81,7 +81,7 @@ namespace SoitMed.Services
                 _logger.LogInformation("Maintenance request created. RequestId: {RequestId}, CustomerId: {CustomerId}", 
                     request.Id, customerId);
 
-                // Try auto-assignment to engineer
+                // Try auto-assignment to Engineer
                 await TryAutoAssignToEngineerAsync(request.Id, equipment);
 
                 // Send notification to Maintenance Support
@@ -123,9 +123,9 @@ namespace SoitMed.Services
             return result;
         }
 
-        public async Task<IEnumerable<MaintenanceRequestResponseDTO>> GetEngineerRequestsAsync(string engineerId)
+        public async Task<IEnumerable<MaintenanceRequestResponseDTO>> GetEngineerRequestsAsync(string EngineerId)
         {
-            var requests = await _unitOfWork.MaintenanceRequests.GetByEngineerIdAsync(engineerId);
+            var requests = await _unitOfWork.MaintenanceRequests.GetByEngineerIdAsync(EngineerId);
             var result = new List<MaintenanceRequestResponseDTO>();
 
             foreach (var request in requests)
@@ -155,8 +155,8 @@ namespace SoitMed.Services
             if (request == null)
                 throw new ArgumentException("Maintenance request not found", nameof(requestId));
 
-            var engineer = await _userManager.FindByIdAsync(dto.EngineerId);
-            if (engineer == null)
+            var Engineer = await _userManager.FindByIdAsync(dto.EngineerId);
+            if (Engineer == null)
                 throw new ArgumentException("Engineer not found", nameof(dto.EngineerId));
 
             request.AssignedToEngineerId = dto.EngineerId;
@@ -170,7 +170,7 @@ namespace SoitMed.Services
             _logger.LogInformation("Maintenance request assigned. RequestId: {RequestId}, EngineerId: {EngineerId}", 
                 requestId, dto.EngineerId);
 
-            // Send notification to engineer
+            // Send notification to Engineer
             await _notificationService.CreateNotificationAsync(
                 dto.EngineerId,
                 "New maintenance request assigned",
@@ -305,7 +305,7 @@ namespace SoitMed.Services
                 ));
             }
 
-            // Notify engineer if assigned
+            // Notify Engineer if assigned
             if (request.AssignedToEngineerId != null && request.AssignedToEngineerId != userId)
             {
                 notifications.Add(_notificationService.CreateNotificationAsync(
@@ -366,7 +366,7 @@ namespace SoitMed.Services
         private async Task<MaintenanceRequestResponseDTO> MapToResponseDTO(MaintenanceRequest request)
         {
             var customer = await _userManager.FindByIdAsync(request.CustomerId);
-            var engineer = request.AssignedToEngineerId != null 
+            var Engineer = request.AssignedToEngineerId != null 
                 ? await _userManager.FindByIdAsync(request.AssignedToEngineerId) 
                 : null;
             var equipment = await _unitOfWork.Equipment.GetByIdAsync(request.EquipmentId);
@@ -392,7 +392,7 @@ namespace SoitMed.Services
                 Id = v.Id,
                 MaintenanceRequestId = v.MaintenanceRequestId,
                 EngineerId = v.EngineerId,
-                EngineerName = engineer?.UserName ?? "",
+                EngineerName = Engineer?.UserName ?? "",
                 QRCode = v.QRCode,
                 SerialCode = v.SerialCode,
                 Report = v.Report,
@@ -440,7 +440,7 @@ namespace SoitMed.Services
                 Symptoms = request.Symptoms,
                 Status = request.Status,
                 AssignedToEngineerId = request.AssignedToEngineerId,
-                AssignedToEngineerName = engineer?.UserName ?? "",
+                AssignedToEngineerName = Engineer?.UserName ?? "",
                 PaymentStatus = request.PaymentStatus,
                 TotalAmount = request.TotalAmount,
                 PaidAmount = request.PaidAmount,
@@ -489,41 +489,41 @@ namespace SoitMed.Services
                     return;
                 }
 
-                // Get all active engineers with their governorates
+                // Get all active Engineers with their governorates
                 var allEngineers = await _unitOfWork.Engineers.GetActiveEngineersAsync();
                 var availableEngineers = new List<Engineer>();
 
-                foreach (var engineer in allEngineers)
+                foreach (var Engineer in allEngineers)
                 {
-                    var engineerWithGovs = await _unitOfWork.Engineers.GetEngineerWithGovernoratesAsync(engineer.EngineerId);
-                    if (engineerWithGovs?.EngineerGovernorates != null)
+                    var EngineerWithGovs = await _unitOfWork.Engineers.GetEngineerWithGovernoratesAsync(Engineer.EngineerId);
+                    if (EngineerWithGovs?.EngineerGovernorates != null)
                     {
-                        var matches = engineerWithGovs.EngineerGovernorates
+                        var matches = EngineerWithGovs.EngineerGovernorates
                             .Where(eg => eg.IsActive && 
                                 eg.Governorate != null && 
                                 eg.Governorate.Name.Contains(location, StringComparison.OrdinalIgnoreCase));
                         
                         if (matches.Any())
                         {
-                            availableEngineers.Add(engineer);
+                            availableEngineers.Add(Engineer);
                         }
                     }
                 }
 
                 if (!availableEngineers.Any())
                 {
-                    _logger.LogInformation("No available engineers found for location {Location}", location);
+                    _logger.LogInformation("No available Engineers found for location {Location}", location);
                     // Notify maintenance support that manual assignment is needed
                     await _notificationService.SendNotificationToRoleGroupAsync(
                         UserRoles.MaintenanceSupport,
                         "Manual assignment required",
-                        $"Request #{requestId} requires manual assignment (no engineers available for location: {location})",
+                        $"Request #{requestId} requires manual assignment (no Engineers available for location: {location})",
                         new Dictionary<string, object> { { "MaintenanceRequestId", requestId } }
                     );
                     return;
                 }
 
-                // Get engineer workloads (active maintenance requests)
+                // Get Engineer workloads (active maintenance requests)
                 var allRequests = await _unitOfWork.MaintenanceRequests
                     .GetFilteredAsync(mr => mr.AssignedToEngineerId != null && 
                         mr.Status != MaintenanceRequestStatus.Completed && 
@@ -534,20 +534,20 @@ namespace SoitMed.Services
                     .GroupBy(mr => mr.AssignedToEngineerId)
                     .ToDictionary(g => g.Key!, g => g.Count());
 
-                // Select engineer with least workload
+                // Select Engineer with least workload
                 Engineer? selectedEngineer = null;
                 int minWorkload = int.MaxValue;
 
-                foreach (var engineer in availableEngineers)
+                foreach (var Engineer in availableEngineers)
                 {
-                    if (string.IsNullOrEmpty(engineer.UserId))
+                    if (string.IsNullOrEmpty(Engineer.UserId))
                         continue;
 
-                    var workload = workloadDict.GetValueOrDefault(engineer.UserId, 0);
+                    var workload = workloadDict.GetValueOrDefault(Engineer.UserId, 0);
                     if (workload < minWorkload)
                     {
                         minWorkload = workload;
-                        selectedEngineer = engineer;
+                        selectedEngineer = Engineer;
                     }
                 }
 
@@ -563,10 +563,10 @@ namespace SoitMed.Services
                         await _unitOfWork.MaintenanceRequests.UpdateAsync(request);
                         await _unitOfWork.SaveChangesAsync();
 
-                        _logger.LogInformation("Auto-assigned request {RequestId} to engineer {EngineerId}", 
+                        _logger.LogInformation("Auto-assigned request {RequestId} to Engineer {EngineerId}", 
                             requestId, selectedEngineer.UserId);
 
-                        // Notify engineer
+                        // Notify Engineer
                         await _notificationService.CreateNotificationAsync(
                             selectedEngineer.UserId,
                             "New maintenance request assigned",

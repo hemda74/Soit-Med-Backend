@@ -3,15 +3,15 @@ using SoitMed.Models;
 
 namespace SoitMed.Repositories
 {
-    public class SalesmanTargetRepository : BaseRepository<SalesmanTarget>, ISalesmanTargetRepository
+    public class SalesManTargetRepository : BaseRepository<SalesManTarget>, ISalesManTargetRepository
     {
-        public SalesmanTargetRepository(Context context) : base(context)
+        public SalesManTargetRepository(Context context) : base(context)
         {
         }
 
-        public async Task<List<SalesmanTarget>> GetTargetsBySalesmanAsync(string salesmanId, int year, int? quarter = null)
+        public async Task<List<SalesManTarget>> GetTargetsBySalesManAsync(string salesmanId, int year, int? quarter = null)
         {
-            var query = _dbSet.Where(t => t.SalesmanId == salesmanId && t.Year == year);
+            var query = _dbSet.Where(t => t.SalesManId == salesmanId && t.Year == year);
 
             if (quarter.HasValue)
             {
@@ -21,7 +21,7 @@ namespace SoitMed.Repositories
             return await query.ToListAsync();
         }
 
-        public async Task<SalesmanTarget?> GetTeamTargetAsync(int year, int? quarter = null)
+        public async Task<SalesManTarget?> GetTeamTargetAsync(int year, int? quarter = null)
         {
             var query = _dbSet.Where(t => t.IsTeamTarget && t.Year == year);
 
@@ -33,7 +33,7 @@ namespace SoitMed.Repositories
             return await query.FirstOrDefaultAsync();
         }
 
-        public async Task<List<SalesmanTarget>> GetAllTargetsForPeriodAsync(int year, int? quarter = null)
+        public async Task<List<SalesManTarget>> GetAllTargetsForPeriodAsync(int year, int? quarter = null)
         {
             var query = _dbSet.Where(t => t.Year == year);
 
@@ -45,9 +45,9 @@ namespace SoitMed.Repositories
             return await query.ToListAsync();
         }
 
-        public async Task<SalesmanTarget?> GetTargetBySalesmanAndPeriodAsync(string? salesmanId, int year, int? quarter = null)
+        public async Task<SalesManTarget?> GetTargetBySalesManAndPeriodAsync(string? salesmanId, int year, int? quarter = null)
         {
-            var query = _dbSet.Where(t => t.SalesmanId == salesmanId && t.Year == year);
+            var query = _dbSet.Where(t => t.SalesManId == salesmanId && t.Year == year);
 
             if (quarter.HasValue)
             {

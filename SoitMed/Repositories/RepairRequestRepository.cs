@@ -17,24 +17,24 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<RepairRequest>> GetByDoctorIdAsync(int doctorId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<RepairRequest>> GetByDoctorIdAsync(int DoctorId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .Where(rr => rr.DoctorId == doctorId)
+                .Where(rr => rr.DoctorId == DoctorId)
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<RepairRequest>> GetByTechnicianIdAsync(int technicianId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<RepairRequest>> GetByTechnicianIdAsync(int TechnicianId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .Where(rr => rr.TechnicianId == technicianId)
+                .Where(rr => rr.TechnicianId == TechnicianId)
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<RepairRequest>> GetByAssignedEngineerIdAsync(int engineerId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<RepairRequest>> GetByAssignedEngineerIdAsync(int EngineerId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .Where(rr => rr.AssignedEngineerId == engineerId)
+                .Where(rr => rr.AssignedEngineerId == EngineerId)
                 .ToListAsync(cancellationToken);
         }
 

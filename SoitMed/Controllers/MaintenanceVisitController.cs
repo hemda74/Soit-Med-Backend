@@ -79,7 +79,7 @@ namespace SoitMed.Controllers
             }
         }
 
-        [HttpGet("engineer/my-visits")]
+        [HttpGet("Engineer/my-visits")]
         [Authorize(Roles = "Engineer")]
         public async Task<IActionResult> GetMyVisits()
         {
@@ -94,7 +94,7 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting engineer visits");
+                _logger.LogError(ex, "Error getting Engineer visits");
                 return ErrorResponse(ex.Message);
             }
         }

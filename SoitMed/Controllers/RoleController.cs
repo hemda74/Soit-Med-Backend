@@ -24,14 +24,27 @@ namespace SoitMed.Controllers
 		[Authorize(Roles = "SuperAdmin")]
 		public async Task<IActionResult> CreateRole(string roleName)
 		{
-			bool roleExist = await roleManager.RoleExistsAsync(roleName);
+			// Normalize and validate the role name
+			var normalizedRoleName = UserRoles.NormalizeAndValidateRole(roleName);
+			if (normalizedRoleName == null)
+			{
+				return BadRequest(new
+				{
+					error = "Invalid role name",
+					message = $"Role '{roleName}' is not valid. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}",
+					validRoles = UserRoles.GetAllRoles()
+				});
+			}
+
+			// Check if role already exists (case-insensitive check)
+			bool roleExist = await roleManager.RoleExistsAsync(normalizedRoleName);
 
 			if (!roleExist)
 			{
-				IdentityResult result = await roleManager.CreateAsync(new IdentityRole { Name = roleName });
+				IdentityResult result = await roleManager.CreateAsync(new IdentityRole { Name = normalizedRoleName });
 				if (result.Succeeded)
 				{
-					return Ok($"Role {roleName} created successfully");
+					return Ok($"Role {normalizedRoleName} created successfully");
 				}
 				else
 				{
@@ -41,7 +54,7 @@ namespace SoitMed.Controllers
 			}
 			else
 			{
-				return BadRequest($"Role {roleName} already exists");
+				return BadRequest($"Role {normalizedRoleName} already exists");
 			}
 
 		}
@@ -79,7 +92,7 @@ namespace SoitMed.Controllers
 
 			switch (role.ToLower())
 			{
-				case "doctor":
+				case "Doctor":
 					roleSpecificFields.AddRange(new[]
 					{
 						new { name = "specialty", type = "string", required = true, label = "Medical Specialty" },
@@ -88,7 +101,7 @@ namespace SoitMed.Controllers
 					requiredData.Add(new { endpoint = "/api/Hospital", description = "Get list of hospitals for hospitalId selection" });
 					break;
 
-				case "engineer":
+				case "Engineer":
 					roleSpecificFields.AddRange(new[]
 					{
 						new { name = "specialty", type = "string", required = true, label = "Engineering Specialty", itemType = (string)null },
@@ -97,7 +110,7 @@ namespace SoitMed.Controllers
 					requiredData.Add(new { endpoint = "/api/Governorate", description = "Get list of governorates for governorateIds selection" });
 					break;
 
-				case "technician":
+				case "Technician":
 					roleSpecificFields.AddRange(new[]
 					{
 						new { name = "department", type = "string", required = true, label = "Technical Department" },
@@ -106,11 +119,11 @@ namespace SoitMed.Controllers
 					requiredData.Add(new { endpoint = "/api/Hospital", description = "Get list of hospitals for hospitalId selection" });
 					break;
 
-				case "admin":
+				case "Admin":
 					roleSpecificFields.Add(new { name = "accessLevel", type = "string", required = false, label = "Access Level (Optional)" });
 					break;
 
-				case "financemanager":
+				case "FinanceManager":
 					roleSpecificFields.Add(new { name = "budgetAuthority", type = "string", required = false, label = "Budget Authority (Optional)" });
 					break;
 
@@ -118,7 +131,7 @@ namespace SoitMed.Controllers
 					roleSpecificFields.Add(new { name = "legalSpecialty", type = "string", required = false, label = "Legal Specialty (Optional)" });
 					break;
 
-				case "salesman":
+				case "SalesMan":
 					roleSpecificFields.AddRange(new[]
 					{
 						new { name = "territory", type = "string", required = false, label = "Sales Territory (Optional)" },
@@ -127,8 +140,8 @@ namespace SoitMed.Controllers
 					break;
 
 				case "financeemployee":
-				case "legalemployee":
-				case "superadmin":
+				case "LegalEmployee":
+				case "superAdmin":
 					// These roles only need base fields
 					break;
 
@@ -305,15 +318,27 @@ namespace SoitMed.Controllers
 		[Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> UpdateRole(string roleName, string newRoleName)
         {
+            // Normalize and validate the new role name
+            var normalizedNewRoleName = UserRoles.NormalizeAndValidateRole(newRoleName);
+            if (normalizedNewRoleName == null)
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid role name",
+                    message = $"Role '{newRoleName}' is not valid. Valid roles are: {string.Join(", ", UserRoles.GetAllRoles())}",
+                    validRoles = UserRoles.GetAllRoles()
+                });
+            }
+
             IdentityRole? role = await roleManager.FindByNameAsync(roleName);
             if (role != null)
             {
 
-                role.Name = newRoleName;
+                role.Name = normalizedNewRoleName;
                 IdentityResult result = await roleManager.UpdateAsync(role);
                 if (result.Succeeded)
                 {
-                    return Ok($"Role {roleName} updated to {newRoleName} successfully");
+                    return Ok($"Role {roleName} updated to {normalizedNewRoleName} successfully");
                 }
                 else
                 {

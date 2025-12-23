@@ -130,10 +130,10 @@ namespace SoitMed.Controllers
         }
 
         // Create Doctor with User Account and Optional Image
-        [HttpPost("doctor")]
+        [HttpPost("Doctor")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateDoctor([FromForm] CreateDoctorWithImageDTO doctorDTO, [FromForm] IFormFile? profileImage = null)
+        public async Task<IActionResult> CreateDoctor([FromForm] CreateDoctorWithImageDTO DoctorDTO, [FromForm] IFormFile? profileImage = null)
         {
             try
             {
@@ -143,11 +143,11 @@ namespace SoitMed.Controllers
                 }
 
                 // Check if hospital exists
-                var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(doctorDTO.HospitalId);
+                var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(DoctorDTO.HospitalId);
                 if (hospital == null)
                 {
                     return BadRequest(ValidationHelperService.CreateBusinessLogicError(
-                        $"Hospital with ID '{doctorDTO.HospitalId}' not found. Please verify the hospital ID is correct.",
+                        $"Hospital with ID '{DoctorDTO.HospitalId}' not found. Please verify the hospital ID is correct.",
                         "HospitalId",
                         "HOSPITAL_NOT_FOUND"
                     ));
@@ -166,28 +166,28 @@ namespace SoitMed.Controllers
 
                 // Generate custom user ID
                 string customUserId = await userIdGenerationService.GenerateUserIdAsync(
-                    doctorDTO.FirstName ?? "Unknown",
-                    doctorDTO.LastName ?? "User",
+                    DoctorDTO.FirstName ?? "Unknown",
+                    DoctorDTO.LastName ?? "User",
                     UserRoles.Doctor,
-                    doctorDTO.DepartmentId ?? medicalDepartment.Id,
-                    doctorDTO.HospitalId
+                    DoctorDTO.DepartmentId ?? medicalDepartment.Id,
+                    DoctorDTO.HospitalId
                 );
 
                 // Create user account
                 var user = new ApplicationUser
                 {
                     Id = customUserId, // Use custom generated ID
-                    UserName = doctorDTO.Email, // Use email as username
-                    Email = doctorDTO.Email,
-                    FirstName = doctorDTO.FirstName,
-                    LastName = doctorDTO.LastName,
-                    PhoneNumber = doctorDTO.PhoneNumber,
-                    DepartmentId = doctorDTO.DepartmentId ?? medicalDepartment.Id,
+                    UserName = DoctorDTO.Email, // Use email as username
+                    Email = DoctorDTO.Email,
+                    FirstName = DoctorDTO.FirstName,
+                    LastName = DoctorDTO.LastName,
+                    PhoneNumber = DoctorDTO.PhoneNumber,
+                    DepartmentId = DoctorDTO.DepartmentId ?? medicalDepartment.Id,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true
                 };
 
-                var result = await userManager.CreateAsync(user, doctorDTO.Password);
+                var result = await userManager.CreateAsync(user, DoctorDTO.Password);
                 if (!result.Succeeded)
                 {
                     var identityErrors = result.Errors.Select(e => e.Description).ToList();
@@ -201,36 +201,36 @@ namespace SoitMed.Controllers
                 await userManager.AddToRoleAsync(user, UserRoles.Doctor);
 
                 // Create Doctor entity
-                var doctor = new Doctor
+                var Doctor = new Doctor
                 {
-                    Name = $"{doctorDTO.FirstName} {doctorDTO.LastName}".Trim(),
-                    Specialty = doctorDTO.Specialty,
+                    Name = $"{DoctorDTO.FirstName} {DoctorDTO.LastName}".Trim(),
+                    Specialty = DoctorDTO.Specialty,
                     UserId = user.Id,
-                    HospitalId = doctorDTO.HospitalId,
+                    HospitalId = DoctorDTO.HospitalId,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true
                 };
 
-                await _unitOfWork.Doctors.CreateAsync(doctor);
+                await _unitOfWork.Doctors.CreateAsync(Doctor);
                 await _unitOfWork.SaveChangesAsync();
 
                 // Create Doctor-Hospital relationship
-                var doctorHospital = new DoctorHospital
+                var DoctorHospital = new DoctorHospital
                 {
-                    DoctorId = doctor.DoctorId,
-                    HospitalId = doctorDTO.HospitalId,
+                    DoctorId = Doctor.DoctorId,
+                    HospitalId = DoctorDTO.HospitalId,
                     IsActive = true,
                     AssignedAt = DateTime.UtcNow
                 };
-                await _unitOfWork.DoctorHospitals.CreateAsync(doctorHospital);
+                await _unitOfWork.DoctorHospitals.CreateAsync(DoctorHospital);
                 await _unitOfWork.SaveChangesAsync();
 
                 var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                     profileImage, 
                     user, 
-                    "doctor", 
+                    "Doctor", 
                     medicalDepartment.Name, 
-                    doctorDTO.AltText,
+                    DoctorDTO.AltText,
                     userImage => new DoctorImageInfo
                     {
                         Id = userImage.Id,
@@ -255,11 +255,11 @@ namespace SoitMed.Controllers
                     Role = UserRoles.Doctor,
                     DepartmentName = medicalDepartment.Name,
                     CreatedAt = user.CreatedAt,
-                    DoctorId = doctor.DoctorId,
-                    Specialty = doctor.Specialty,
+                    DoctorId = Doctor.DoctorId,
+                    Specialty = Doctor.Specialty,
                     HospitalName = hospital.Name,
                     ProfileImage = profileImageInfo as DoctorImageInfo,
-                    Message = $"Doctor '{doctor.Name}' created successfully and assigned to hospital '{hospital.Name}'"
+                    Message = $"Doctor '{Doctor.Name}' created successfully and assigned to hospital '{hospital.Name}'"
                 });
             }
             catch (Exception ex)
@@ -269,7 +269,7 @@ namespace SoitMed.Controllers
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 
                 return BadRequest(new { 
-                    message = "An error occurred while creating the doctor. Please try again.",
+                    message = "An error occurred while creating the Doctor. Please try again.",
                     error = ex.Message 
                 });
             }
@@ -278,10 +278,10 @@ namespace SoitMed.Controllers
 
 
         // Create Engineer with User Account
-        [HttpPost("engineer")]
+        [HttpPost("Engineer")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateEngineer([FromForm] CreateEngineerWithImageDTO engineerDTO, [FromForm] IFormFile? profileImage = null)
+        public async Task<IActionResult> CreateEngineer([FromForm] CreateEngineerWithImageDTO EngineerDTO, [FromForm] IFormFile? profileImage = null)
         {
             if (!ModelState.IsValid)
             {
@@ -289,11 +289,11 @@ namespace SoitMed.Controllers
             }
 
             // Validate governorates
-            var governorates = await _unitOfWork.Governorates.GetFilteredAsync(g => engineerDTO.GovernorateIds.Contains(g.GovernorateId));
+            var governorates = await _unitOfWork.Governorates.GetFilteredAsync(g => EngineerDTO.GovernorateIds.Contains(g.GovernorateId));
 
-            if (governorates.Count() != engineerDTO.GovernorateIds.Count)
+            if (governorates.Count() != EngineerDTO.GovernorateIds.Count)
             {
-                var missingIds = engineerDTO.GovernorateIds.Except(governorates.Select(g => g.GovernorateId));
+                var missingIds = EngineerDTO.GovernorateIds.Except(governorates.Select(g => g.GovernorateId));
                 return BadRequest(ValidationHelperService.CreateBusinessLogicError(
                     $"Governorates with IDs [{string.Join(", ", missingIds)}] not found. Please verify the governorate IDs are correct.",
                     "GovernorateIds",
@@ -302,8 +302,8 @@ namespace SoitMed.Controllers
             }
 
             // Get Engineering department
-            var engineeringDepartment = await _unitOfWork.Departments.GetByNameAsync("Engineering");
-            if (engineeringDepartment == null)
+            var EngineeringDepartment = await _unitOfWork.Departments.GetByNameAsync("Engineering");
+            if (EngineeringDepartment == null)
             {
                 return BadRequest(ValidationHelperService.CreateBusinessLogicError(
                     "Engineering department not found. Please ensure departments are seeded in the system.",
@@ -314,10 +314,10 @@ namespace SoitMed.Controllers
 
             // Generate custom user ID
             string customUserId = await userIdGenerationService.GenerateUserIdAsync(
-                engineerDTO.FirstName ?? "Unknown",
-                engineerDTO.LastName ?? "User",
+                EngineerDTO.FirstName ?? "Unknown",
+                EngineerDTO.LastName ?? "User",
                 UserRoles.Engineer,
-                engineerDTO.DepartmentId ?? engineeringDepartment.Id,
+                EngineerDTO.DepartmentId ?? EngineeringDepartment.Id,
                 null // Engineers don't use hospital ID
             );
 
@@ -325,17 +325,17 @@ namespace SoitMed.Controllers
             var user = new ApplicationUser
             {
                 Id = customUserId, // Use custom generated ID
-                UserName = engineerDTO.Email, // Use email as username
-                Email = engineerDTO.Email,
-                FirstName = engineerDTO.FirstName,
-                LastName = engineerDTO.LastName,
-                PhoneNumber = engineerDTO.PhoneNumber,
-                DepartmentId = engineerDTO.DepartmentId ?? engineeringDepartment.Id,
+                UserName = EngineerDTO.Email, // Use email as username
+                Email = EngineerDTO.Email,
+                FirstName = EngineerDTO.FirstName,
+                LastName = EngineerDTO.LastName,
+                PhoneNumber = EngineerDTO.PhoneNumber,
+                DepartmentId = EngineerDTO.DepartmentId ?? EngineeringDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            var result = await userManager.CreateAsync(user, engineerDTO.Password);
+            var result = await userManager.CreateAsync(user, EngineerDTO.Password);
             if (!result.Succeeded)
             {
                 var identityErrors = result.Errors.Select(e => e.Description).ToList();
@@ -349,19 +349,19 @@ namespace SoitMed.Controllers
             await userManager.AddToRoleAsync(user, UserRoles.Engineer);
 
             // Create Engineer entity
-            var engineer = new Engineer
+            var Engineer = new Engineer
             {
-                Name = $"{engineerDTO.FirstName} {engineerDTO.LastName}".Trim(),
-                Specialty = engineerDTO.Specialty,
+                Name = $"{EngineerDTO.FirstName} {EngineerDTO.LastName}".Trim(),
+                Specialty = EngineerDTO.Specialty,
                 UserId = user.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            await _unitOfWork.Engineers.CreateAsync(engineer);
+            await _unitOfWork.Engineers.CreateAsync(Engineer);
             await _unitOfWork.SaveChangesAsync();
 
-            // Assign governorates to engineer
+            // Assign governorates to Engineer
             // Create Engineer-Governorate relationships
             // Note: EngineerGovernorate is a junction table, we'll add it directly to context
             // This would need a proper repository if we want to follow the pattern completely
@@ -370,9 +370,9 @@ namespace SoitMed.Controllers
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "engineer", 
-                engineeringDepartment.Name, 
-                engineerDTO.AltText,
+                "Engineer", 
+                EngineeringDepartment.Name, 
+                EngineerDTO.AltText,
                 userImage => new EngineerImageInfo
                 {
                     Id = userImage.Id,
@@ -395,21 +395,21 @@ namespace SoitMed.Controllers
                 UserId = user.Id,
                 Email = user.Email, // Email is now the username
                 Role = UserRoles.Engineer,
-                DepartmentName = engineeringDepartment.Name,
+                DepartmentName = EngineeringDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                EngineerId = engineer.EngineerId.ToString(),
-                Specialty = engineer.Specialty,
+                EngineerId = Engineer.EngineerId.ToString(),
+                Specialty = Engineer.Specialty,
                 GovernorateNames = governorates?.Select(g => g.Name).ToList() ?? new List<string>(),
                 ProfileImage = profileImageInfo as EngineerImageInfo,
-                Message = $"Engineer '{engineer.Name}' created successfully and assigned to {governorates?.Count()} governorate(s)"
+                Message = $"Engineer '{Engineer.Name}' created successfully and assigned to {governorates?.Count()} governorate(s)"
             });
         }
 
         // Create Technician with User Account
-        [HttpPost("technician")]
+        [HttpPost("Technician")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateTechnician([FromForm] CreateTechnicianWithImageDTO technicianDTO, [FromForm] IFormFile? profileImage = null)
+        public async Task<IActionResult> CreateTechnician([FromForm] CreateTechnicianWithImageDTO TechnicianDTO, [FromForm] IFormFile? profileImage = null)
         {
             if (!ModelState.IsValid)
             {
@@ -417,11 +417,11 @@ namespace SoitMed.Controllers
             }
 
             // Check if hospital exists
-            var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(technicianDTO.HospitalId);
+            var hospital = await _unitOfWork.Hospitals.GetByHospitalIdAsync(TechnicianDTO.HospitalId);
             if (hospital == null)
             {
                 return BadRequest(ValidationHelperService.CreateBusinessLogicError(
-                    $"Hospital with ID '{technicianDTO.HospitalId}' not found. Please verify the hospital ID is correct.",
+                    $"Hospital with ID '{TechnicianDTO.HospitalId}' not found. Please verify the hospital ID is correct.",
                     "HospitalId",
                     "HOSPITAL_NOT_FOUND"
                 ));
@@ -440,28 +440,28 @@ namespace SoitMed.Controllers
 
             // Generate custom user ID
             string customUserId = await userIdGenerationService.GenerateUserIdAsync(
-                technicianDTO.FirstName ?? "Unknown",
-                technicianDTO.LastName ?? "User",
+                TechnicianDTO.FirstName ?? "Unknown",
+                TechnicianDTO.LastName ?? "User",
                 UserRoles.Technician,
-                technicianDTO.DepartmentId ?? medicalDepartment.Id,
-                technicianDTO.HospitalId
+                TechnicianDTO.DepartmentId ?? medicalDepartment.Id,
+                TechnicianDTO.HospitalId
             );
 
             // Create user account
             var user = new ApplicationUser
             {
                 Id = customUserId, // Use custom generated ID
-                UserName = technicianDTO.Email, // Use email as username
-                Email = technicianDTO.Email,
-                FirstName = technicianDTO.FirstName,
-                LastName = technicianDTO.LastName,
-                PhoneNumber = technicianDTO.PhoneNumber,
-                DepartmentId = technicianDTO.DepartmentId ?? medicalDepartment.Id,
+                UserName = TechnicianDTO.Email, // Use email as username
+                Email = TechnicianDTO.Email,
+                FirstName = TechnicianDTO.FirstName,
+                LastName = TechnicianDTO.LastName,
+                PhoneNumber = TechnicianDTO.PhoneNumber,
+                DepartmentId = TechnicianDTO.DepartmentId ?? medicalDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            var result = await userManager.CreateAsync(user, technicianDTO.Password);
+            var result = await userManager.CreateAsync(user, TechnicianDTO.Password);
             if (!result.Succeeded)
             {
                 var identityErrors = result.Errors.Select(e => e.Description).ToList();
@@ -475,25 +475,25 @@ namespace SoitMed.Controllers
             await userManager.AddToRoleAsync(user, UserRoles.Technician);
 
             // Create Technician entity
-            var technician = new Technician
+            var Technician = new Technician
             {
-                Name = $"{technicianDTO.FirstName} {technicianDTO.LastName}".Trim(),
-                Department = technicianDTO.Department,
-                HospitalId = technicianDTO.HospitalId,
+                Name = $"{TechnicianDTO.FirstName} {TechnicianDTO.LastName}".Trim(),
+                Department = TechnicianDTO.Department,
+                HospitalId = TechnicianDTO.HospitalId,
                 UserId = user.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            await _unitOfWork.Technicians.CreateAsync(technician);
+            await _unitOfWork.Technicians.CreateAsync(Technician);
             await _unitOfWork.SaveChangesAsync();
 
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "technician", 
+                "Technician", 
                 medicalDepartment.Name, 
-                technicianDTO.AltText,
+                TechnicianDTO.AltText,
                 userImage => new TechnicianImageInfo
                 {
                     Id = userImage.Id,
@@ -518,19 +518,19 @@ namespace SoitMed.Controllers
                 Role = UserRoles.Technician,
                 DepartmentName = medicalDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                TechnicianId = technician.TechnicianId,
-                Department = technician.Department,
+                TechnicianId = Technician.TechnicianId,
+                Department = Technician.Department,
                 HospitalName = hospital.Name,
                 ProfileImage = profileImageInfo as TechnicianImageInfo,
-                Message = $"Technician '{technician.Name}' created successfully and assigned to hospital '{hospital.Name}'"
+                Message = $"Technician '{Technician.Name}' created successfully and assigned to hospital '{hospital.Name}'"
             });
         }
 
         // Create Admin with User Account
-        [HttpPost("admin")]
+        [HttpPost("Admin")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> CreateAdmin([FromForm] CreateAdminWithImageDTO adminDTO, [FromForm] IFormFile? profileImage = null)
+        public async Task<IActionResult> CreateAdmin([FromForm] CreateAdminWithImageDTO AdminDTO, [FromForm] IFormFile? profileImage = null)
         {
             if (!ModelState.IsValid)
             {
@@ -538,8 +538,8 @@ namespace SoitMed.Controllers
             }
 
             // Get Administration department
-            var adminDepartment = await _unitOfWork.Departments.GetByNameAsync("Administration");
-            if (adminDepartment == null)
+            var AdminDepartment = await _unitOfWork.Departments.GetByNameAsync("Administration");
+            if (AdminDepartment == null)
             {
                 return BadRequest(ValidationHelperService.CreateBusinessLogicError(
                     "Administration department not found. Please ensure departments are seeded in the system.",
@@ -550,10 +550,10 @@ namespace SoitMed.Controllers
 
             // Generate custom user ID
             string customUserId = await userIdGenerationService.GenerateUserIdAsync(
-                adminDTO.FirstName ?? "Unknown",
-                adminDTO.LastName ?? "User",
+                AdminDTO.FirstName ?? "Unknown",
+                AdminDTO.LastName ?? "User",
                 UserRoles.Admin,
-                adminDTO.DepartmentId ?? adminDepartment.Id,
+                AdminDTO.DepartmentId ?? AdminDepartment.Id,
                 null // Admins don't use hospital ID
             );
 
@@ -561,17 +561,17 @@ namespace SoitMed.Controllers
             var user = new ApplicationUser
             {
                 Id = customUserId, // Use custom generated ID
-                UserName = adminDTO.Email, // Use email as username
-                Email = adminDTO.Email,
-                FirstName = adminDTO.FirstName,
-                LastName = adminDTO.LastName,
-                PhoneNumber = adminDTO.PhoneNumber,
-                DepartmentId = adminDTO.DepartmentId ?? adminDepartment.Id,
+                UserName = AdminDTO.Email, // Use email as username
+                Email = AdminDTO.Email,
+                FirstName = AdminDTO.FirstName,
+                LastName = AdminDTO.LastName,
+                PhoneNumber = AdminDTO.PhoneNumber,
+                DepartmentId = AdminDTO.DepartmentId ?? AdminDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            var result = await userManager.CreateAsync(user, adminDTO.Password);
+            var result = await userManager.CreateAsync(user, AdminDTO.Password);
             if (!result.Succeeded)
             {
                 var identityErrors = result.Errors.Select(e => e.Description).ToList();
@@ -587,9 +587,9 @@ namespace SoitMed.Controllers
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "admin", 
-                adminDepartment.Name, 
-                adminDTO.AltText,
+                "Admin", 
+                AdminDepartment.Name, 
+                AdminDTO.AltText,
                 userImage => new AdminImageInfo
                 {
                     Id = userImage.Id,
@@ -612,7 +612,7 @@ namespace SoitMed.Controllers
                 UserId = user.Id,
                 Email = user.Email, // Email is now the username
                 Role = UserRoles.Admin,
-                DepartmentName = adminDepartment.Name,
+                DepartmentName = AdminDepartment.Name,
                 CreatedAt = user.CreatedAt,
                 ProfileImage = profileImageInfo as AdminImageInfo,
                 Message = $"Admin '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
@@ -620,7 +620,7 @@ namespace SoitMed.Controllers
         }
 
         // Create Finance Manager with User Account
-        [HttpPost("finance-manager")]
+        [HttpPost("FinanceManager")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateFinanceManager([FromForm] CreateFinanceManagerWithImageDTO financeDTO, [FromForm] IFormFile? profileImage = null)
@@ -680,7 +680,7 @@ namespace SoitMed.Controllers
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "finance-manager", 
+                "FinanceManager", 
                 financeDepartment.Name, 
                 financeDTO.AltText,
                 userImage => new FinanceManagerImageInfo
@@ -713,7 +713,7 @@ namespace SoitMed.Controllers
         }
 
         // Create Legal Manager with User Account
-        [HttpPost("legal-manager")]
+        [HttpPost("LegalManager")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateLegalManager([FromForm] CreateLegalManagerWithImageDTO legalDTO, [FromForm] IFormFile? profileImage = null)
@@ -773,7 +773,7 @@ namespace SoitMed.Controllers
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "legal-manager", 
+                "LegalManager", 
                 legalDepartment.Name, 
                 legalDTO.AltText,
                 userImage => new LegalManagerImageInfo
@@ -805,11 +805,11 @@ namespace SoitMed.Controllers
             });
         }
 
-        // Create Salesman with User Account
-        [HttpPost("salesman")]
+        // Create SalesMan with User Account
+        [HttpPost("SalesMan")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateSalesman([FromForm] CreateSalesmanWithImageDTO salesDTO, [FromForm] IFormFile? profileImage = null)
+        public async Task<IActionResult> CreateSalesMan([FromForm] CreateSalesManWithImageDTO salesDTO, [FromForm] IFormFile? profileImage = null)
         {
             if (!ModelState.IsValid)
             {
@@ -831,7 +831,7 @@ namespace SoitMed.Controllers
             string customUserId = await userIdGenerationService.GenerateUserIdAsync(
                 salesDTO.FirstName ?? "Unknown",
                 salesDTO.LastName ?? "User",
-                UserRoles.Salesman,
+                UserRoles.SalesMan,
                 salesDTO.DepartmentId ?? salesDepartment.Id,
                 null // Salesmen don't use hospital ID
             );
@@ -860,16 +860,16 @@ namespace SoitMed.Controllers
                 ));
             }
 
-            // Assign Salesman role
-            await userManager.AddToRoleAsync(user, UserRoles.Salesman);
+            // Assign SalesMan role
+            await userManager.AddToRoleAsync(user, UserRoles.SalesMan);
 
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "salesman", 
+                "SalesMan", 
                 salesDepartment.Name, 
                 salesDTO.AltText,
-                userImage => new SalesmanImageInfo
+                userImage => new SalesManImageInfo
                 {
                     Id = userImage.Id,
                     FileName = userImage.FileName,
@@ -886,20 +886,20 @@ namespace SoitMed.Controllers
                 return BadRequest(new { message = imageError });
             }
 
-            return Ok(new CreatedSalesmanWithImageResponseDTO
+            return Ok(new CreatedSalesManWithImageResponseDTO
             {
                 UserId = user.Id,
                 Email = user.Email, // Email is now the username
-                Role = UserRoles.Salesman,
+                Role = UserRoles.SalesMan,
                 DepartmentName = salesDepartment.Name,
                 CreatedAt = user.CreatedAt,
-                ProfileImage = profileImageInfo as SalesmanImageInfo,
-                Message = $"Salesman '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
+                ProfileImage = profileImageInfo as SalesManImageInfo,
+                Message = $"SalesMan '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
             });
         }
 
         // Create Sales Manager with User Account
-        [HttpPost("sales-manager")]
+        [HttpPost("SalesManager")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         [ProducesResponseType(typeof(CreatedSalesManagerWithImageResponseDTO), 200)]
@@ -961,7 +961,7 @@ namespace SoitMed.Controllers
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "sales-manager", 
+                "SalesManager", 
                 salesDepartment.Name, 
                 salesManagerDTO.AltText,
                 userImage => new SalesManagerImageInfo
@@ -997,7 +997,7 @@ namespace SoitMed.Controllers
         }
 
         // Create Finance Employee with User Account
-        [HttpPost("finance-employee")]
+        [HttpPost("FinanceEmployee")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin,FinanceManager")]
         public async Task<IActionResult> CreateFinanceEmployee([FromForm] CreateFinanceEmployeeWithImageDTO financeEmployeeDTO, [FromForm] IFormFile? profileImage = null)
@@ -1057,7 +1057,7 @@ namespace SoitMed.Controllers
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "finance-employee", 
+                "FinanceEmployee", 
                 financeDepartment.Name, 
                 financeEmployeeDTO.AltText,
                 userImage => new FinanceEmployeeImageInfo
@@ -1090,7 +1090,7 @@ namespace SoitMed.Controllers
         }
 
         // Create Legal Employee with User Account
-        [HttpPost("legal-employee")]
+        [HttpPost("LegalEmployee")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin,LegalManager")]
         public async Task<IActionResult> CreateLegalEmployee([FromForm] CreateLegalEmployeeWithImageDTO legalEmployeeDTO, [FromForm] IFormFile? profileImage = null)
@@ -1150,7 +1150,7 @@ namespace SoitMed.Controllers
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "legal-employee", 
+                "LegalEmployee", 
                 legalDepartment.Name, 
                 legalEmployeeDTO.AltText,
                 userImage => new LegalEmployeeImageInfo
@@ -1183,7 +1183,7 @@ namespace SoitMed.Controllers
         }
 
         // Create Maintenance Manager with User Account
-        [HttpPost("maintenance-manager")]
+        [HttpPost("MaintenanceManager")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> CreateMaintenanceManager([FromForm] CreateMaintenanceManagerWithImageDTO maintenanceManagerDTO, [FromForm] IFormFile? profileImage = null)
@@ -1194,8 +1194,8 @@ namespace SoitMed.Controllers
             }
 
             // Get Engineering department
-            var engineeringDepartment = await _unitOfWork.Departments.GetByNameAsync("Engineering");
-            if (engineeringDepartment == null)
+            var EngineeringDepartment = await _unitOfWork.Departments.GetByNameAsync("Engineering");
+            if (EngineeringDepartment == null)
             {
                 return BadRequest(ValidationHelperService.CreateBusinessLogicError(
                     "Engineering department not found. Please ensure departments are seeded in the system.",
@@ -1209,7 +1209,7 @@ namespace SoitMed.Controllers
                 maintenanceManagerDTO.FirstName ?? "Unknown",
                 maintenanceManagerDTO.LastName ?? "User",
                 UserRoles.MaintenanceManager,
-                maintenanceManagerDTO.DepartmentId ?? engineeringDepartment.Id,
+                maintenanceManagerDTO.DepartmentId ?? EngineeringDepartment.Id,
                 null // Maintenance Managers don't use hospital ID
             );
 
@@ -1222,7 +1222,7 @@ namespace SoitMed.Controllers
                 FirstName = maintenanceManagerDTO.FirstName,
                 LastName = maintenanceManagerDTO.LastName,
                 PhoneNumber = maintenanceManagerDTO.PhoneNumber,
-                DepartmentId = maintenanceManagerDTO.DepartmentId ?? engineeringDepartment.Id,
+                DepartmentId = maintenanceManagerDTO.DepartmentId ?? EngineeringDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
@@ -1243,8 +1243,8 @@ namespace SoitMed.Controllers
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "maintenance-manager", 
-                engineeringDepartment.Name, 
+                "MaintenanceManager", 
+                EngineeringDepartment.Name, 
                 maintenanceManagerDTO.AltText,
                 userImage => new MaintenanceManagerImageInfo
                 {
@@ -1268,7 +1268,7 @@ namespace SoitMed.Controllers
                 UserId = user.Id,
                 Email = user.Email, // Email is now the username
                 Role = UserRoles.MaintenanceManager,
-                DepartmentName = engineeringDepartment.Name,
+                DepartmentName = EngineeringDepartment.Name,
                 CreatedAt = user.CreatedAt,
                 ProfileImage = profileImageInfo as MaintenanceManagerImageInfo,
                 Message = $"Maintenance Manager '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
@@ -1276,7 +1276,7 @@ namespace SoitMed.Controllers
         }
 
         // Create Maintenance Support with User Account
-        [HttpPost("maintenance-support")]
+        [HttpPost("MaintenanceSupport")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin,MaintenanceManager")]
         public async Task<IActionResult> CreateMaintenanceSupport([FromForm] CreateMaintenanceSupportWithImageDTO maintenanceSupportDTO, [FromForm] IFormFile? profileImage = null)
@@ -1287,8 +1287,8 @@ namespace SoitMed.Controllers
             }
 
             // Get Engineering department
-            var engineeringDepartment = await _unitOfWork.Departments.GetByNameAsync("Engineering");
-            if (engineeringDepartment == null)
+            var EngineeringDepartment = await _unitOfWork.Departments.GetByNameAsync("Engineering");
+            if (EngineeringDepartment == null)
             {
                 return BadRequest(ValidationHelperService.CreateBusinessLogicError(
                     "Engineering department not found. Please ensure departments are seeded in the system.",
@@ -1302,7 +1302,7 @@ namespace SoitMed.Controllers
                 maintenanceSupportDTO.FirstName ?? "Unknown",
                 maintenanceSupportDTO.LastName ?? "User",
                 UserRoles.MaintenanceSupport,
-                maintenanceSupportDTO.DepartmentId ?? engineeringDepartment.Id,
+                maintenanceSupportDTO.DepartmentId ?? EngineeringDepartment.Id,
                 null // Maintenance Support don't use hospital ID
             );
 
@@ -1315,7 +1315,7 @@ namespace SoitMed.Controllers
                 FirstName = maintenanceSupportDTO.FirstName,
                 LastName = maintenanceSupportDTO.LastName,
                 PhoneNumber = maintenanceSupportDTO.PhoneNumber,
-                DepartmentId = maintenanceSupportDTO.DepartmentId ?? engineeringDepartment.Id,
+                DepartmentId = maintenanceSupportDTO.DepartmentId ?? EngineeringDepartment.Id,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
@@ -1336,8 +1336,8 @@ namespace SoitMed.Controllers
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "maintenance-support", 
-                engineeringDepartment.Name, 
+                "MaintenanceSupport", 
+                EngineeringDepartment.Name, 
                 maintenanceSupportDTO.AltText,
                 userImage => new MaintenanceSupportImageInfo
                 {
@@ -1361,7 +1361,7 @@ namespace SoitMed.Controllers
                 UserId = user.Id,
                 Email = user.Email, // Email is now the username
                 Role = UserRoles.MaintenanceSupport,
-                DepartmentName = engineeringDepartment.Name,
+                DepartmentName = EngineeringDepartment.Name,
                 CreatedAt = user.CreatedAt,
                 ProfileImage = profileImageInfo as MaintenanceSupportImageInfo,
                 Message = $"Maintenance Support '{user.UserName}' created successfully" + (profileImageInfo != null ? " with profile image" : "")
@@ -1369,7 +1369,7 @@ namespace SoitMed.Controllers
         }
 
         // Create Sales Support with User Account
-        [HttpPost("sales-support")]
+        [HttpPost("SalesSupport")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "SuperAdmin,Admin,SalesManager")]
         [ProducesResponseType(typeof(CreatedSalesSupportWithImageResponseDTO), 200)]
@@ -1431,7 +1431,7 @@ namespace SoitMed.Controllers
             var (profileImageInfo, imageError) = await HandleImageUploadAsync(
                 profileImage, 
                 user, 
-                "sales-support", 
+                "SalesSupport", 
                 salesDepartment.Name, 
                 salesSupportDTO.AltText,
                 userImage => new SalesSupportImageInfo

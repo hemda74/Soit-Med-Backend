@@ -15,14 +15,14 @@ namespace SoitMed.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class SalesmanStatisticsController : BaseController
+    public class SalesManStatisticsController : BaseController
     {
-        private readonly ISalesmanStatisticsService _statisticsService;
-        private readonly ILogger<SalesmanStatisticsController> _logger;
+        private readonly ISalesManStatisticsService _statisticsService;
+        private readonly ILogger<SalesManStatisticsController> _logger;
 
-        public SalesmanStatisticsController(
-            ISalesmanStatisticsService statisticsService,
-            ILogger<SalesmanStatisticsController> logger,
+        public SalesManStatisticsController(
+            ISalesManStatisticsService statisticsService,
+            ILogger<SalesManStatisticsController> logger,
             UserManager<ApplicationUser> userManager) 
             : base(userManager)
         {
@@ -34,7 +34,7 @@ namespace SoitMed.Controllers
         /// Get statistics for the current salesman
         /// </summary>
         [HttpGet("my-statistics")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> GetMyStatistics([FromQuery] int? year = null, [FromQuery] int? quarter = null)
         {
             try
@@ -47,7 +47,7 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving statistics for salesman {SalesmanId}", GetCurrentUserId());
+                _logger.LogError(ex, "Error retrieving statistics for salesman {SalesManId}", GetCurrentUserId());
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving statistics"));
             }
         }
@@ -57,7 +57,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{salesmanId}")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> GetSalesmanStatistics(string salesmanId, [FromQuery] int? year = null, [FromQuery] int? quarter = null)
+        public async Task<IActionResult> GetSalesManStatistics(string salesmanId, [FromQuery] int? year = null, [FromQuery] int? quarter = null)
         {
             try
             {
@@ -73,7 +73,7 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving statistics for salesman {SalesmanId}", salesmanId);
+                _logger.LogError(ex, "Error retrieving statistics for salesman {SalesManId}", salesmanId);
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving statistics"));
             }
         }
@@ -103,18 +103,18 @@ namespace SoitMed.Controllers
         /// Get progress for the current salesman (statistics + targets)
         /// </summary>
         [HttpGet("my-progress")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> GetMyProgress([FromQuery] int year, [FromQuery] int? quarter = null)
         {
             try
             {
                 var salesmanId = GetCurrentUserId();
-                var result = await _statisticsService.GetSalesmanProgressAsync(salesmanId, year, quarter);
+                var result = await _statisticsService.GetSalesManProgressAsync(salesmanId, year, quarter);
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Progress retrieved successfully"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving progress for salesman {SalesmanId}", GetCurrentUserId());
+                _logger.LogError(ex, "Error retrieving progress for salesman {SalesManId}", GetCurrentUserId());
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving progress"));
             }
         }
@@ -124,13 +124,13 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{salesmanId}/progress")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> GetSalesmanProgress(string salesmanId, [FromQuery] int? year = null, [FromQuery] int? quarter = null)
+        public async Task<IActionResult> GetSalesManProgress(string salesmanId, [FromQuery] int? year = null, [FromQuery] int? quarter = null)
         {
             try
             {
                 // Use current year as default if year not provided
                 var statisticsYear = year ?? DateTime.UtcNow.Year;
-                var result = await _statisticsService.GetSalesmanProgressAsync(salesmanId, statisticsYear, quarter);
+                var result = await _statisticsService.GetSalesManProgressAsync(salesmanId, statisticsYear, quarter);
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Progress retrieved successfully"));
             }
             catch (ArgumentException ex)
@@ -140,7 +140,7 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving progress for salesman {SalesmanId}", salesmanId);
+                _logger.LogError(ex, "Error retrieving progress for salesman {SalesManId}", salesmanId);
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving progress"));
             }
         }
@@ -148,11 +148,11 @@ namespace SoitMed.Controllers
         /// <summary>
         /// Create a new target for a salesman or team
         /// Money targets: SalesManager only
-        /// Activity targets: Salesman can set for themselves
+        /// Activity targets: SalesMan can set for themselves
         /// </summary>
         [HttpPost("targets")]
-        [Authorize(Roles = "SalesManager,Salesman")]
-        public async Task<IActionResult> CreateTarget([FromBody] CreateSalesmanTargetDTO dto)
+        [Authorize(Roles = "SalesManager,SalesMan")]
+        public async Task<IActionResult> CreateTarget([FromBody] CreateSalesManTargetDTO dto)
         {
             try
             {
@@ -171,11 +171,11 @@ namespace SoitMed.Controllers
                 
                 var userRoles = await UserManager.GetRolesAsync(user);
                 var isManager = userRoles.Contains("SalesManager") || userRoles.Contains("SuperAdmin");
-                var isSalesman = userRoles.Contains("Salesman");
+                var isSalesMan = userRoles.Contains("SalesMan");
 
                 // Log for debugging
-                _logger.LogInformation("CreateTarget - UserId: {UserId}, UserName: {UserName}, Roles: [{Roles}], TargetType: {TargetType}, IsManager: {IsManager}, IsSalesman: {IsSalesman}",
-                    currentUserId, user.UserName, string.Join(", ", userRoles), dto.TargetType, isManager, isSalesman);
+                _logger.LogInformation("CreateTarget - UserId: {UserId}, UserName: {UserName}, Roles: [{Roles}], TargetType: {TargetType}, IsManager: {IsManager}, IsSalesMan: {IsSalesMan}",
+                    currentUserId, user.UserName, string.Join(", ", userRoles), dto.TargetType, isManager, isSalesMan);
 
                 string? managerId = null;
                 string? salesmanId = null;
@@ -192,26 +192,26 @@ namespace SoitMed.Controllers
                 }
                 else if (dto.TargetType == TargetType.Activity)
                 {
-                    if (!isSalesman)
+                    if (!isSalesMan)
                     {
                         _logger.LogWarning("User {UserId} attempted to create activity target but is not a salesman. Roles: {Roles}", 
                             currentUserId, string.Join(",", userRoles));
                         return StatusCode(403, ResponseHelper.CreateErrorResponse($"Only salesmen can create activity targets. Your roles: {string.Join(", ", userRoles)}"));
                     }
                     
-                    // Salesman can only set targets for themselves (not team targets)
-                    // Ignore dto.SalesmanId from client - always use current user's ID for security
+                    // SalesMan can only set targets for themselves (not team targets)
+                    // Ignore dto.SalesManId from client - always use current user's ID for security
                     if (!dto.IsTeamTarget)
                     {
                         // Force salesmanId to be the current user for individual targets
                         salesmanId = currentUserId;
-                        dto.SalesmanId = currentUserId;
+                        dto.SalesManId = currentUserId;
                     }
                     else
                     {
                         // For team targets, salesmanId should be null
                         salesmanId = null;
-                        dto.SalesmanId = null;
+                        dto.SalesManId = null;
                     }
                 }
 
@@ -243,11 +243,11 @@ namespace SoitMed.Controllers
         /// <summary>
         /// Update an existing target
         /// Money targets: SalesManager only
-        /// Activity targets: Salesman can update their own
+        /// Activity targets: SalesMan can update their own
         /// </summary>
         [HttpPut("targets/{targetId}")]
-        [Authorize(Roles = "SalesManager,Salesman")]
-        public async Task<IActionResult> UpdateTarget(long targetId, [FromBody] CreateSalesmanTargetDTO dto)
+        [Authorize(Roles = "SalesManager,SalesMan")]
+        public async Task<IActionResult> UpdateTarget(long targetId, [FromBody] CreateSalesManTargetDTO dto)
         {
             try
             {
@@ -280,11 +280,11 @@ namespace SoitMed.Controllers
         /// <summary>
         /// Partially update an existing target (PATCH)
         /// Money targets: SalesManager only
-        /// Activity targets: Salesman can update their own
+        /// Activity targets: SalesMan can update their own
         /// </summary>
         [HttpPatch("targets/{targetId}")]
-        [Authorize(Roles = "SalesManager,Salesman")]
-        public async Task<IActionResult> PatchTarget(long targetId, [FromBody] CreateSalesmanTargetDTO dto)
+        [Authorize(Roles = "SalesManager,SalesMan")]
+        public async Task<IActionResult> PatchTarget(long targetId, [FromBody] CreateSalesManTargetDTO dto)
         {
             try
             {
@@ -334,18 +334,18 @@ namespace SoitMed.Controllers
         /// <summary>
         /// Get targets for a specific salesman
         /// </summary>
-        [HttpGet("targets/salesman/{salesmanId}")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> GetSalesmanTargets(string salesmanId, [FromQuery] int year)
+        [HttpGet("targets/SalesMan/{salesmanId}")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
+        public async Task<IActionResult> GetSalesManTargets(string salesmanId, [FromQuery] int year)
         {
             try
             {
-                var result = await _statisticsService.GetTargetsForSalesmanAsync(salesmanId, year);
+                var result = await _statisticsService.GetTargetsForSalesManAsync(salesmanId, year);
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Targets retrieved successfully"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving targets for salesman {SalesmanId}", salesmanId);
+                _logger.LogError(ex, "Error retrieving targets for salesman {SalesManId}", salesmanId);
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving targets"));
             }
         }
@@ -354,7 +354,7 @@ namespace SoitMed.Controllers
         /// Get team target for a specific period
         /// </summary>
         [HttpGet("targets/team")]
-        [Authorize(Roles = "Salesman,SalesManager,SuperAdmin")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
         public async Task<IActionResult> GetTeamTarget([FromQuery] int year, [FromQuery] int? quarter = null)
         {
             try
@@ -373,18 +373,18 @@ namespace SoitMed.Controllers
         /// Get targets for the current salesman
         /// </summary>
         [HttpGet("my-targets")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> GetMyTargets([FromQuery] int year)
         {
             try
             {
                 var salesmanId = GetCurrentUserId();
-                var result = await _statisticsService.GetTargetsForSalesmanAsync(salesmanId, year);
+                var result = await _statisticsService.GetTargetsForSalesManAsync(salesmanId, year);
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Targets retrieved successfully"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving targets for salesman {SalesmanId}", GetCurrentUserId());
+                _logger.LogError(ex, "Error retrieving targets for salesman {SalesManId}", GetCurrentUserId());
                 return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving targets"));
             }
         }

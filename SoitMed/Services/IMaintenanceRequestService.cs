@@ -8,7 +8,7 @@ namespace SoitMed.Services
         Task<MaintenanceRequestResponseDTO> CreateMaintenanceRequestAsync(CreateMaintenanceRequestDTO dto, string customerId);
         Task<MaintenanceRequestResponseDTO?> GetMaintenanceRequestAsync(int id);
         Task<IEnumerable<MaintenanceRequestResponseDTO>> GetCustomerRequestsAsync(string customerId);
-        Task<IEnumerable<MaintenanceRequestResponseDTO>> GetEngineerRequestsAsync(string engineerId);
+        Task<IEnumerable<MaintenanceRequestResponseDTO>> GetEngineerRequestsAsync(string EngineerId);
         Task<IEnumerable<MaintenanceRequestResponseDTO>> GetPendingRequestsAsync();
         Task<MaintenanceRequestResponseDTO> AssignToEngineerAsync(int requestId, AssignMaintenanceRequestDTO dto, string maintenanceSupportId);
         Task<MaintenanceRequestResponseDTO> UpdateStatusAsync(int requestId, MaintenanceRequestStatus status, string? notes = null);

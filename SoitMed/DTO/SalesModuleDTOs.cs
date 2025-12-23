@@ -168,7 +168,12 @@ namespace SoitMed.DTO
         public string? PaymentType { get; set; } // Cash, Installments, Other
         
         [Range(0.01, double.MaxValue)]
+        [JsonPropertyName("finalPrice")]
         public decimal? FinalPrice { get; set; } // Required if creating installments
+        
+        [Range(0, double.MaxValue)]
+        [JsonPropertyName("discountAmount")]
+        public decimal? DiscountAmount { get; set; } // Optional discount amount
         
         [MaxLength(200)]
         public string? OfferDuration { get; set; }
@@ -251,7 +256,12 @@ namespace SoitMed.DTO
         public string? PaymentType { get; set; } // Cash, Installments, Other
         
         [Range(0.01, double.MaxValue)]
+        [JsonPropertyName("finalPrice")]
         public decimal? FinalPrice { get; set; }
+        
+        [Range(0, double.MaxValue)]
+        [JsonPropertyName("discountAmount")]
+        public decimal? DiscountAmount { get; set; } // Optional discount amount
         
         [MaxLength(200)]
         public string? OfferDuration { get; set; }
@@ -292,7 +302,12 @@ namespace SoitMed.DTO
         public string? PaymentType { get; set; }
 
         [Range(0.01, double.MaxValue)]
+        [JsonPropertyName("finalPrice")]
         public decimal? FinalPrice { get; set; }
+
+        [Range(0, double.MaxValue)]
+        [JsonPropertyName("discountAmount")]
+        public decimal? DiscountAmount { get; set; } // Optional discount amount
 
         [MaxLength(200)]
         public string? OfferDuration { get; set; }
@@ -326,8 +341,22 @@ namespace SoitMed.DTO
         public string? SalesManagerComments { get; set; }
         public string? SalesManagerRejectionReason { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
         public bool IsSalesManagerApproved { get; set; }
-        public bool CanSendToSalesman { get; set; }
+        public bool CanSendToSalesMan { get; set; }
+        public string? PdfPath { get; set; }
+        public DateTime? PdfGeneratedAt { get; set; }
+        // Additional fields from SalesOffer model
+        [JsonPropertyName("paymentType")]
+        public string? PaymentType { get; set; }
+        [JsonPropertyName("finalPrice")]
+        public decimal? FinalPrice { get; set; }
+        [JsonPropertyName("discountAmount")]
+        public decimal? DiscountAmount { get; set; } // Calculated discount amount
+        [JsonPropertyName("offerDuration")]
+        public string? OfferDuration { get; set; }
+        [JsonPropertyName("notes")]
+        public string? Notes { get; set; }
     }
 
     public class OfferSummaryDTO
@@ -510,8 +539,8 @@ namespace SoitMed.DTO
         public long? OfferId { get; set; }
         public long ClientId { get; set; }
         public string ClientName { get; set; } = string.Empty;
-        public string SalesmanId { get; set; } = string.Empty;
-        public string SalesmanName { get; set; } = string.Empty;
+        public string SalesManId { get; set; } = string.Empty;
+        public string SalesManName { get; set; } = string.Empty;
         public decimal DealValue { get; set; }
         public decimal TotalValue { get; set; } // Alias for DealValue for mobile compatibility
         public DateTime ClosedDate { get; set; }
@@ -534,6 +563,17 @@ namespace SoitMed.DTO
         public string? ReportAttachments { get; set; }
         public DateTime? ReportSubmittedAt { get; set; }
         public DateTime? SentToLegalAt { get; set; }
+        // Salesmen reviews
+        public string? SecondSalesManId { get; set; }
+        public string? SecondSalesManName { get; set; }
+        public string? FirstSalesManReview { get; set; }
+        public DateTime? FirstSalesManReviewSubmittedAt { get; set; }
+        public string? SecondSalesManReview { get; set; }
+        public DateTime? SecondSalesManReviewSubmittedAt { get; set; }
+        // Client credentials
+        public string? ClientUsername { get; set; }
+        public DateTime? ClientCredentialsSetAt { get; set; }
+        public string? ClientCredentialsSetByName { get; set; }
     }
 
     public class DealSummaryDTO
@@ -603,10 +643,10 @@ namespace SoitMed.DTO
         public string AssignedTo { get; set; } = string.Empty;
     }
 
-    public class AssignOfferToSalesmanDTO
+    public class AssignOfferToSalesManDTO
     {
         [Required]
-        public string SalesmanId { get; set; } = string.Empty;
+        public string SalesManId { get; set; } = string.Empty;
     }
 
     public class UpdateOfferRequestStatusDTO
@@ -642,6 +682,25 @@ namespace SoitMed.DTO
         public string? ReportAttachments { get; set; } // JSON array of file paths/URLs
     }
 
+    public class SubmitReviewDTO
+    {
+        [Required(ErrorMessage = "Review text is required")]
+        [MaxLength(5000, ErrorMessage = "Review text cannot exceed 5000 characters")]
+        public string ReviewText { get; set; } = string.Empty;
+    }
+
+    public class SetClientCredentialsDTO
+    {
+        [Required(ErrorMessage = "Username is required")]
+        [MaxLength(200, ErrorMessage = "Username cannot exceed 200 characters")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Password is required")]
+        [MinLength(6, ErrorMessage = "Password must be at least 6 characters")]
+        [MaxLength(100, ErrorMessage = "Password cannot exceed 100 characters")]
+        public string Password { get; set; } = string.Empty;
+    }
+
     public class RecordClientResponseDTO
     {
         [Required(ErrorMessage = "Response is required")]
@@ -670,7 +729,7 @@ namespace SoitMed.DTO
         public string Type { get; set; } = string.Empty; // Accepted, Completed, Sent, Rejected
         public string Description { get; set; } = string.Empty;
         public string? ClientName { get; set; }
-        public string? SalesmanName { get; set; }
+        public string? SalesManName { get; set; }
         public decimal TotalAmount { get; set; }
         public DateTime Timestamp { get; set; }
     }

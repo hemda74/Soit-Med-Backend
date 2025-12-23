@@ -147,11 +147,11 @@ namespace SoitMed.Services
 
         public async Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansWithFiltersAsync(WeeklyPlanFiltersDTO filters, string userRole, int page, int pageSize)
         {
-            // SalesManager, SuperAdmin, and Salesman can use filters
-            // Note: For Salesman, the controller ensures they can only filter their own plans by date
-            if (userRole != "SalesManager" && userRole != "SuperAdmin" && userRole != "Salesman")
+            // SalesManager, SuperAdmin, and SalesMan can use filters
+            // Note: For SalesMan, the controller ensures they can only filter their own plans by date
+            if (userRole != "SalesManager" && userRole != "SuperAdmin" && userRole != "SalesMan")
             {
-                throw new UnauthorizedAccessException("Only SalesManager, SuperAdmin and Salesman can use filters");
+                throw new UnauthorizedAccessException("Only SalesManager, SuperAdmin and SalesMan can use filters");
             }
 
             var plans = await UnitOfWork.WeeklyPlans.GetAllPlansWithFiltersAsync(
@@ -232,7 +232,7 @@ namespace SoitMed.Services
                 return null;
             }
 
-            // Mark as viewed if manager/admin is viewing
+            // Mark as viewed if manager/Admin is viewing
             if ((userRole == "SalesManager" || userRole == "SuperAdmin") && !plan.ManagerViewedAt.HasValue)
             {
                 plan.ManagerViewedAt = DateTime.UtcNow;

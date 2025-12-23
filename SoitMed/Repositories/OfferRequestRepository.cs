@@ -21,7 +21,7 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<OfferRequest>> GetRequestsBySalesmanAsync(string salesmanId)
+        public async Task<List<OfferRequest>> GetRequestsBySalesManAsync(string salesmanId)
         {
             return await _context.OfferRequests
                 .AsNoTracking()
@@ -111,7 +111,7 @@ namespace SoitMed.Repositories
                 .CountAsync(or => or.Status == status);
         }
 
-        public async Task<int> GetRequestCountBySalesmanAsync(string salesmanId, DateTime? startDate, DateTime? endDate)
+        public async Task<int> GetRequestCountBySalesManAsync(string salesmanId, DateTime? startDate, DateTime? endDate)
         {
             var query = _context.OfferRequests
                 .AsNoTracking()

@@ -22,7 +22,7 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetEngineers()
         {
-            var engineers = await context.Engineers
+            var Engineers = await context.Engineers
                 .Include(e => e.EngineerGovernorates.Where(eg => eg.IsActive))
                 .ThenInclude(eg => eg.Governorate)
                 .Include(e => e.User)
@@ -44,33 +44,33 @@ namespace SoitMed.Controllers
                 })
                 .ToListAsync();
 
-            return Ok(engineers);
+            return Ok(Engineers);
         }
 
         [HttpGet("{id}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetEngineer(int id)
         {
-            var engineer = await context.Engineers
+            var Engineer = await context.Engineers
                 .Include(e => e.EngineerGovernorates.Where(eg => eg.IsActive))
                 .ThenInclude(eg => eg.Governorate)
                 .Include(e => e.User)
                 .FirstOrDefaultAsync(e => e.EngineerId == id);
 
-            if (engineer == null)
+            if (Engineer == null)
             {
                 return NotFound($"Engineer with ID {id} not found");
             }
 
             var response = new EngineerResponseDTO
             {
-                EngineerId = engineer.EngineerId,
-                Name = engineer.Name,
-                Specialty = engineer.Specialty,
-                CreatedAt = engineer.CreatedAt,
-                IsActive = engineer.IsActive,
-                UserId = engineer.UserId,
-                Governorates = engineer.EngineerGovernorates
+                EngineerId = Engineer.EngineerId,
+                Name = Engineer.Name,
+                Specialty = Engineer.Specialty,
+                CreatedAt = Engineer.CreatedAt,
+                IsActive = Engineer.IsActive,
+                UserId = Engineer.UserId,
+                Governorates = Engineer.EngineerGovernorates
                     .Where(eg => eg.IsActive)
                     .Select(eg => new GovernorateSimpleDTO
                     {
@@ -84,36 +84,36 @@ namespace SoitMed.Controllers
 
         [HttpPost]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> CreateEngineer(EngineerDTO engineerDTO)
+        public async Task<IActionResult> CreateEngineer(EngineerDTO EngineerDTO)
         {
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
 
-            var engineer = new Engineer
+            var Engineer = new Engineer
             {
-                Name = engineerDTO.Name,
-                Specialty = engineerDTO.Specialty,
-                UserId = engineerDTO.UserId,
+                Name = EngineerDTO.Name,
+                Specialty = EngineerDTO.Specialty,
+                UserId = EngineerDTO.UserId,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            context.Engineers.Add(engineer);
+            context.Engineers.Add(Engineer);
             await context.SaveChangesAsync();
 
             // Assign to governorates if provided
-            if (engineerDTO.GovernorateIds != null && engineerDTO.GovernorateIds.Any())
+            if (EngineerDTO.GovernorateIds != null && EngineerDTO.GovernorateIds.Any())
             {
-                foreach (var governorateId in engineerDTO.GovernorateIds)
+                foreach (var governorateId in EngineerDTO.GovernorateIds)
                 {
                     var governorate = await context.Governorates.FindAsync(governorateId);
                     if (governorate != null)
                     {
                         var assignment = new EngineerGovernorate
                         {
-                            EngineerId = engineer.EngineerId,
+                            EngineerId = Engineer.EngineerId,
                             GovernorateId = governorateId,
                             AssignedAt = DateTime.UtcNow,
                             IsActive = true
@@ -126,44 +126,44 @@ namespace SoitMed.Controllers
                 await context.SaveChangesAsync();
             }
 
-            return Ok($"Engineer '{engineer.Name}' created successfully");
+            return Ok($"Engineer '{Engineer.Name}' created successfully");
         }
 
         [HttpPut("{id}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> UpdateEngineer(int id, EngineerDTO engineerDTO)
+        public async Task<IActionResult> UpdateEngineer(int id, EngineerDTO EngineerDTO)
         {
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
 
-            var engineer = await context.Engineers
+            var Engineer = await context.Engineers
                 .Include(e => e.EngineerGovernorates)
                 .FirstOrDefaultAsync(e => e.EngineerId == id);
 
-            if (engineer == null)
+            if (Engineer == null)
             {
                 return NotFound($"Engineer with ID {id} not found");
             }
 
-            engineer.Name = engineerDTO.Name;
-            engineer.Specialty = engineerDTO.Specialty;
-            engineer.UserId = engineerDTO.UserId;
+            Engineer.Name = EngineerDTO.Name;
+            Engineer.Specialty = EngineerDTO.Specialty;
+            Engineer.UserId = EngineerDTO.UserId;
 
             // Update governorate assignments if provided
-            if (engineerDTO.GovernorateIds != null)
+            if (EngineerDTO.GovernorateIds != null)
             {
                 // Deactivate all current assignments
-                foreach (var assignment in engineer.EngineerGovernorates.Where(eg => eg.IsActive))
+                foreach (var assignment in Engineer.EngineerGovernorates.Where(eg => eg.IsActive))
                 {
                     assignment.IsActive = false;
                 }
 
                 // Add new assignments
-                foreach (var governorateId in engineerDTO.GovernorateIds)
+                foreach (var governorateId in EngineerDTO.GovernorateIds)
                 {
-                    var existingAssignment = engineer.EngineerGovernorates
+                    var existingAssignment = Engineer.EngineerGovernorates
                         .FirstOrDefault(eg => eg.GovernorateId == governorateId);
 
                     if (existingAssignment != null)
@@ -178,7 +178,7 @@ namespace SoitMed.Controllers
                         {
                             var assignment = new EngineerGovernorate
                             {
-                                EngineerId = engineer.EngineerId,
+                                EngineerId = Engineer.EngineerId,
                                 GovernorateId = governorateId,
                                 AssignedAt = DateTime.UtcNow,
                                 IsActive = true
@@ -192,50 +192,50 @@ namespace SoitMed.Controllers
 
             await context.SaveChangesAsync();
 
-            return Ok($"Engineer '{engineer.Name}' updated successfully");
+            return Ok($"Engineer '{Engineer.Name}' updated successfully");
         }
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> DeleteEngineer(int id)
         {
-            var engineer = await context.Engineers
+            var Engineer = await context.Engineers
                 .Include(e => e.EngineerGovernorates)
                 .FirstOrDefaultAsync(e => e.EngineerId == id);
 
-            if (engineer == null)
+            if (Engineer == null)
             {
                 return NotFound($"Engineer with ID {id} not found");
             }
 
             // Deactivate all governorate assignments
-            foreach (var assignment in engineer.EngineerGovernorates.Where(eg => eg.IsActive))
+            foreach (var assignment in Engineer.EngineerGovernorates.Where(eg => eg.IsActive))
             {
                 assignment.IsActive = false;
             }
 
-            engineer.IsActive = false;
+            Engineer.IsActive = false;
 
             await context.SaveChangesAsync();
 
-            return Ok($"Engineer '{engineer.Name}' deactivated successfully");
+            return Ok($"Engineer '{Engineer.Name}' deactivated successfully");
         }
 
         [HttpGet("{id}/governorates")]
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetEngineerGovernorates(int id)
         {
-            var engineer = await context.Engineers
+            var Engineer = await context.Engineers
                 .Include(e => e.EngineerGovernorates.Where(eg => eg.IsActive))
                 .ThenInclude(eg => eg.Governorate)
                 .FirstOrDefaultAsync(e => e.EngineerId == id);
 
-            if (engineer == null)
+            if (Engineer == null)
             {
                 return NotFound($"Engineer with ID {id} not found");
             }
 
-            var governorates = engineer.EngineerGovernorates
+            var governorates = Engineer.EngineerGovernorates
                 .Where(eg => eg.IsActive)
                 .Select(eg => new
                 {
@@ -246,7 +246,7 @@ namespace SoitMed.Controllers
 
             return Ok(new
             {
-                Engineer = engineer.Name,
+                Engineer = Engineer.Name,
                 GovernorateCount = governorates.Count(),
                 Governorates = governorates
             });
