@@ -20,7 +20,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Gets a specific task by ID
         /// </summary>
-        Task<WeeklyPlanTaskDetailResponseDTO?> GetTaskAsync(long taskId, string userId, string userRole);
+        Task<WeeklyPlanTaskDetailResponseDTO?> GetTaskAsync(int taskId, string userId, string userRole);
 
         /// <summary>
         /// Gets all tasks for a specific weekly plan
@@ -30,17 +30,17 @@ namespace SoitMed.Services
         /// <summary>
         /// Updates an existing task
         /// </summary>
-        Task<WeeklyPlanTaskDetailResponseDTO?> UpdateTaskAsync(long taskId, UpdateWeeklyPlanTaskDTO updateDto, string userId);
+        Task<WeeklyPlanTaskDetailResponseDTO?> UpdateTaskAsync(int taskId, UpdateWeeklyPlanTaskDTO updateDto, string userId);
 
         /// <summary>
         /// Deletes a task (soft delete or hard delete based on business rules)
         /// </summary>
-        Task<bool> DeleteTaskAsync(long taskId, string userId);
+        Task<bool> DeleteTaskAsync(int taskId, string userId);
 
         /// <summary>
         /// Validates if a user can modify a task
         /// </summary>
-        Task<bool> CanModifyTaskAsync(long taskId, string userId);
+        Task<bool> CanModifyTaskAsync(int taskId, string userId);
 
         /// <summary>
         /// Validates task creation data

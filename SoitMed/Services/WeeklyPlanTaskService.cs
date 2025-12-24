@@ -216,11 +216,11 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<WeeklyPlanTaskDetailResponseDTO?> GetTaskAsync(long taskId, string userId, string userRole)
+        public async Task<WeeklyPlanTaskDetailResponseDTO?> GetTaskAsync(int taskId, string userId, string userRole)
         {
             try
             {
-                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync((int)taskId);
+                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync(taskId);
                 if (task == null)
                     return null;
 
@@ -273,11 +273,11 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<WeeklyPlanTaskDetailResponseDTO?> UpdateTaskAsync(long taskId, UpdateWeeklyPlanTaskDTO updateDto, string userId)
+        public async Task<WeeklyPlanTaskDetailResponseDTO?> UpdateTaskAsync(int taskId, UpdateWeeklyPlanTaskDTO updateDto, string userId)
         {
             try
             {
-                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync((int)taskId);
+                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync(taskId);
                 if (task == null)
                     return null;
 
@@ -353,11 +353,11 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<bool> DeleteTaskAsync(long taskId, string userId)
+        public async Task<bool> DeleteTaskAsync(int taskId, string userId)
         {
             try
             {
-                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync((int)taskId);
+                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync(taskId);
                 if (task == null)
                     return false;
 
@@ -381,7 +381,7 @@ namespace SoitMed.Services
                 else
                 {
                     // Hard delete
-                    await UnitOfWork.WeeklyPlanTasks.DeleteAsync((int)taskId);
+                    await UnitOfWork.WeeklyPlanTasks.DeleteAsync(taskId);
                     Logger.LogInformation("Task {TaskId} deleted successfully", taskId);
                 }
 
@@ -395,11 +395,11 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<bool> CanModifyTaskAsync(long taskId, string userId)
+        public async Task<bool> CanModifyTaskAsync(int taskId, string userId)
         {
             try
             {
-                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync((int)taskId);
+                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync(taskId);
                 if (task == null)
                     return false;
 
