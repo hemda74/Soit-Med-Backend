@@ -12,7 +12,7 @@ namespace SoitMed.Models
         public int Id { get; set; }
 
         [Required]
-        public long WeeklyPlanId { get; set; }
+        public int WeeklyPlanId { get; set; }
 
         [Required]
         [MaxLength(300)]
