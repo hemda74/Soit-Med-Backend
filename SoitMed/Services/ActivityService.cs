@@ -70,7 +70,7 @@ namespace SoitMed.Services
                             ActivityLogId = activityLog.Id,
                             UserId = userId,
                             DealValue = request.DealInfo.DealValue,
-                            Status = DealStatus.Pending,
+                            Status = Models.Enums.DealStatus.Pending,
                             ExpectedCloseDate = request.DealInfo.ExpectedCloseDate,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
@@ -88,7 +88,7 @@ namespace SoitMed.Services
                             ActivityLogId = activityLog.Id,
                             UserId = userId,
                             OfferDetails = request.OfferInfo.OfferDetails,
-                            Status = OfferStatus.Draft,
+                            Status = Models.Enums.OfferStatus.Pending,
                             DocumentUrl = request.OfferInfo.DocumentUrl,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow

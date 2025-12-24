@@ -19,7 +19,7 @@ namespace SoitMed.Repositories
                 .FirstOrDefaultAsync(t => t.Id == id && t.IsActive, cancellationToken);
         }
 
-        public async Task<IEnumerable<WeeklyPlanTask>> GetByWeeklyPlanIdAsync(int weeklyPlanId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<WeeklyPlanTask>> GetByWeeklyPlanIdAsync(long weeklyPlanId, CancellationToken cancellationToken = default)
         {
             return await _context.WeeklyPlanTasks
                 .Where(t => t.WeeklyPlanId == weeklyPlanId && t.IsActive)
@@ -37,6 +37,21 @@ namespace SoitMed.Repositories
             _context.WeeklyPlanTasks.Add(task);
             await _context.SaveChangesAsync(cancellationToken);
             return task;
+        }
+
+        public async Task<IEnumerable<WeeklyPlanTask>> CreateRangeAsync(IEnumerable<WeeklyPlanTask> tasks, CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.UtcNow;
+            foreach (var task in tasks)
+            {
+                task.CreatedAt = now;
+                task.UpdatedAt = now;
+                task.IsActive = true;
+            }
+
+            _context.WeeklyPlanTasks.AddRange(tasks);
+            await _context.SaveChangesAsync(cancellationToken);
+            return tasks;
         }
 
         public async Task<WeeklyPlanTask> UpdateAsync(WeeklyPlanTask task, CancellationToken cancellationToken = default)
@@ -69,7 +84,7 @@ namespace SoitMed.Repositories
                 .AnyAsync(t => t.Id == id && t.IsActive, cancellationToken);
         }
 
-        public async Task<bool> BelongsToWeeklyPlanAsync(int taskId, int weeklyPlanId, CancellationToken cancellationToken = default)
+        public async Task<bool> BelongsToWeeklyPlanAsync(int taskId, long weeklyPlanId, CancellationToken cancellationToken = default)
         {
             return await _context.WeeklyPlanTasks
                 .AnyAsync(t => t.Id == taskId && t.WeeklyPlanId == weeklyPlanId && t.IsActive, cancellationToken);

@@ -20,7 +20,7 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<Deal>> GetByStatusAsync(DealStatus status, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<Deal>> GetByStatusAsync(Models.Enums.DealStatus status, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(d => d.ActivityLog)
@@ -30,7 +30,7 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<Deal>> GetByUserIdAndStatusAsync(string userId, DealStatus status, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<Deal>> GetByUserIdAndStatusAsync(string userId, Models.Enums.DealStatus status, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(d => d.ActivityLog)
@@ -61,7 +61,7 @@ namespace SoitMed.Repositories
         {
             return await _dbSet
                 .Where(d => d.UserId == userId && 
-                           d.Status == DealStatus.Won && 
+                           d.Status == Models.Enums.DealStatus.Completed && 
                            d.CreatedAt >= startDate && 
                            d.CreatedAt <= endDate)
                 .SumAsync(d => d.DealValue, cancellationToken);
@@ -79,7 +79,7 @@ namespace SoitMed.Repositories
         {
             return await _dbSet
                 .Where(d => userIds.Contains(d.UserId) && 
-                           d.Status == DealStatus.Won && 
+                           d.Status == Models.Enums.DealStatus.Completed && 
                            d.CreatedAt >= startDate && 
                            d.CreatedAt <= endDate)
                 .GroupBy(d => d.UserId)

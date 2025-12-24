@@ -18,7 +18,7 @@ namespace SoitMed.Repositories
                 .FirstOrDefaultAsync(dp => dp.Id == id && dp.IsActive, cancellationToken);
         }
 
-        public async Task<DailyProgress?> GetByWeeklyPlanAndDateAsync(int weeklyPlanId, DateOnly progressDate, CancellationToken cancellationToken = default)
+        public async Task<DailyProgress?> GetByWeeklyPlanAndDateAsync(long weeklyPlanId, DateOnly progressDate, CancellationToken cancellationToken = default)
         {
             return await _context.DailyProgresses
                 .FirstOrDefaultAsync(dp => dp.WeeklyPlanId == weeklyPlanId 
@@ -26,7 +26,7 @@ namespace SoitMed.Repositories
                     && dp.IsActive, cancellationToken);
         }
 
-        public async Task<IEnumerable<DailyProgress>> GetByWeeklyPlanIdAsync(int weeklyPlanId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<DailyProgress>> GetByWeeklyPlanIdAsync(long weeklyPlanId, CancellationToken cancellationToken = default)
         {
             return await _context.DailyProgresses
                 .Where(dp => dp.WeeklyPlanId == weeklyPlanId && dp.IsActive)
@@ -67,7 +67,7 @@ namespace SoitMed.Repositories
                 .AnyAsync(dp => dp.Id == id && dp.IsActive, cancellationToken);
         }
 
-        public async Task<bool> BelongsToWeeklyPlanAsync(int progressId, int weeklyPlanId, CancellationToken cancellationToken = default)
+        public async Task<bool> BelongsToWeeklyPlanAsync(int progressId, long weeklyPlanId, CancellationToken cancellationToken = default)
         {
             return await _context.DailyProgresses
                 .AnyAsync(dp => dp.Id == progressId && dp.WeeklyPlanId == weeklyPlanId && dp.IsActive, cancellationToken);

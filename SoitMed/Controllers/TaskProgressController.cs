@@ -172,7 +172,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("task/{taskId}")]
         [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> GetProgressByTask(long taskId)
+        public async Task<IActionResult> GetProgressByTask(int taskId)
         {
             try
             {

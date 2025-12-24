@@ -77,7 +77,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPut("{id}")]
         [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> UpdateWeeklyPlan(int id, [FromBody] UpdateWeeklyPlanDto updateDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> UpdateWeeklyPlan(long id, [FromBody] UpdateWeeklyPlanDto updateDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(updateDto, _updatePlanValidator, cancellationToken);
             if (validationError != null)
@@ -101,7 +101,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpDelete("{id}")]
         [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> DeleteWeeklyPlan(int id, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> DeleteWeeklyPlan(long id, CancellationToken cancellationToken = default)
         {
             var userId = GetCurrentUserId();
             if (string.IsNullOrEmpty(userId))
@@ -120,7 +120,7 @@ namespace SoitMed.Controllers
         /// Get a specific weekly plan by ID
         /// </summary>
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetWeeklyPlanById(int id, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> GetWeeklyPlanById(long id, CancellationToken cancellationToken = default)
         {
             var userId = GetCurrentUserId();
             var (user, authError) = await ControllerAuthorizationHelper.GetCurrentUserAsync(userId, UserManager);
@@ -177,7 +177,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{weeklyPlanId}/tasks")]
         [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> AddTask(int weeklyPlanId, [FromBody] AddTaskToWeeklyPlanDto taskDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> AddTask(long weeklyPlanId, [FromBody] AddTaskToWeeklyPlanDto taskDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(taskDto, _addTaskValidator, cancellationToken);
             if (validationError != null)
@@ -201,7 +201,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPut("{weeklyPlanId}/tasks/{taskId}")]
         [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> UpdateTask(int weeklyPlanId, int taskId, [FromBody] UpdateWeeklyPlanTaskDto updateDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> UpdateTask(long weeklyPlanId, int taskId, [FromBody] UpdateWeeklyPlanTaskDto updateDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(updateDto, _updateTaskValidator, cancellationToken);
             if (validationError != null)
@@ -225,7 +225,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpDelete("{weeklyPlanId}/tasks/{taskId}")]
         [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> DeleteTask(int weeklyPlanId, int taskId, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> DeleteTask(long weeklyPlanId, int taskId, CancellationToken cancellationToken = default)
         {
             var userId = GetCurrentUserId();
             if (string.IsNullOrEmpty(userId))
@@ -249,7 +249,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{weeklyPlanId}/progress")]
         [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> AddDailyProgress(int weeklyPlanId, [FromBody] CreateDailyProgressDto progressDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> AddDailyProgress(long weeklyPlanId, [FromBody] CreateDailyProgressDto progressDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(progressDto, _createProgressValidator, cancellationToken);
             if (validationError != null)
@@ -273,7 +273,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPut("{weeklyPlanId}/progress/{progressId}")]
         [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> UpdateDailyProgress(int weeklyPlanId, int progressId, [FromBody] UpdateDailyProgressDto updateDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> UpdateDailyProgress(long weeklyPlanId, int progressId, [FromBody] UpdateDailyProgressDto updateDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(updateDto, _updateProgressValidator, cancellationToken);
             if (validationError != null)
@@ -297,7 +297,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpDelete("{weeklyPlanId}/progress/{progressId}")]
         [Authorize(Roles = "Salesman")]
-        public async Task<IActionResult> DeleteDailyProgress(int weeklyPlanId, int progressId, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> DeleteDailyProgress(long weeklyPlanId, int progressId, CancellationToken cancellationToken = default)
         {
             var userId = GetCurrentUserId();
             if (string.IsNullOrEmpty(userId))
@@ -321,7 +321,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{id}/review")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> ReviewWeeklyPlan(int id, [FromBody] ReviewWeeklyPlanDto reviewDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> ReviewWeeklyPlan(long id, [FromBody] ReviewWeeklyPlanDto reviewDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(reviewDto, _reviewValidator, cancellationToken);
             if (validationError != null)

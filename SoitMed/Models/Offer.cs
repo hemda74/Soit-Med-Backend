@@ -12,7 +12,7 @@ namespace SoitMed.Models
         public long ActivityLogId { get; set; } // Foreign Key (One-to-One)
         public string UserId { get; set; } = string.Empty;
         public string OfferDetails { get; set; } = string.Empty;
-        public OfferStatus Status { get; set; } = OfferStatus.Draft;
+        public Enums.OfferStatus Status { get; set; } = Enums.OfferStatus.Pending;
         public string? DocumentUrl { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

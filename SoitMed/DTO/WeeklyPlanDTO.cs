@@ -162,7 +162,7 @@ namespace SoitMed.DTO
     public class WeeklyPlanTaskResponseDto
     {
         public int Id { get; set; }
-        public int WeeklyPlanId { get; set; }
+        public long WeeklyPlanId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
         public bool IsCompleted { get; set; }
@@ -177,7 +177,7 @@ namespace SoitMed.DTO
     public class DailyProgressResponseDto
     {
         public int Id { get; set; }
-        public int WeeklyPlanId { get; set; }
+        public long WeeklyPlanId { get; set; }
         public DateOnly ProgressDate { get; set; }
         public string Notes { get; set; } = string.Empty;
         public List<int> TasksWorkedOn { get; set; } = new();

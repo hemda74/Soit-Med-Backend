@@ -2,6 +2,7 @@ using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Repositories;
 using System.Text.Json;
+using System.Linq.Expressions;
 
 namespace SoitMed.Services
 {
@@ -24,19 +25,20 @@ namespace SoitMed.Services
         public async Task<WeeklyPlanResponseDTO> CreateWeeklyPlanAsync(CreateWeeklyPlanDTO createDto, string userId)
         {
             // Check if plan already exists for this week
-            var existingPlan = await UnitOfWork.WeeklyPlans.HasPlanForWeekAsync(userId, createDto.WeekStartDate);
+            var weekStartDateOnly = DateOnly.FromDateTime(createDto.WeekStartDate);
+            var existingPlan = await UnitOfWork.WeeklyPlans.HasPlanForWeekAsync(userId, weekStartDateOnly, null);
             if (existingPlan)
             {
                 throw new InvalidOperationException("يوجد خطة أسبوعية بالفعل لهذا الأسبوع");
             }
 
             // Auto-calculate end date as 7 days from start date
-            var weekEndDate = createDto.WeekStartDate.AddDays(6); // 7 days total (start day + 6 more days)
+            var weekEndDate = weekStartDateOnly.AddDays(6); // 7 days total (start day + 6 more days)
 
             var plan = new Models.WeeklyPlan
             {
                 EmployeeId = userId,
-                WeekStartDate = createDto.WeekStartDate,
+                WeekStartDate = weekStartDateOnly,
                 WeekEndDate = weekEndDate, // Auto-calculated: 7 days from start
                 Title = createDto.Title,
                 Description = createDto.Description,
@@ -60,7 +62,7 @@ namespace SoitMed.Services
             }
 
             // Reload plan with tasks
-            var planWithTasks = await UnitOfWork.WeeklyPlans.GetPlanWithFullDetailsAsync(plan.Id);
+            var planWithTasks = await UnitOfWork.WeeklyPlans.GetByIdWithDetailsAsync(plan.Id);
             
             // Map tasks sequentially to avoid DbContext concurrency issues
             var tasksList = planWithTasks?.Tasks?.ToList() ?? new List<WeeklyPlanTask>();
@@ -75,8 +77,8 @@ namespace SoitMed.Services
             {
                 Id = plan.Id,
                 EmployeeId = plan.EmployeeId,
-                WeekStartDate = plan.WeekStartDate,
-                WeekEndDate = plan.WeekEndDate,
+                WeekStartDate = plan.WeekStartDate.ToDateTime(TimeOnly.MinValue),
+                WeekEndDate = plan.WeekEndDate.ToDateTime(TimeOnly.MinValue),
                 Title = plan.Title,
                 Description = plan.Description,
                 IsActive = plan.IsActive,
@@ -89,13 +91,21 @@ namespace SoitMed.Services
         public async Task<(IEnumerable<WeeklyPlanResponseDTO> Plans, int TotalCount)> GetWeeklyPlansAsync(string userId, string userRole, int page, int pageSize)
         {
             // SalesManager and SuperAdmin can view all plans
-            var plans = (userRole == "SalesManager" || userRole == "SuperAdmin") 
-                ? await UnitOfWork.WeeklyPlans.GetAllPlansAsync(page, pageSize)
-                : await UnitOfWork.WeeklyPlans.GetEmployeePlansAsync(userId, page, pageSize);
+            IEnumerable<WeeklyPlan> plans;
+            int totalCount;
             
-            var totalCount = (userRole == "SalesManager" || userRole == "SuperAdmin")
-                ? await UnitOfWork.WeeklyPlans.CountAsync()
-                : await UnitOfWork.WeeklyPlans.CountAsync(p => p.EmployeeId == userId);
+            if (userRole == "SalesManager" || userRole == "SuperAdmin")
+            {
+                var result = await UnitOfWork.WeeklyPlans.GetPaginatedAsync(null, page, pageSize);
+                plans = result.Plans;
+                totalCount = result.TotalCount;
+            }
+            else
+            {
+                var result = await UnitOfWork.WeeklyPlans.GetPaginatedAsync(p => p.EmployeeId == userId, page, pageSize);
+                plans = result.Plans;
+                totalCount = result.TotalCount;
+            }
 
             // OPTIMIZATION: Map tasks sequentially to avoid DbContext concurrency issues
             // MapTaskToDTO makes database calls, so we can't parallelize it safely
@@ -125,8 +135,8 @@ namespace SoitMed.Services
                     PhoneNumber = p.Employee.PhoneNumber,
                     UserName = p.Employee.UserName ?? string.Empty
                 } : null,
-                WeekStartDate = p.WeekStartDate,
-                WeekEndDate = p.WeekEndDate,
+                WeekStartDate = p.WeekStartDate.ToDateTime(TimeOnly.MinValue),
+                WeekEndDate = p.WeekEndDate.ToDateTime(TimeOnly.MinValue),
                 Title = p.Title,
                 Description = p.Description,
                 IsActive = p.IsActive,
@@ -154,21 +164,20 @@ namespace SoitMed.Services
                 throw new UnauthorizedAccessException("Only SalesManager, SuperAdmin and SalesMan can use filters");
             }
 
-            var plans = await UnitOfWork.WeeklyPlans.GetAllPlansWithFiltersAsync(
-                filters.EmployeeId,
-                filters.WeekStartDate,
-                filters.WeekEndDate,
-                filters.IsViewed,
-                page,
-                pageSize
-            );
+            // Build predicate for filtering
+            Expression<Func<WeeklyPlan, bool>>? predicate = null;
+            if (!string.IsNullOrEmpty(filters.EmployeeId) || filters.WeekStartDate.HasValue || filters.WeekEndDate.HasValue || filters.IsViewed.HasValue)
+            {
+                predicate = p => 
+                    (string.IsNullOrEmpty(filters.EmployeeId) || p.EmployeeId == filters.EmployeeId) &&
+                    (!filters.WeekStartDate.HasValue || p.WeekStartDate >= DateOnly.FromDateTime(filters.WeekStartDate.Value)) &&
+                    (!filters.WeekEndDate.HasValue || p.WeekEndDate <= DateOnly.FromDateTime(filters.WeekEndDate.Value)) &&
+                    (!filters.IsViewed.HasValue || (filters.IsViewed.Value ? p.ManagerViewedAt.HasValue : !p.ManagerViewedAt.HasValue));
+            }
 
-            var totalCount = await UnitOfWork.WeeklyPlans.CountAllPlansWithFiltersAsync(
-                filters.EmployeeId,
-                filters.WeekStartDate,
-                filters.WeekEndDate,
-                filters.IsViewed
-            );
+            var result = await UnitOfWork.WeeklyPlans.GetPaginatedAsync(predicate, page, pageSize);
+            var plans = result.Plans;
+            var totalCount = result.TotalCount;
 
             // OPTIMIZATION: Map tasks sequentially to avoid DbContext concurrency issues
             // MapTaskToDTO makes database calls, so we can't parallelize it safely
@@ -198,8 +207,8 @@ namespace SoitMed.Services
                     PhoneNumber = p.Employee.PhoneNumber,
                     UserName = p.Employee.UserName ?? string.Empty
                 } : null,
-                WeekStartDate = p.WeekStartDate,
-                WeekEndDate = p.WeekEndDate,
+                WeekStartDate = p.WeekStartDate.ToDateTime(TimeOnly.MinValue),
+                WeekEndDate = p.WeekEndDate.ToDateTime(TimeOnly.MinValue),
                 Title = p.Title,
                 Description = p.Description,
                 IsActive = p.IsActive,
@@ -220,7 +229,7 @@ namespace SoitMed.Services
 
         public async Task<WeeklyPlanResponseDTO?> GetWeeklyPlanAsync(long id, string userId, string userRole)
         {
-            var plan = await UnitOfWork.WeeklyPlans.GetPlanWithFullDetailsAsync(id);
+            var plan = await UnitOfWork.WeeklyPlans.GetByIdWithDetailsAsync(id);
             if (plan == null)
             {
                 return null;
@@ -253,8 +262,8 @@ namespace SoitMed.Services
             {
                 Id = plan.Id,
                 EmployeeId = plan.EmployeeId,
-                WeekStartDate = plan.WeekStartDate,
-                WeekEndDate = plan.WeekEndDate,
+                WeekStartDate = plan.WeekStartDate.ToDateTime(TimeOnly.MinValue),
+                WeekEndDate = plan.WeekEndDate.ToDateTime(TimeOnly.MinValue),
                 Title = plan.Title,
                 Description = plan.Description,
                 IsActive = plan.IsActive,
@@ -416,8 +425,8 @@ namespace SoitMed.Services
             {
                 Id = plan.Id,
                 EmployeeId = plan.EmployeeId,
-                WeekStartDate = plan.WeekStartDate,
-                WeekEndDate = plan.WeekEndDate,
+                WeekStartDate = plan.WeekStartDate.ToDateTime(TimeOnly.MinValue),
+                WeekEndDate = plan.WeekEndDate.ToDateTime(TimeOnly.MinValue),
                 Title = plan.Title,
                 Description = plan.Description,
                 IsActive = plan.IsActive,
@@ -467,7 +476,10 @@ namespace SoitMed.Services
 
         public async Task<WeeklyPlanResponseDTO?> GetCurrentWeeklyPlanAsync(string userId)
         {
-            var plan = await UnitOfWork.WeeklyPlans.GetCurrentWeekPlanAsync(userId);
+            // Get current week's plan using GetByEmployeeIdAsync and filter
+            var allPlans = await UnitOfWork.WeeklyPlans.GetByEmployeeIdAsync(userId);
+            var now = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+            var plan = allPlans.FirstOrDefault(p => p.WeekStartDate <= now && p.WeekEndDate >= now && p.IsActive);
             if (plan == null)
             {
                 return null;
@@ -481,8 +493,8 @@ namespace SoitMed.Services
             {
                 Id = plan.Id,
                 EmployeeId = plan.EmployeeId,
-                WeekStartDate = plan.WeekStartDate,
-                WeekEndDate = plan.WeekEndDate,
+                WeekStartDate = plan.WeekStartDate.ToDateTime(TimeOnly.MinValue),
+                WeekEndDate = plan.WeekEndDate.ToDateTime(TimeOnly.MinValue),
                 Title = plan.Title,
                 Description = plan.Description,
                 IsActive = plan.IsActive,
@@ -509,7 +521,425 @@ namespace SoitMed.Services
 
         public async Task<bool> HasPlanForWeekAsync(string userId, DateTime weekStartDate)
         {
-            return await UnitOfWork.WeeklyPlans.HasPlanForWeekAsync(userId, weekStartDate);
+            var weekStartDateOnly = DateOnly.FromDateTime(weekStartDate);
+            return await UnitOfWork.WeeklyPlans.HasPlanForWeekAsync(userId, weekStartDateOnly, null);
+        }
+
+        // ==================== Interface Implementation Methods ====================
+        // These methods implement IWeeklyPlanService interface with lowercase 'Dto' types
+
+        public async Task<WeeklyPlanResponseDto?> CreateWeeklyPlanAsync(CreateWeeklyPlanDto createDto, string employeeId, CancellationToken cancellationToken = default)
+        {
+            // Convert CreateWeeklyPlanDto to CreateWeeklyPlanDTO
+            var createDtoUpper = new CreateWeeklyPlanDTO
+            {
+                Title = createDto.Title,
+                Description = createDto.Description,
+                WeekStartDate = createDto.WeekStartDate.ToDateTime(TimeOnly.MinValue),
+                WeekEndDate = createDto.WeekEndDate.ToDateTime(TimeOnly.MinValue),
+                Tasks = createDto.Tasks?.Select(t => new CreateWeeklyPlanTaskDTO
+                {
+                    WeeklyPlanId = 0, // Will be set by service
+                    Title = t.Title,
+                    ClientId = null, // Not in CreateWeeklyPlanTaskDto
+                    ClientName = null,
+                    ClientPhone = null,
+                    ClientAddress = null,
+                    ClientLocation = null,
+                    ClientClassification = null,
+                    PlannedDate = null,
+                    Notes = t.Description,
+                    ClientStatus = null
+                }).ToList()
+            };
+
+            var result = await CreateWeeklyPlanAsync(createDtoUpper, employeeId);
+            
+            // Convert WeeklyPlanResponseDTO to WeeklyPlanResponseDto
+            if (result == null) return null;
+            
+            return new WeeklyPlanResponseDto
+            {
+                Id = (int)result.Id,
+                Title = result.Title,
+                Description = result.Description,
+                WeekStartDate = DateOnly.FromDateTime(result.WeekStartDate),
+                WeekEndDate = DateOnly.FromDateTime(result.WeekEndDate),
+                EmployeeId = result.EmployeeId,
+                EmployeeName = result.Employee?.FirstName + " " + result.Employee?.LastName ?? "",
+                Rating = result.Rating,
+                ManagerComment = result.ManagerComment,
+                ManagerReviewedAt = result.ManagerReviewedAt,
+                CreatedAt = result.CreatedAt,
+                UpdatedAt = result.UpdatedAt,
+                IsActive = result.IsActive,
+                Tasks = result.Tasks?.Select(t => new WeeklyPlanTaskResponseDto
+                {
+                    Id = (int)t.Id,
+                    WeeklyPlanId = t.WeeklyPlanId,
+                    Title = t.Title,
+                    Description = t.Notes,
+                    IsCompleted = false, // Not available in WeeklyPlanTaskResponseDTO
+                    DisplayOrder = 0, // Not available in WeeklyPlanTaskResponseDTO
+                    CreatedAt = DateTime.UtcNow, // Not available in WeeklyPlanTaskResponseDTO
+                    UpdatedAt = DateTime.UtcNow // Not available in WeeklyPlanTaskResponseDTO
+                }).ToList() ?? new List<WeeklyPlanTaskResponseDto>(),
+                DailyProgresses = new List<DailyProgressResponseDto>(),
+                TotalTasks = result.Tasks?.Count ?? 0,
+                CompletedTasks = 0,
+                CompletionPercentage = 0
+            };
+        }
+
+        public async Task<WeeklyPlanResponseDto?> UpdateWeeklyPlanAsync(long id, UpdateWeeklyPlanDto updateDto, string employeeId, CancellationToken cancellationToken = default)
+        {
+            var updateDtoUpper = new UpdateWeeklyPlanDTO
+            {
+                Title = updateDto.Title,
+                Description = updateDto.Description
+            };
+
+            var result = await UpdateWeeklyPlanAsync(id, updateDtoUpper, employeeId);
+            if (result == null) return null;
+
+            return new WeeklyPlanResponseDto
+            {
+                Id = (int)result.Id,
+                Title = result.Title,
+                Description = result.Description,
+                WeekStartDate = DateOnly.FromDateTime(result.WeekStartDate),
+                WeekEndDate = DateOnly.FromDateTime(result.WeekEndDate),
+                EmployeeId = result.EmployeeId,
+                EmployeeName = "",
+                CreatedAt = result.CreatedAt,
+                UpdatedAt = result.UpdatedAt,
+                IsActive = result.IsActive,
+                Tasks = new List<WeeklyPlanTaskResponseDto>(),
+                DailyProgresses = new List<DailyProgressResponseDto>(),
+                TotalTasks = 0,
+                CompletedTasks = 0,
+                CompletionPercentage = 0
+            };
+        }
+
+        public async Task<bool> DeleteWeeklyPlanAsync(long id, string employeeId, CancellationToken cancellationToken = default)
+        {
+            var plan = await UnitOfWork.WeeklyPlans.GetByIdAsync(id, cancellationToken);
+            if (plan == null || plan.EmployeeId != employeeId)
+                return false;
+
+            plan.IsActive = false;
+            await UnitOfWork.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        public async Task<WeeklyPlanResponseDto?> GetWeeklyPlanByIdAsync(long id, CancellationToken cancellationToken = default)
+        {
+            var plan = await UnitOfWork.WeeklyPlans.GetByIdWithDetailsAsync(id, cancellationToken);
+            if (plan == null) return null;
+
+            return new WeeklyPlanResponseDto
+            {
+                Id = (int)plan.Id,
+                Title = plan.Title,
+                Description = plan.Description,
+                WeekStartDate = plan.WeekStartDate,
+                WeekEndDate = plan.WeekEndDate,
+                EmployeeId = plan.EmployeeId,
+                EmployeeName = plan.Employee?.FirstName + " " + plan.Employee?.LastName ?? "",
+                Rating = plan.Rating,
+                ManagerComment = plan.ManagerComment,
+                ManagerReviewedAt = plan.ManagerReviewedAt,
+                CreatedAt = plan.CreatedAt,
+                UpdatedAt = plan.UpdatedAt,
+                IsActive = plan.IsActive,
+                Tasks = plan.Tasks?.Select(t => new WeeklyPlanTaskResponseDto
+                {
+                    Id = t.Id,
+                    WeeklyPlanId = t.WeeklyPlanId,
+                    Title = t.Title,
+                    Description = t.Notes,
+                    IsCompleted = false,
+                    DisplayOrder = 0,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                }).ToList() ?? new List<WeeklyPlanTaskResponseDto>(),
+                DailyProgresses = new List<DailyProgressResponseDto>(),
+                TotalTasks = plan.Tasks?.Count ?? 0,
+                CompletedTasks = 0,
+                CompletionPercentage = 0
+            };
+        }
+
+        public async Task<PaginatedWeeklyPlansResponseDto> GetWeeklyPlansAsync(FilterWeeklyPlansDto filterDto, CancellationToken cancellationToken = default)
+        {
+            var filtersUpper = new WeeklyPlanFiltersDTO
+            {
+                EmployeeId = filterDto.EmployeeId,
+                WeekStartDate = filterDto.StartDate?.ToDateTime(TimeOnly.MinValue),
+                WeekEndDate = filterDto.EndDate?.ToDateTime(TimeOnly.MinValue),
+                IsViewed = filterDto.HasManagerReview
+            };
+
+            var (plans, totalCount) = await GetWeeklyPlansWithFiltersAsync(filtersUpper, "SalesManager", filterDto.Page, filterDto.PageSize);
+
+            return new PaginatedWeeklyPlansResponseDto
+            {
+                Data = plans.Select(p => new WeeklyPlanResponseDto
+                {
+                    Id = (int)p.Id,
+                    Title = p.Title,
+                    Description = p.Description,
+                    WeekStartDate = DateOnly.FromDateTime(p.WeekStartDate),
+                    WeekEndDate = DateOnly.FromDateTime(p.WeekEndDate),
+                    EmployeeId = p.EmployeeId,
+                    EmployeeName = p.Employee?.FirstName + " " + p.Employee?.LastName ?? "",
+                    Rating = p.Rating,
+                    ManagerComment = p.ManagerComment,
+                    ManagerReviewedAt = p.ManagerReviewedAt,
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt,
+                    IsActive = p.IsActive,
+                    Tasks = p.Tasks?.Select(t => new WeeklyPlanTaskResponseDto
+                    {
+                        Id = (int)t.Id,
+                        WeeklyPlanId = t.WeeklyPlanId,
+                        Title = t.Title,
+                        Description = t.Notes,
+                        IsCompleted = false,
+                        DisplayOrder = 0,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    }).ToList() ?? new List<WeeklyPlanTaskResponseDto>(),
+                    DailyProgresses = new List<DailyProgressResponseDto>(),
+                    TotalTasks = p.Tasks?.Count ?? 0,
+                    CompletedTasks = 0,
+                    CompletionPercentage = 0
+                }).ToList(),
+                TotalCount = totalCount,
+                Page = filterDto.Page,
+                PageSize = filterDto.PageSize,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)filterDto.PageSize)
+            };
+        }
+
+        public async Task<PaginatedWeeklyPlansResponseDto> GetWeeklyPlansForEmployeeAsync(string employeeId, FilterWeeklyPlansDto filterDto, CancellationToken cancellationToken = default)
+        {
+            var filtersUpper = new WeeklyPlanFiltersDTO
+            {
+                EmployeeId = employeeId,
+                WeekStartDate = filterDto.StartDate?.ToDateTime(TimeOnly.MinValue),
+                WeekEndDate = filterDto.EndDate?.ToDateTime(TimeOnly.MinValue),
+                IsViewed = filterDto.HasManagerReview
+            };
+
+            var (plans, totalCount) = await GetWeeklyPlansWithFiltersAsync(filtersUpper, "SalesMan", filterDto.Page, filterDto.PageSize);
+
+            return new PaginatedWeeklyPlansResponseDto
+            {
+                Data = plans.Select(p => new WeeklyPlanResponseDto
+                {
+                    Id = (int)p.Id,
+                    Title = p.Title,
+                    Description = p.Description,
+                    WeekStartDate = DateOnly.FromDateTime(p.WeekStartDate),
+                    WeekEndDate = DateOnly.FromDateTime(p.WeekEndDate),
+                    EmployeeId = p.EmployeeId,
+                    EmployeeName = p.Employee?.FirstName + " " + p.Employee?.LastName ?? "",
+                    Rating = p.Rating,
+                    ManagerComment = p.ManagerComment,
+                    ManagerReviewedAt = p.ManagerReviewedAt,
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt,
+                    IsActive = p.IsActive,
+                    Tasks = p.Tasks?.Select(t => new WeeklyPlanTaskResponseDto
+                    {
+                        Id = (int)t.Id,
+                        WeeklyPlanId = t.WeeklyPlanId,
+                        Title = t.Title,
+                        Description = t.Notes,
+                        IsCompleted = false,
+                        DisplayOrder = 0,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    }).ToList() ?? new List<WeeklyPlanTaskResponseDto>(),
+                    DailyProgresses = new List<DailyProgressResponseDto>(),
+                    TotalTasks = p.Tasks?.Count ?? 0,
+                    CompletedTasks = 0,
+                    CompletionPercentage = 0
+                }).ToList(),
+                TotalCount = totalCount,
+                Page = filterDto.Page,
+                PageSize = filterDto.PageSize,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)filterDto.PageSize)
+            };
+        }
+
+        public async Task<bool> CanAccessWeeklyPlanAsync(long planId, string userId, bool isManager, CancellationToken cancellationToken = default)
+        {
+            var plan = await UnitOfWork.WeeklyPlans.GetByIdAsync(planId, cancellationToken);
+            if (plan == null) return false;
+
+            if (isManager) return true;
+            return plan.EmployeeId == userId;
+        }
+
+        public async Task<WeeklyPlanTaskResponseDto?> AddTaskToWeeklyPlanAsync(long weeklyPlanId, AddTaskToWeeklyPlanDto taskDto, string employeeId, CancellationToken cancellationToken = default)
+        {
+            var createTaskDto = new CreateWeeklyPlanTaskDTO
+            {
+                WeeklyPlanId = weeklyPlanId,
+                Title = taskDto.Title,
+                Notes = taskDto.Description,
+                ClientId = null,
+                ClientName = null,
+                ClientPhone = null,
+                ClientAddress = null,
+                ClientLocation = null,
+                ClientClassification = null,
+                PlannedDate = null,
+                ClientStatus = null
+            };
+
+            var result = await _taskService.CreateTaskAsync(createTaskDto, employeeId);
+            if (result == null) return null;
+
+            return new WeeklyPlanTaskResponseDto
+            {
+                Id = (int)result.Id,
+                WeeklyPlanId = result.WeeklyPlanId,
+                Title = result.Title,
+                Description = result.Notes,
+                IsCompleted = false,
+                DisplayOrder = 0,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+        }
+
+        public async Task<WeeklyPlanTaskResponseDto?> UpdateTaskAsync(long weeklyPlanId, int taskId, UpdateWeeklyPlanTaskDto updateDto, string employeeId, CancellationToken cancellationToken = default)
+        {
+            var updateTaskDto = new UpdateWeeklyPlanTaskDTO
+            {
+                Title = updateDto.Title,
+                Notes = updateDto.Description,
+                ClientId = null,
+                ClientName = null,
+                ClientPhone = null,
+                ClientAddress = null,
+                ClientLocation = null,
+                ClientClassification = null,
+                PlannedDate = null,
+                ClientStatus = null
+            };
+
+            var result = await _taskService.UpdateTaskAsync(taskId, updateTaskDto, employeeId);
+            if (result == null) return null;
+
+            return new WeeklyPlanTaskResponseDto
+            {
+                Id = (int)result.Id,
+                WeeklyPlanId = result.WeeklyPlanId,
+                Title = result.Title,
+                Description = result.Notes,
+                IsCompleted = false,
+                DisplayOrder = 0,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+        }
+
+        public async Task<bool> DeleteTaskAsync(long weeklyPlanId, int taskId, string employeeId, CancellationToken cancellationToken = default)
+        {
+            return await _taskService.DeleteTaskAsync(taskId, employeeId);
+        }
+
+        public async Task<DailyProgressResponseDto?> AddDailyProgressAsync(long weeklyPlanId, CreateDailyProgressDto progressDto, string employeeId, CancellationToken cancellationToken = default)
+        {
+            var progress = new DailyProgress
+            {
+                WeeklyPlanId = weeklyPlanId,
+                ProgressDate = progressDto.ProgressDate,
+                Notes = progressDto.Notes,
+                TasksWorkedOn = progressDto.TasksWorkedOn != null && progressDto.TasksWorkedOn.Any()
+                    ? string.Join(",", progressDto.TasksWorkedOn)
+                    : null,
+                IsActive = true
+            };
+
+            var repository = new DailyProgressRepository(UnitOfWork.GetContext());
+            var created = await repository.CreateAsync(progress, cancellationToken);
+
+            return new DailyProgressResponseDto
+            {
+                Id = created.Id,
+                WeeklyPlanId = created.WeeklyPlanId,
+                ProgressDate = created.ProgressDate,
+                Notes = created.Notes,
+                TasksWorkedOn = !string.IsNullOrEmpty(created.TasksWorkedOn)
+                    ? created.TasksWorkedOn.Split(',').Select(int.Parse).ToList()
+                    : new List<int>(),
+                CreatedAt = created.CreatedAt,
+                UpdatedAt = created.UpdatedAt
+            };
+        }
+
+        public async Task<DailyProgressResponseDto?> UpdateDailyProgressAsync(long weeklyPlanId, int progressId, UpdateDailyProgressDto updateDto, string employeeId, CancellationToken cancellationToken = default)
+        {
+            var repository = new DailyProgressRepository(UnitOfWork.GetContext());
+            var progress = await repository.GetByIdAsync(progressId, cancellationToken);
+            if (progress == null || progress.WeeklyPlanId != weeklyPlanId)
+                return null;
+
+            progress.Notes = updateDto.Notes;
+            progress.TasksWorkedOn = updateDto.TasksWorkedOn != null && updateDto.TasksWorkedOn.Any()
+                ? string.Join(",", updateDto.TasksWorkedOn)
+                : null;
+            progress.UpdatedAt = DateTime.UtcNow;
+
+            var updated = await repository.UpdateAsync(progress, cancellationToken);
+
+            return new DailyProgressResponseDto
+            {
+                Id = updated.Id,
+                WeeklyPlanId = updated.WeeklyPlanId,
+                ProgressDate = updated.ProgressDate,
+                Notes = updated.Notes,
+                TasksWorkedOn = !string.IsNullOrEmpty(updated.TasksWorkedOn)
+                    ? updated.TasksWorkedOn.Split(',').Select(int.Parse).ToList()
+                    : new List<int>(),
+                CreatedAt = updated.CreatedAt,
+                UpdatedAt = updated.UpdatedAt
+            };
+        }
+
+        public async Task<bool> DeleteDailyProgressAsync(long weeklyPlanId, int progressId, string employeeId, CancellationToken cancellationToken = default)
+        {
+            var repository = new DailyProgressRepository(UnitOfWork.GetContext());
+            return await repository.DeleteAsync(progressId, cancellationToken);
+        }
+
+        public async Task<WeeklyPlanResponseDto?> ReviewWeeklyPlanAsync(long id, ReviewWeeklyPlanDto reviewDto, CancellationToken cancellationToken = default)
+        {
+            var reviewDtoUpper = new ReviewWeeklyPlanDTO
+            {
+                Rating = reviewDto.Rating,
+                Comment = reviewDto.ManagerComment
+            };
+
+            var result = await ReviewWeeklyPlanAsync(id, reviewDtoUpper, "");
+            if (!result) return null;
+
+            return await GetWeeklyPlanByIdAsync(id, cancellationToken);
         }
     }
 }
+
+
+
+
+
+
+
+
+

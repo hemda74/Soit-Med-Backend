@@ -67,6 +67,7 @@ namespace SoitMed.Models
         public DbSet<WeeklyPlan> WeeklyPlans { get; set; }
         public DbSet<WeeklyPlanTask> WeeklyPlanTasks { get; set; }
         public DbSet<TaskProgress> TaskProgresses { get; set; }
+        public DbSet<DailyProgress> DailyProgresses { get; set; }
 
         // Chat entities
         public DbSet<ChatConversation> ChatConversations { get; set; }

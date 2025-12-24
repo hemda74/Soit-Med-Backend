@@ -6,25 +6,25 @@ namespace SoitMed.Services
     {
         // Weekly Plan operations
         Task<WeeklyPlanResponseDto?> CreateWeeklyPlanAsync(CreateWeeklyPlanDto createDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<WeeklyPlanResponseDto?> UpdateWeeklyPlanAsync(int id, UpdateWeeklyPlanDto updateDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<bool> DeleteWeeklyPlanAsync(int id, string employeeId, CancellationToken cancellationToken = default);
-        Task<WeeklyPlanResponseDto?> GetWeeklyPlanByIdAsync(int id, CancellationToken cancellationToken = default);
+        Task<WeeklyPlanResponseDto?> UpdateWeeklyPlanAsync(long id, UpdateWeeklyPlanDto updateDto, string employeeId, CancellationToken cancellationToken = default);
+        Task<bool> DeleteWeeklyPlanAsync(long id, string employeeId, CancellationToken cancellationToken = default);
+        Task<WeeklyPlanResponseDto?> GetWeeklyPlanByIdAsync(long id, CancellationToken cancellationToken = default);
         Task<PaginatedWeeklyPlansResponseDto> GetWeeklyPlansAsync(FilterWeeklyPlansDto filterDto, CancellationToken cancellationToken = default);
         Task<PaginatedWeeklyPlansResponseDto> GetWeeklyPlansForEmployeeAsync(string employeeId, FilterWeeklyPlansDto filterDto, CancellationToken cancellationToken = default);
-        Task<bool> CanAccessWeeklyPlanAsync(int planId, string userId, bool isManager, CancellationToken cancellationToken = default);
+        Task<bool> CanAccessWeeklyPlanAsync(long planId, string userId, bool isManager, CancellationToken cancellationToken = default);
         
         // Task operations
-        Task<WeeklyPlanTaskResponseDto?> AddTaskToWeeklyPlanAsync(int weeklyPlanId, AddTaskToWeeklyPlanDto taskDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<WeeklyPlanTaskResponseDto?> UpdateTaskAsync(int weeklyPlanId, int taskId, UpdateWeeklyPlanTaskDto updateDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<bool> DeleteTaskAsync(int weeklyPlanId, int taskId, string employeeId, CancellationToken cancellationToken = default);
+        Task<WeeklyPlanTaskResponseDto?> AddTaskToWeeklyPlanAsync(long weeklyPlanId, AddTaskToWeeklyPlanDto taskDto, string employeeId, CancellationToken cancellationToken = default);
+        Task<WeeklyPlanTaskResponseDto?> UpdateTaskAsync(long weeklyPlanId, int taskId, UpdateWeeklyPlanTaskDto updateDto, string employeeId, CancellationToken cancellationToken = default);
+        Task<bool> DeleteTaskAsync(long weeklyPlanId, int taskId, string employeeId, CancellationToken cancellationToken = default);
         
         // Daily Progress operations
-        Task<DailyProgressResponseDto?> AddDailyProgressAsync(int weeklyPlanId, CreateDailyProgressDto progressDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<DailyProgressResponseDto?> UpdateDailyProgressAsync(int weeklyPlanId, int progressId, UpdateDailyProgressDto updateDto, string employeeId, CancellationToken cancellationToken = default);
-        Task<bool> DeleteDailyProgressAsync(int weeklyPlanId, int progressId, string employeeId, CancellationToken cancellationToken = default);
+        Task<DailyProgressResponseDto?> AddDailyProgressAsync(long weeklyPlanId, CreateDailyProgressDto progressDto, string employeeId, CancellationToken cancellationToken = default);
+        Task<DailyProgressResponseDto?> UpdateDailyProgressAsync(long weeklyPlanId, int progressId, UpdateDailyProgressDto updateDto, string employeeId, CancellationToken cancellationToken = default);
+        Task<bool> DeleteDailyProgressAsync(long weeklyPlanId, int progressId, string employeeId, CancellationToken cancellationToken = default);
         
         // Manager Review operations
-        Task<WeeklyPlanResponseDto?> ReviewWeeklyPlanAsync(int id, ReviewWeeklyPlanDto reviewDto, CancellationToken cancellationToken = default);
+        Task<WeeklyPlanResponseDto?> ReviewWeeklyPlanAsync(long id, ReviewWeeklyPlanDto reviewDto, CancellationToken cancellationToken = default);
     }
 }
 

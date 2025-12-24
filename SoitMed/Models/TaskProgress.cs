@@ -10,7 +10,7 @@ namespace SoitMed.Models
     public class TaskProgress : BaseEntity
     {
         [Required]
-        public long TaskId { get; set; } // Link to WeeklyPlanTask
+        public int TaskId { get; set; } // Link to WeeklyPlanTask
 
         public long? ClientId { get; set; } // Link to Client for history tracking
 

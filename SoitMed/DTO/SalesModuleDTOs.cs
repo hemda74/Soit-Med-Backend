@@ -24,7 +24,7 @@ namespace SoitMed.DTO
     public class CreateTaskProgressDTO
     {
         [Required]
-        public long TaskId { get; set; }
+        public int TaskId { get; set; }
 
         [Required]
         public DateTime ProgressDate { get; set; }
@@ -70,7 +70,7 @@ namespace SoitMed.DTO
     public class TaskProgressResponseDTO
     {
         public long Id { get; set; }
-        public long TaskId { get; set; }
+        public int TaskId { get; set; }
         public long? ClientId { get; set; }
         public string? ClientName { get; set; }
         public string EmployeeId { get; set; } = string.Empty;

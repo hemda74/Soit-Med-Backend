@@ -77,21 +77,21 @@ namespace SoitMed.Services
             // Deal statistics
             var deals = activitiesList.Where(a => a.Deal != null).Select(a => a.Deal!).ToList();
             var totalDeals = deals.Count;
-            var wonDeals = deals.Count(d => d.Status == DealStatus.Won);
-            var lostDeals = deals.Count(d => d.Status == DealStatus.Lost);
-            var pendingDeals = deals.Count(d => d.Status == DealStatus.Pending);
+            var wonDeals = deals.Count(d => d.Status == Models.Enums.DealStatus.Completed || d.Status == Models.Enums.DealStatus.Closed);
+            var lostDeals = deals.Count(d => d.Status == Models.Enums.DealStatus.Lost);
+            var pendingDeals = deals.Count(d => d.Status == Models.Enums.DealStatus.Pending);
 
             // Offer statistics
             var offers = activitiesList.Where(a => a.Offer != null).Select(a => a.Offer!).ToList();
             var totalOffers = offers.Count;
-            var acceptedOffers = offers.Count(o => o.Status == OfferStatus.Accepted);
-            var rejectedOffers = offers.Count(o => o.Status == OfferStatus.Rejected);
-            var draftOffers = offers.Count(o => o.Status == OfferStatus.Draft);
-            var sentOffers = offers.Count(o => o.Status == OfferStatus.Sent);
+            var acceptedOffers = offers.Count(o => o.Status == Models.Enums.OfferStatus.Accepted);
+            var rejectedOffers = offers.Count(o => o.Status == Models.Enums.OfferStatus.Rejected);
+            var draftOffers = offers.Count(o => o.Status == Models.Enums.OfferStatus.Pending);
+            var sentOffers = offers.Count(o => o.Status == Models.Enums.OfferStatus.Sent);
 
             // Value calculations
             var totalDealValue = deals.Sum(d => d.DealValue);
-            var wonDealValue = deals.Where(d => d.Status == DealStatus.Won).Sum(d => d.DealValue);
+            var wonDealValue = deals.Where(d => d.Status == Models.Enums.DealStatus.Completed || d.Status == Models.Enums.DealStatus.Closed).Sum(d => d.DealValue);
             var averageDealValue = totalDeals > 0 ? totalDealValue / totalDeals : 0;
 
             // Conversion rates
@@ -128,9 +128,9 @@ namespace SoitMed.Services
                     UserName = userName,
                     TotalActivities = userActivities.Count,
                     TotalDeals = userDeals.Count,
-                    WonDeals = userDeals.Count(d => d.Status == DealStatus.Won),
+                    WonDeals = userDeals.Count(d => d.Status == Models.Enums.DealStatus.Completed || d.Status == Models.Enums.DealStatus.Closed),
                     TotalValue = userDeals.Sum(d => d.DealValue),
-                    WonValue = userDeals.Where(d => d.Status == DealStatus.Won).Sum(d => d.DealValue),
+                    WonValue = userDeals.Where(d => d.Status == Models.Enums.DealStatus.Completed || d.Status == Models.Enums.DealStatus.Closed).Sum(d => d.DealValue),
                     ConversionRate = userActivities.Count > 0 ? (decimal)userDeals.Count / userActivities.Count * 100 : 0
                 });
             }

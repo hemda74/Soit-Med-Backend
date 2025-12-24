@@ -24,7 +24,7 @@ namespace SoitMed.Services
                     createDto.WeeklyPlanId, userId, createDto.Title);
                 
                 // Validate weekly plan exists and belongs to user
-                var weeklyPlan = await UnitOfWork.WeeklyPlans.GetByIdAsync(createDto.WeeklyPlanId);
+                var weeklyPlan = await UnitOfWork.WeeklyPlans.GetByIdAsync((int)createDto.WeeklyPlanId);
                 if (weeklyPlan == null)
                     throw new ArgumentException("Weekly plan not found", nameof(createDto.WeeklyPlanId));
 
@@ -78,8 +78,9 @@ namespace SoitMed.Services
 
                 var task = new WeeklyPlanTask
                 {
-                    WeeklyPlanId = createDto.WeeklyPlanId,
+                    WeeklyPlanId = (int)createDto.WeeklyPlanId,
                     Title = createDto.Title,
+                    Description = createDto.Notes, // Map Notes to Description
                     ClientId = resolvedClientId,
                     ClientStatus = createDto.ClientStatus,
                     ClientName = createDto.ClientName,
@@ -165,6 +166,7 @@ namespace SoitMed.Services
                     {
                         WeeklyPlanId = weeklyPlanId,
                         Title = createDto.Title,
+                        Description = createDto.Notes, // Map Notes to Description
                         ClientId = resolvedClientId,
                         ClientStatus = createDto.ClientStatus,
                         ClientName = createDto.ClientName,
@@ -185,7 +187,7 @@ namespace SoitMed.Services
                 await UnitOfWork.SaveChangesAsync();
 
                 // OPTIMIZATION: Get all tasks once instead of querying N times in loop
-                var savedTasks = await UnitOfWork.WeeklyPlanTasks.GetTasksByWeeklyPlanIdAsync(weeklyPlanId);
+                var savedTasks = await UnitOfWork.WeeklyPlanTasks.GetByWeeklyPlanIdAsync(weeklyPlanId);
                 
                 // Match tasks by title and planned date, then map to DTOs sequentially to avoid DbContext concurrency issues
                 var createdTasks = new List<WeeklyPlanTaskDetailResponseDTO>();
@@ -218,7 +220,7 @@ namespace SoitMed.Services
         {
             try
             {
-                var task = await UnitOfWork.WeeklyPlanTasks.GetTaskWithDetailsAsync(taskId);
+                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync((int)taskId);
                 if (task == null)
                     return null;
 
@@ -251,7 +253,7 @@ namespace SoitMed.Services
                 if (userRole != "SalesManager" && userRole != "SuperAdmin" && weeklyPlan.EmployeeId != userId)
                     throw new UnauthorizedAccessException("You don't have permission to view tasks for this weekly plan");
 
-                var tasks = await UnitOfWork.WeeklyPlanTasks.GetTasksByWeeklyPlanIdAsync(weeklyPlanId);
+                var tasks = await UnitOfWork.WeeklyPlanTasks.GetByWeeklyPlanIdAsync(weeklyPlanId);
                 
                 // Map sequentially to avoid DbContext concurrency issues (MapToDetailResponseDTO makes DB calls)
                 var tasksList = tasks.ToList();
@@ -275,7 +277,7 @@ namespace SoitMed.Services
         {
             try
             {
-                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync(taskId);
+                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync((int)taskId);
                 if (task == null)
                     return null;
 
@@ -355,7 +357,7 @@ namespace SoitMed.Services
         {
             try
             {
-                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync(taskId);
+                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync((int)taskId);
                 if (task == null)
                     return false;
 
@@ -379,7 +381,7 @@ namespace SoitMed.Services
                 else
                 {
                     // Hard delete
-                    await UnitOfWork.WeeklyPlanTasks.DeleteAsync(task);
+                    await UnitOfWork.WeeklyPlanTasks.DeleteAsync((int)taskId);
                     Logger.LogInformation("Task {TaskId} deleted successfully", taskId);
                 }
 
@@ -397,7 +399,7 @@ namespace SoitMed.Services
         {
             try
             {
-                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync(taskId);
+                var task = await UnitOfWork.WeeklyPlanTasks.GetByIdAsync((int)taskId);
                 if (task == null)
                     return false;
 
@@ -419,7 +421,7 @@ namespace SoitMed.Services
             try
             {
                 // Check if weekly plan exists
-                var weeklyPlan = await UnitOfWork.WeeklyPlans.GetByIdAsync(createDto.WeeklyPlanId);
+                var weeklyPlan = await UnitOfWork.WeeklyPlans.GetByIdAsync((int)createDto.WeeklyPlanId);
                 if (weeklyPlan == null)
                     return false;
 

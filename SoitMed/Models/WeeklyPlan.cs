@@ -10,7 +10,7 @@ namespace SoitMed.Models
     public class WeeklyPlan
     {
         [Key]
-        public int Id { get; set; }
+        public long Id { get; set; }
 
         [Required]
         [MaxLength(200)]
@@ -36,6 +36,14 @@ namespace SoitMed.Models
         public string? ManagerComment { get; set; }
 
         public DateTime? ManagerReviewedAt { get; set; }
+
+        public DateTime? ManagerViewedAt { get; set; }
+
+        [MaxLength(450)]
+        public string? ViewedBy { get; set; }
+
+        [MaxLength(450)]
+        public string? ReviewedBy { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

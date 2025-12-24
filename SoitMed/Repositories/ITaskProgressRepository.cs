@@ -7,7 +7,7 @@ namespace SoitMed.Repositories
     /// </summary>
     public interface ITaskProgressRepository : IBaseRepository<TaskProgress>
     {
-        Task<List<TaskProgress>> GetProgressesByTaskIdAsync(long taskId);
+        Task<List<TaskProgress>> GetProgressesByTaskIdAsync(int taskId);
         Task<List<TaskProgress>> GetProgressesByClientIdAsync(long clientId);
         Task<List<TaskProgress>> GetProgressesByEmployeeAsync(string employeeId, DateTime? startDate, DateTime? endDate);
         Task<List<TaskProgress>> GetAllProgressesAsync(DateTime? startDate, DateTime? endDate);

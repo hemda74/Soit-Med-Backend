@@ -20,7 +20,7 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<Offer>> GetByStatusAsync(OfferStatus status, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<Offer>> GetByStatusAsync(Models.Enums.OfferStatus status, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(o => o.ActivityLog)
@@ -30,7 +30,7 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<Offer>> GetByUserIdAndStatusAsync(string userId, OfferStatus status, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<Offer>> GetByUserIdAndStatusAsync(string userId, Models.Enums.OfferStatus status, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(o => o.ActivityLog)
@@ -62,7 +62,7 @@ namespace SoitMed.Repositories
         {
             return await _dbSet
                 .Where(o => userIds.Contains(o.UserId) && 
-                           o.Status == OfferStatus.Accepted && 
+                           o.Status == Models.Enums.OfferStatus.Accepted && 
                            o.CreatedAt >= startDate && 
                            o.CreatedAt <= endDate)
                 .GroupBy(o => o.UserId)

@@ -11,7 +11,7 @@ namespace SoitMed.Services
         Task<TaskProgressResponseDTO> CreateProgressAsync(CreateTaskProgressDTO createDto, string userId);
         Task<TaskProgressResponseDTO> CreateProgressAndOfferRequestAsync(CreateTaskProgressWithOfferRequestDTO createDto, string userId);
         Task<TaskProgressResponseDTO?> GetProgressAsync(long progressId, string userId, string userRole);
-        Task<List<TaskProgressResponseDTO>> GetProgressesByTaskAsync(long taskId, string userId, string userRole);
+        Task<List<TaskProgressResponseDTO>> GetProgressesByTaskAsync(int taskId, string userId, string userRole);
         Task<List<TaskProgressResponseDTO>> GetProgressesByClientAsync(long clientId, string userId, string userRole);
         Task<List<TaskProgressResponseDTO>> GetProgressesByEmployeeAsync(string employeeId, DateTime? startDate, DateTime? endDate);
         Task<List<TaskProgressResponseDTO>> GetAllProgressesAsync(DateTime? startDate, DateTime? endDate);

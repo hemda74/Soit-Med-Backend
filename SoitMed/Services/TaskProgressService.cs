@@ -245,11 +245,11 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<List<TaskProgressResponseDTO>> GetProgressesByTaskAsync(long taskId, string userId, string userRole)
+        public async Task<List<TaskProgressResponseDTO>> GetProgressesByTaskAsync(int taskId, string userId, string userRole)
         {
             try
             {
-                var task = await _unitOfWork.WeeklyPlanTasks.GetTaskWithDetailsAsync(taskId);
+                var task = await _unitOfWork.WeeklyPlanTasks.GetByIdAsync(taskId);
                 if (task == null)
                     throw new ArgumentException("Task not found", nameof(taskId));
 
@@ -460,7 +460,7 @@ namespace SoitMed.Services
                     return true;
 
                 // Check if user is manager of the task owner
-                var task = await _unitOfWork.WeeklyPlanTasks.GetByIdAsync(progress.TaskId);
+                var task = await _unitOfWork.WeeklyPlanTasks.GetByIdAsync((int)progress.TaskId);
                 if (task != null)
                 {
                     var weeklyPlan = await _unitOfWork.WeeklyPlans.GetByIdAsync(task.WeeklyPlanId);

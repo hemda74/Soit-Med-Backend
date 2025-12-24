@@ -12,7 +12,7 @@ namespace SoitMed.Repositories
         {
         }
 
-        public async Task<List<TaskProgress>> GetProgressesByTaskIdAsync(long taskId)
+        public async Task<List<TaskProgress>> GetProgressesByTaskIdAsync(int taskId)
         {
             return await _context.TaskProgresses
                 .AsNoTracking()

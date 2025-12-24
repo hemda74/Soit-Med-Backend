@@ -6,6 +6,8 @@ using SoitMed.Models.Hospital;
 using SoitMed.Services;
 using SoitMed.Repositories;
 using SoitMed.Extensions;
+using SoitMed.Validators;
+using SoitMed.DTO;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -193,6 +195,16 @@ namespace SoitMed
                 builder.Services.AddApplicationServices();
                 builder.Services.AddSignalR();
                 builder.Services.AddFluentValidationAutoValidation();
+                
+                // Register FluentValidation validators explicitly
+                builder.Services.AddScoped<IValidator<CreateWeeklyPlanDto>, CreateWeeklyPlanDtoValidator>();
+                builder.Services.AddScoped<IValidator<UpdateWeeklyPlanDto>, UpdateWeeklyPlanDtoValidator>();
+                builder.Services.AddScoped<IValidator<AddTaskToWeeklyPlanDto>, AddTaskToWeeklyPlanDtoValidator>();
+                builder.Services.AddScoped<IValidator<UpdateWeeklyPlanTaskDto>, UpdateWeeklyPlanTaskDtoValidator>();
+                builder.Services.AddScoped<IValidator<CreateDailyProgressDto>, CreateDailyProgressDtoValidator>();
+                builder.Services.AddScoped<IValidator<UpdateDailyProgressDto>, UpdateDailyProgressDtoValidator>();
+                builder.Services.AddScoped<IValidator<ReviewWeeklyPlanDto>, ReviewWeeklyPlanDtoValidator>();
+                builder.Services.AddScoped<IValidator<FilterWeeklyPlansDto>, FilterWeeklyPlansDtoValidator>();
                 builder.Services.AddMemoryCache();
                 builder.Services.AddResponseCaching();
 
