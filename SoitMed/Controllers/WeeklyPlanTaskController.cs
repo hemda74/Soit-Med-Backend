@@ -86,7 +86,7 @@ namespace SoitMed.Controllers
                     return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
 
                 var userRole = await GetCurrentUserRoleAsync();
-                var task = await _taskService.GetTaskAsync(id, userId, userRole);
+                var task = await _taskService.GetTaskAsync((int)id, userId, userRole);
 
                 if (task == null)
                     return NotFound(ResponseHelper.CreateErrorResponse("Task not found"));
@@ -163,7 +163,7 @@ namespace SoitMed.Controllers
                 if (string.IsNullOrEmpty(userId))
                     return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
 
-                var result = await _taskService.UpdateTaskAsync(id, updateDto, userId);
+                var result = await _taskService.UpdateTaskAsync((int)id, updateDto, userId);
 
                 if (result == null)
                     return NotFound(ResponseHelper.CreateErrorResponse("Task not found"));
@@ -202,7 +202,7 @@ namespace SoitMed.Controllers
                 if (string.IsNullOrEmpty(userId))
                     return Unauthorized(ResponseHelper.CreateErrorResponse("Unauthorized access"));
 
-                var result = await _taskService.DeleteTaskAsync(id, userId);
+                var result = await _taskService.DeleteTaskAsync((int)id, userId);
 
                 if (!result)
                     return NotFound(ResponseHelper.CreateErrorResponse("Task not found"));

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using SoitMed.Common;
 using SoitMed.DTO;
 using SoitMed.Models.Identity;
@@ -13,6 +14,7 @@ namespace SoitMed.Controllers
     public class WeeklyPlanController : BaseController
     {
         private readonly IWeeklyPlanService _weeklyPlanService;
+        private readonly ILogger<WeeklyPlanController> _logger;
         private readonly IValidator<CreateWeeklyPlanDto> _createPlanValidator;
         private readonly IValidator<UpdateWeeklyPlanDto> _updatePlanValidator;
         private readonly IValidator<AddTaskToWeeklyPlanDto> _addTaskValidator;
@@ -25,6 +27,7 @@ namespace SoitMed.Controllers
         public WeeklyPlanController(
             IWeeklyPlanService weeklyPlanService,
             UserManager<ApplicationUser> userManager,
+            ILogger<WeeklyPlanController> logger,
             IValidator<CreateWeeklyPlanDto> createPlanValidator,
             IValidator<UpdateWeeklyPlanDto> updatePlanValidator,
             IValidator<AddTaskToWeeklyPlanDto> addTaskValidator,
@@ -35,6 +38,7 @@ namespace SoitMed.Controllers
             IValidator<FilterWeeklyPlansDto> filterValidator) : base(userManager)
         {
             _weeklyPlanService = weeklyPlanService;
+            _logger = logger;
             _createPlanValidator = createPlanValidator;
             _updatePlanValidator = updatePlanValidator;
             _addTaskValidator = addTaskValidator;
@@ -51,7 +55,7 @@ namespace SoitMed.Controllers
         /// Create a new weekly plan with tasks (Salesman only)
         /// </summary>
         [HttpPost]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> CreateWeeklyPlan([FromBody] CreateWeeklyPlanDto createDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(createDto, _createPlanValidator, cancellationToken);
@@ -76,7 +80,7 @@ namespace SoitMed.Controllers
         /// Update an existing weekly plan (Salesman only - own plans)
         /// </summary>
         [HttpPut("{id}")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> UpdateWeeklyPlan(long id, [FromBody] UpdateWeeklyPlanDto updateDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(updateDto, _updatePlanValidator, cancellationToken);
@@ -100,7 +104,7 @@ namespace SoitMed.Controllers
         /// Delete a weekly plan (Salesman only - own plans)
         /// </summary>
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> DeleteWeeklyPlan(long id, CancellationToken cancellationToken = default)
         {
             var userId = GetCurrentUserId();
@@ -168,6 +172,47 @@ namespace SoitMed.Controllers
             return SuccessResponse(result, $"Found {result.TotalCount} weekly plan(s)");
         }
 
+        /// <summary>
+        /// Get all salesmen (for filter dropdown - SalesManager and SuperAdmin only)
+        /// </summary>
+        [HttpGet("salesmen")]
+        [Authorize(Roles = "SalesManager,SuperAdmin")]
+        public async Task<IActionResult> GetAllSalesmen([FromQuery] string? q = null)
+        {
+            try
+            {
+                var salesmen = await UserManager.GetUsersInRoleAsync("SalesMan");
+
+                if (!string.IsNullOrWhiteSpace(q))
+                {
+                    var term = q.Trim().ToLower();
+                    salesmen = salesmen
+                        .Where(u =>
+                            (!string.IsNullOrEmpty(u.FirstName) && u.FirstName.ToLower().Contains(term)) ||
+                            (!string.IsNullOrEmpty(u.LastName) && u.LastName.ToLower().Contains(term)) ||
+                            (!string.IsNullOrEmpty(u.UserName) && u.UserName.ToLower().Contains(term)))
+                        .ToList();
+                }
+
+                var salesmenList = salesmen.Select(u => new
+                {
+                    id = u.Id,
+                    firstName = u.FirstName,
+                    lastName = u.LastName,
+                    email = u.Email,
+                    phoneNumber = u.PhoneNumber,
+                    userName = u.UserName
+                }).ToList();
+
+                return SuccessResponse(salesmenList, "Salesmen retrieved successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all salesmen for weekly plan filter");
+                return ErrorResponse("An error occurred while retrieving salesmen", 500);
+            }
+        }
+
         #endregion
 
         #region Task Operations
@@ -176,7 +221,7 @@ namespace SoitMed.Controllers
         /// Add a new task to an existing weekly plan (Salesman only - own plans)
         /// </summary>
         [HttpPost("{weeklyPlanId}/tasks")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> AddTask(long weeklyPlanId, [FromBody] AddTaskToWeeklyPlanDto taskDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(taskDto, _addTaskValidator, cancellationToken);
@@ -200,7 +245,7 @@ namespace SoitMed.Controllers
         /// Update a task in a weekly plan (Salesman only - own plans)
         /// </summary>
         [HttpPut("{weeklyPlanId}/tasks/{taskId}")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> UpdateTask(long weeklyPlanId, int taskId, [FromBody] UpdateWeeklyPlanTaskDto updateDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(updateDto, _updateTaskValidator, cancellationToken);
@@ -224,7 +269,7 @@ namespace SoitMed.Controllers
         /// Delete a task from a weekly plan (Salesman only - own plans)
         /// </summary>
         [HttpDelete("{weeklyPlanId}/tasks/{taskId}")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> DeleteTask(long weeklyPlanId, int taskId, CancellationToken cancellationToken = default)
         {
             var userId = GetCurrentUserId();
@@ -248,7 +293,7 @@ namespace SoitMed.Controllers
         /// Add daily progress to a weekly plan (Salesman only - own plans)
         /// </summary>
         [HttpPost("{weeklyPlanId}/progress")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> AddDailyProgress(long weeklyPlanId, [FromBody] CreateDailyProgressDto progressDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(progressDto, _createProgressValidator, cancellationToken);
@@ -272,7 +317,7 @@ namespace SoitMed.Controllers
         /// Update daily progress in a weekly plan (Salesman only - own plans)
         /// </summary>
         [HttpPut("{weeklyPlanId}/progress/{progressId}")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> UpdateDailyProgress(long weeklyPlanId, int progressId, [FromBody] UpdateDailyProgressDto updateDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(updateDto, _updateProgressValidator, cancellationToken);
@@ -296,7 +341,7 @@ namespace SoitMed.Controllers
         /// Delete daily progress from a weekly plan (Salesman only - own plans)
         /// </summary>
         [HttpDelete("{weeklyPlanId}/progress/{progressId}")]
-        [Authorize(Roles = "Salesman")]
+        [Authorize(Roles = "SalesMan")]
         public async Task<IActionResult> DeleteDailyProgress(long weeklyPlanId, int progressId, CancellationToken cancellationToken = default)
         {
             var userId = GetCurrentUserId();

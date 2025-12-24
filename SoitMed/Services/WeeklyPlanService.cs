@@ -535,8 +535,8 @@ namespace SoitMed.Services
             {
                 Title = createDto.Title,
                 Description = createDto.Description,
-                WeekStartDate = createDto.WeekStartDate.ToDateTime(TimeOnly.MinValue),
-                WeekEndDate = createDto.WeekEndDate.ToDateTime(TimeOnly.MinValue),
+                WeekStartDate = createDto.WeekStartDate,
+                WeekEndDate = createDto.WeekEndDate,
                 Tasks = createDto.Tasks?.Select(t => new CreateWeeklyPlanTaskDTO
                 {
                     WeeklyPlanId = 0, // Will be set by service

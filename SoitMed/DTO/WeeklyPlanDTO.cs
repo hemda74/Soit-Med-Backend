@@ -17,10 +17,10 @@ namespace SoitMed.DTO
         public string? Description { get; set; }
 
         [Required(ErrorMessage = "Week start date is required.")]
-        public DateOnly WeekStartDate { get; set; }
+        public DateTime WeekStartDate { get; set; }
 
         [Required(ErrorMessage = "Week end date is required.")]
-        public DateOnly WeekEndDate { get; set; }
+        public DateTime WeekEndDate { get; set; }
 
         public List<CreateWeeklyPlanTaskDto> Tasks { get; set; } = new();
     }

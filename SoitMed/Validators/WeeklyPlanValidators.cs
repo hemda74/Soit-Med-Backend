@@ -16,10 +16,10 @@ namespace SoitMed.Validators
                 .When(x => !string.IsNullOrEmpty(x.Description));
 
             RuleFor(x => x.WeekStartDate)
-                .NotEmpty().WithMessage("Week start date is required.");
+                .NotEqual(default(DateTime)).WithMessage("Week start date is required.");
 
             RuleFor(x => x.WeekEndDate)
-                .NotEmpty().WithMessage("Week end date is required.")
+                .NotEqual(default(DateTime)).WithMessage("Week end date is required.")
                 .GreaterThan(x => x.WeekStartDate)
                 .WithMessage("Week end date must be after week start date.");
 

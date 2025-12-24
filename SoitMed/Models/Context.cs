@@ -351,6 +351,14 @@ namespace SoitMed.Models
                 .HasForeignKey(wpt => wpt.ClientId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // TaskProgress - Explicit table and column mapping
+            modelBuilder.Entity<TaskProgress>()
+                .ToTable("TaskProgresses");
+            
+            modelBuilder.Entity<TaskProgress>()
+                .Property(tp => tp.TaskId)
+                .HasColumnName("TaskId");
+            
             // TaskProgress relationships
             modelBuilder.Entity<TaskProgress>()
                 .HasOne(tp => tp.Task)

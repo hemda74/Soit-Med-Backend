@@ -164,7 +164,7 @@ namespace SoitMed.Services
 
                     var task = new WeeklyPlanTask
                     {
-                        WeeklyPlanId = (int)weeklyPlanId,
+                        WeeklyPlanId = weeklyPlanId,
                         Title = createDto.Title,
                         Description = createDto.Notes, // Map Notes to Description
                         ClientId = resolvedClientId,
