@@ -435,8 +435,7 @@ GO
 -- Count products without CategoryId
 SELECT 
     'Products without CategoryId' AS Status,
-    COUNT(*) AS Count,
-    STRING_AGG(DISTINCT Category, ', ') AS UnmappedCategories
+    COUNT(*) AS Count
 FROM Products
 WHERE CategoryId IS NULL AND Category IS NOT NULL;
 GO
