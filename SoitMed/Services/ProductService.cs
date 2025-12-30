@@ -254,8 +254,36 @@ namespace SoitMed.Services
                 if (updateDto.Country != null)
                     product.Country = updateDto.Country;
 
-                if (updateDto.Category != null)
+                // Handle CategoryId (new way) - validate it exists
+                if (updateDto.CategoryId.HasValue)
+                {
+                    var categoryExists = await _unitOfWork.ProductCategories.GetByIdAsync(updateDto.CategoryId.Value);
+                    if (categoryExists == null)
+                        throw new ArgumentException($"Category with ID {updateDto.CategoryId.Value} not found", nameof(updateDto.CategoryId));
+                    
+                    if (!categoryExists.IsActive)
+                        throw new ArgumentException($"Category with ID {updateDto.CategoryId.Value} is not active", nameof(updateDto.CategoryId));
+                    
+                    product.CategoryId = updateDto.CategoryId.Value;
+                    
+                    // Also update legacy Category field for backward compatibility
+                    if (string.IsNullOrWhiteSpace(updateDto.Category))
+                    {
+                        product.Category = categoryExists.Name;
+                    }
+                }
+                
+                // Handle legacy Category field (for backward compatibility)
+                if (updateDto.Category != null && !updateDto.CategoryId.HasValue)
+                {
                     product.Category = updateDto.Category;
+                    // Try to find matching CategoryId from Category name
+                    var categoryByName = await _unitOfWork.ProductCategories.GetByNameAsync(updateDto.Category);
+                    if (categoryByName != null && categoryByName.IsActive)
+                    {
+                        product.CategoryId = categoryByName.Id;
+                    }
+                }
 
                 if (updateDto.BasePrice.HasValue)
                     product.BasePrice = updateDto.BasePrice.Value;

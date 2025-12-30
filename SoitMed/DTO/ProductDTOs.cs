@@ -59,7 +59,9 @@ namespace SoitMed.DTO
         public string? Country { get; set; }
 
         [MaxLength(100)]
-        public string? Category { get; set; }
+        public string? Category { get; set; } // Legacy field - kept for backward compatibility
+
+        public long? CategoryId { get; set; } // New: Foreign key to ProductCategory
 
         [Range(0.01, double.MaxValue, ErrorMessage = "Base price must be greater than 0")]
         public decimal? BasePrice { get; set; }
