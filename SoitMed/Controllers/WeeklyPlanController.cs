@@ -149,9 +149,10 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
-        /// Get weekly plans with optional filtering (SalesManager/SuperAdmin: all plans, Salesman: own plans)
+        /// Get weekly plans with optional filtering (SalesManager/SuperAdmin/Admin: all plans, Salesman: own plans)
         /// </summary>
         [HttpGet]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin,Admin")]
         public async Task<IActionResult> GetWeeklyPlans([FromQuery] FilterWeeklyPlansDto filterDto, CancellationToken cancellationToken = default)
         {
             var validationError = await ValidateDtoAsync(filterDto, _filterValidator, cancellationToken);
@@ -163,9 +164,17 @@ namespace SoitMed.Controllers
             if (authError != null)
                 return authError;
 
+            // Check if user is a manager (includes SuperAdmin, SalesManager, MaintenanceManager)
             var isManager = await ControllerAuthorizationHelper.IsManagerAsync(user!, UserManager);
+            
+            // Also check if user is Admin role (Admin should also see all plans)
+            var userRoles = await UserManager.GetRolesAsync(user!);
+            var isAdmin = userRoles.Contains("Admin") || userRoles.Contains("SuperAdmin");
+            
+            // Managers and Admins can see all plans, others see only their own
+            var canViewAllPlans = isManager || isAdmin;
 
-            PaginatedWeeklyPlansResponseDto result = isManager
+            PaginatedWeeklyPlansResponseDto result = canViewAllPlans
                 ? await _weeklyPlanService.GetWeeklyPlansAsync(filterDto, cancellationToken)
                 : await _weeklyPlanService.GetWeeklyPlansForEmployeeAsync(userId!, filterDto, cancellationToken);
 
@@ -211,6 +220,26 @@ namespace SoitMed.Controllers
                 _logger.LogError(ex, "Error getting all salesmen for weekly plan filter");
                 return ErrorResponse("An error occurred while retrieving salesmen", 500);
             }
+        }
+
+        /// <summary>
+        /// Get current week's plan for the authenticated user (SalesMan only)
+        /// </summary>
+        [HttpGet("current")]
+        [Authorize(Roles = "SalesMan")]
+        public async Task<IActionResult> GetCurrentWeeklyPlan()
+        {
+            var userId = GetCurrentUserId();
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+            var result = await _weeklyPlanService.GetCurrentWeeklyPlanAsync(userId);
+            if (result == null)
+            {
+                return ErrorResponse("No current weekly plan found for this week.", 404);
+            }
+
+            return SuccessResponse(result, "Current weekly plan retrieved successfully");
         }
 
         #endregion

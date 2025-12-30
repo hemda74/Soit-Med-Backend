@@ -21,7 +21,21 @@ namespace SoitMed.Services
             try
             {
                 var categories = await _unitOfWork.ProductCategories.GetAllActiveAsync();
-                return categories.Select(MapToCategoryDTO).ToList();
+                
+                // OPTIMIZATION: Pre-load product counts to avoid N+1 queries
+                var context = _unitOfWork.GetContext();
+                var categoryIds = categories.Select(c => c.Id).ToList();
+                
+                var productCounts = categoryIds.Any()
+                    ? await context.Products
+                        .AsNoTracking()
+                        .Where(p => p.CategoryId.HasValue && categoryIds.Contains(p.CategoryId.Value))
+                        .GroupBy(p => p.CategoryId.Value)
+                        .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+                        .ToDictionaryAsync(x => x.CategoryId, x => x.Count)
+                    : new Dictionary<long, int>();
+                
+                return categories.Select(c => MapToCategoryDTO(c, productCounts.GetValueOrDefault(c.Id, 0))).ToList();
             }
             catch (Exception ex)
             {
@@ -39,7 +53,20 @@ namespace SoitMed.Services
                 // Get only main categories (no parent)
                 var mainCategories = allCategories.Where(c => c.ParentCategoryId == null).ToList();
                 
-                return mainCategories.Select(c => MapToHierarchyDTO(c, allCategories)).ToList();
+                // OPTIMIZATION: Pre-load all product counts to avoid N+1 queries
+                var context = _unitOfWork.GetContext();
+                var allCategoryIds = allCategories.Select(c => c.Id).ToList();
+                
+                var productCounts = allCategoryIds.Any()
+                    ? await context.Products
+                        .AsNoTracking()
+                        .Where(p => p.CategoryId.HasValue && allCategoryIds.Contains(p.CategoryId.Value))
+                        .GroupBy(p => p.CategoryId.Value)
+                        .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+                        .ToDictionaryAsync(x => x.CategoryId, x => x.Count)
+                    : new Dictionary<long, int>();
+                
+                return mainCategories.Select(c => MapToHierarchyDTO(c, allCategories, productCounts)).ToList();
             }
             catch (Exception ex)
             {
@@ -52,12 +79,34 @@ namespace SoitMed.Services
         {
             try
             {
+                // OPTIMIZATION: Query directly from repository (avoids loading all categories)
                 var categories = await _unitOfWork.ProductCategories.GetMainCategoriesAsync();
-                return categories.Select(MapToCategoryDTO).ToList();
+                _logger.LogInformation("✅ [ProductCategoryService] GetMainCategoriesAsync returned: {Count} categories", categories.Count);
+                
+                if (categories.Count == 0)
+                {
+                    _logger.LogWarning("⚠️ [ProductCategoryService] No main categories found!");
+                    return new List<ProductCategoryDTO>();
+                }
+                
+                // OPTIMIZATION: Pre-load product counts in a single query to avoid N+1
+                var context = _unitOfWork.GetContext();
+                var categoryIds = categories.Select(c => c.Id).ToList();
+                
+                // Get product counts for all categories in one query
+                var productCounts = await context.Products
+                    .AsNoTracking()
+                    .Where(p => p.CategoryId.HasValue && categoryIds.Contains(p.CategoryId.Value))
+                    .GroupBy(p => p.CategoryId.Value)
+                    .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.CategoryId, x => x.Count);
+                
+                // Map to DTOs using pre-loaded counts
+                return categories.Select(c => MapToCategoryDTO(c, productCounts.GetValueOrDefault(c.Id, 0))).ToList();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting main categories");
+                _logger.LogError(ex, "❌ [ProductCategoryService] Error getting main categories");
                 throw;
             }
         }
@@ -67,7 +116,21 @@ namespace SoitMed.Services
             try
             {
                 var categories = await _unitOfWork.ProductCategories.GetSubCategoriesAsync(parentCategoryId);
-                return categories.Select(MapToCategoryDTO).ToList();
+                
+                // OPTIMIZATION: Pre-load product counts to avoid N+1 queries
+                var context = _unitOfWork.GetContext();
+                var categoryIds = categories.Select(c => c.Id).ToList();
+                
+                var productCounts = categoryIds.Any()
+                    ? await context.Products
+                        .AsNoTracking()
+                        .Where(p => p.CategoryId.HasValue && categoryIds.Contains(p.CategoryId.Value))
+                        .GroupBy(p => p.CategoryId.Value)
+                        .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+                        .ToDictionaryAsync(x => x.CategoryId, x => x.Count)
+                    : new Dictionary<long, int>();
+                
+                return categories.Select(c => MapToCategoryDTO(c, productCounts.GetValueOrDefault(c.Id, 0))).ToList();
             }
             catch (Exception ex)
             {
@@ -218,11 +281,8 @@ namespace SoitMed.Services
         }
 
         // Helper methods
-        private ProductCategoryDTO MapToCategoryDTO(ProductCategory category)
+        private ProductCategoryDTO MapToCategoryDTO(ProductCategory category, int productCount = 0)
         {
-            var context = _unitOfWork.GetContext();
-            var productCount = context.Products.Count(p => p.CategoryId == category.Id);
-
             return new ProductCategoryDTO
             {
                 Id = category.Id,
@@ -238,17 +298,26 @@ namespace SoitMed.Services
                 ProductCount = productCount
             };
         }
-
-        private CategoryHierarchyDTO MapToHierarchyDTO(ProductCategory category, List<ProductCategory> allCategories)
+        
+        // Overload for backward compatibility (but should avoid using this)
+        private ProductCategoryDTO MapToCategoryDTO(ProductCategory category)
         {
+            // OPTIMIZATION: Only count if not provided (for backward compatibility)
+            // But this should be avoided in hot paths
             var context = _unitOfWork.GetContext();
             var productCount = context.Products.Count(p => p.CategoryId == category.Id);
+            return MapToCategoryDTO(category, productCount);
+        }
+
+        private CategoryHierarchyDTO MapToHierarchyDTO(ProductCategory category, List<ProductCategory> allCategories, Dictionary<long, int> productCounts)
+        {
+            var productCount = productCounts.GetValueOrDefault(category.Id, 0);
 
             var subCategories = allCategories
                 .Where(c => c.ParentCategoryId == category.Id)
                 .OrderBy(c => c.DisplayOrder)
                 .ThenBy(c => c.Name)
-                .Select(c => MapToHierarchyDTO(c, allCategories))
+                .Select(c => MapToHierarchyDTO(c, allCategories, productCounts))
                 .ToList();
 
             return new CategoryHierarchyDTO

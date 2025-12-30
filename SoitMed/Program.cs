@@ -84,7 +84,7 @@ namespace SoitMed
                             maxRetryCount: 3,
                             maxRetryDelay: TimeSpan.FromSeconds(30),
                             errorNumbersToAdd: null);
-                        sqlOptions.CommandTimeout(120); // Increased timeout for complex queries
+                        sqlOptions.CommandTimeout(300); // Increased timeout for complex queries (5 minutes)
                         // Use split queries for better performance with multiple collections
                         sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
                     })

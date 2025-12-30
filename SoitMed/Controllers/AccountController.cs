@@ -462,5 +462,109 @@ namespace SoitMed.Controllers
 			}
 		}
 
+		[HttpPost("test-email")]
+		[Authorize(Roles = "SuperAdmin,Admin")]
+		public async Task<IActionResult> TestEmail([FromBody] TestEmailDTO testEmailDto)
+		{
+			try
+			{
+				if (!ModelState.IsValid)
+				{
+					return BadRequest(new
+					{
+						success = false,
+						message = "Invalid request data",
+						errors = ModelState
+					});
+				}
+
+				logger.LogInformation($"🧪 [AccountController] Test email requested to {testEmailDto.Email}");
+				
+				// Send a simple test email
+				var testSubject = "SoitMed - Test Email";
+				var testBody = $@"
+					<html>
+					<body style='font-family: Arial, sans-serif; padding: 20px;'>
+						<h2>Test Email from SoitMed</h2>
+						<p>This is a test email sent at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC.</p>
+						<p>If you received this email, the SMTP configuration is working correctly.</p>
+						<hr>
+						<p style='color: #666; font-size: 12px;'>This is an automated test message from SoitMed System.</p>
+					</body>
+					</html>";
+
+				var emailSent = await emailService.SendEmailAsync(
+					testEmailDto.Email,
+					testSubject,
+					testBody,
+					true
+				);
+
+				if (!emailSent)
+				{
+					logger.LogError($"❌ [AccountController] Test email failed to send to {testEmailDto.Email}");
+					return StatusCode(500, new
+					{
+						success = false,
+						message = "Failed to send test email. Check server logs for details."
+					});
+				}
+
+				logger.LogInformation($"✅ [AccountController] Test email sent successfully to {testEmailDto.Email}");
+				return Ok(new
+				{
+					success = true,
+					message = "Test email sent successfully. Please check your inbox and spam folder.",
+					email = testEmailDto.Email,
+					timestamp = DateTime.UtcNow
+				});
+			}
+			catch (Exception ex)
+			{
+				logger.LogError(ex, $"Error sending test email to {testEmailDto.Email}");
+				return StatusCode(500, new
+				{
+					success = false,
+					message = "An error occurred while sending the test email."
+				});
+			}
+		}
+
+		[HttpPost("test-smtp-connection")]
+		[Authorize(Roles = "SuperAdmin,Admin")]
+		public async Task<IActionResult> TestSmtpConnection()
+		{
+			try
+			{
+				logger.LogInformation("🧪 [AccountController] Testing SMTP connection...");
+				
+				var result = await emailService.TestSmtpConnectionAsync();
+				
+				if (!result)
+				{
+					return StatusCode(500, new
+					{
+						success = false,
+						message = "SMTP connection test failed. Check server logs for details."
+					});
+				}
+
+				return Ok(new
+				{
+					success = true,
+					message = "SMTP connection test successful. Check the configured email address for the test email."
+				});
+			}
+			catch (Exception ex)
+			{
+				logger.LogError(ex, "Error testing SMTP connection");
+				return StatusCode(500, new
+				{
+					success = false,
+					message = "An error occurred while testing SMTP connection."
+				});
+			}
+		}
+
 	}
 }

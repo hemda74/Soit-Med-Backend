@@ -70,8 +70,19 @@ namespace SoitMed.Services
                     ? (await _unitOfWork.Users.GetByIdsAsync(userIds)).ToDictionary(u => u.Id)
                     : new Dictionary<string, ApplicationUser>();
 
+                // Pre-load all category IDs
+                var categoryIds = productsList
+                    .Where(p => p.CategoryId.HasValue)
+                    .Select(p => p.CategoryId!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var categoriesDict = categoryIds.Any()
+                    ? (await _unitOfWork.ProductCategories.GetByIdsAsync(categoryIds)).ToDictionary(c => c.Id)
+                    : new Dictionary<long, ProductCategory>();
+
                 // Map synchronously using pre-loaded data
-                return productsList.Select(p => MapToProductResponseDTO(p, usersDict)).ToList();
+                return productsList.Select(p => MapToProductResponseDTO(p, usersDict, categoriesDict)).ToList();
             }
             catch (Exception ex)
             {
@@ -119,8 +130,19 @@ namespace SoitMed.Services
                     ? (await _unitOfWork.Users.GetByIdsAsync(userIds)).ToDictionary(u => u.Id)
                     : new Dictionary<string, ApplicationUser>();
 
+                // Pre-load all category IDs
+                var categoryIds = productsList
+                    .Where(p => p.CategoryId.HasValue)
+                    .Select(p => p.CategoryId!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var categoriesDict = categoryIds.Any()
+                    ? (await _unitOfWork.ProductCategories.GetByIdsAsync(categoryIds)).ToDictionary(c => c.Id)
+                    : new Dictionary<long, ProductCategory>();
+
                 // Map synchronously using pre-loaded data
-                return productsList.Select(p => MapToProductResponseDTO(p, usersDict)).ToList();
+                return productsList.Select(p => MapToProductResponseDTO(p, usersDict, categoriesDict)).ToList();
             }
             catch (Exception ex)
             {
@@ -151,8 +173,19 @@ namespace SoitMed.Services
                     ? (await _unitOfWork.Users.GetByIdsAsync(userIds)).ToDictionary(u => u.Id)
                     : new Dictionary<string, ApplicationUser>();
 
+                // Pre-load all category IDs
+                var categoryIds = productsList
+                    .Where(p => p.CategoryId.HasValue)
+                    .Select(p => p.CategoryId!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var categoriesDict = categoryIds.Any()
+                    ? (await _unitOfWork.ProductCategories.GetByIdsAsync(categoryIds)).ToDictionary(c => c.Id)
+                    : new Dictionary<long, ProductCategory>();
+
                 // Map synchronously using pre-loaded data
-                return productsList.Select(p => MapToProductResponseDTO(p, usersDict)).ToList();
+                return productsList.Select(p => MapToProductResponseDTO(p, usersDict, categoriesDict)).ToList();
             }
             catch (Exception ex)
             {
@@ -410,6 +443,14 @@ namespace SoitMed.Services
 
         private async Task<ProductResponseDTO> MapToProductResponseDTO(Product product)
         {
+            // Load category if CategoryId exists
+            string? categoryName = null;
+            if (product.CategoryId.HasValue)
+            {
+                var category = await _unitOfWork.ProductCategories.GetByIdAsync(product.CategoryId.Value);
+                categoryName = category?.Name;
+            }
+
             var dto = new ProductResponseDTO
             {
                 Id = product.Id,
@@ -418,7 +459,9 @@ namespace SoitMed.Services
                 Provider = product.Provider,
                 ProviderImagePath = product.ProviderImagePath,
                 Country = product.Country,
-                Category = product.Category,
+                Category = product.Category, // Legacy - kept for backward compatibility
+                CategoryId = product.CategoryId, // New: Foreign key
+                CategoryName = categoryName ?? product.Category, // Use CategoryName from relationship, fallback to legacy Category
                 BasePrice = product.BasePrice,
                 Description = product.Description,
                 ImagePath = product.ImagePath,
@@ -444,8 +487,15 @@ namespace SoitMed.Services
         }
 
         // Synchronous overload that uses pre-loaded data to avoid DbContext concurrency issues
-        private ProductResponseDTO MapToProductResponseDTO(Product product, Dictionary<string, ApplicationUser> usersDict)
+        private ProductResponseDTO MapToProductResponseDTO(Product product, Dictionary<string, ApplicationUser> usersDict, Dictionary<long, ProductCategory> categoriesDict)
         {
+            // Get category name from pre-loaded dictionary
+            string? categoryName = null;
+            if (product.CategoryId.HasValue && categoriesDict.TryGetValue(product.CategoryId.Value, out var category))
+            {
+                categoryName = category.Name;
+            }
+
             var dto = new ProductResponseDTO
             {
                 Id = product.Id,
@@ -454,7 +504,9 @@ namespace SoitMed.Services
                 Provider = product.Provider,
                 ProviderImagePath = product.ProviderImagePath,
                 Country = product.Country,
-                Category = product.Category,
+                Category = product.Category, // Legacy - kept for backward compatibility
+                CategoryId = product.CategoryId, // New: Foreign key
+                CategoryName = categoryName ?? product.Category, // Use CategoryName from relationship, fallback to legacy Category
                 BasePrice = product.BasePrice,
                 Description = product.Description,
                 ImagePath = product.ImagePath,

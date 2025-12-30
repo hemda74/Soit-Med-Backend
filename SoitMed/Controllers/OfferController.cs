@@ -602,7 +602,26 @@ namespace SoitMed.Controllers
         {
             try
             {
+                var userId = GetCurrentUserId();
+                var user = await GetCurrentUserAsync();
+                var userRoles = user != null ? await UserManager.GetRolesAsync(user) : new List<string>();
+                
+                _logger.LogInformation("GetEquipment - User {UserId} with roles [{Roles}] requesting equipment for offer {OfferId}", 
+                    userId, string.Join(", ", userRoles), offerId);
+
+                // Verify offer exists
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                {
+                    _logger.LogWarning("GetEquipment - Offer {OfferId} not found", offerId);
+                    return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
+                }
+
                 var result = await _offerService.GetEquipmentListAsync(offerId);
+                
+                _logger.LogInformation("GetEquipment - Successfully retrieved {Count} equipment items for offer {OfferId}", 
+                    result?.Count ?? 0, offerId);
+                
                 return Ok(ResponseHelper.CreateSuccessResponse(result, "Equipment retrieved"));
             }
             catch (Exception ex)
@@ -750,7 +769,7 @@ namespace SoitMed.Controllers
         /// Generate and download PDF for an offer (generated on-demand, not stored)
         /// </summary>
         [HttpGet("{offerId}/pdf")]
-        [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,Customer,Doctor,Technician")]
+        [Authorize(Roles = "SalesMan,SalesSupport,SalesManager,SuperAdmin,Customer,Doctor,Technician")]
         public async Task<IActionResult> GetOfferPdf(long offerId, [FromQuery] string language = "en")
         {
             try
@@ -762,6 +781,66 @@ namespace SoitMed.Controllers
                 {
                     _logger.LogWarning("Invalid language '{Language}' provided, defaulting to 'en'", language);
                     language = "en";
+                }
+
+                // Verify offer exists
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                {
+                    _logger.LogWarning("PDF generation requested for non-existent offer {OfferId}", offerId);
+                    return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
+                }
+
+                // Check authorization based on user role
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                {
+                    _logger.LogWarning("PDF generation requested without valid user ID");
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("Authentication required"));
+                }
+
+                var user = await UserManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    _logger.LogWarning("PDF generation requested for non-existent user {UserId}", userId);
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("User not found"));
+                }
+
+                var userRoles = await UserManager.GetRolesAsync(user);
+                var isSalesMan = userRoles.Contains("SalesMan");
+                var isManagerOrAdmin = userRoles.Contains("SalesManager") || 
+                                      userRoles.Contains("SuperAdmin") || 
+                                      userRoles.Contains("SalesSupport");
+                var isCustomer = userRoles.Contains("Customer") || 
+                                userRoles.Contains("Doctor") || 
+                                userRoles.Contains("Technician");
+
+                // For SalesMan role, verify they are assigned to this offer
+                if (isSalesMan && !isManagerOrAdmin)
+                {
+                    if (string.IsNullOrEmpty(offer.AssignedTo) || offer.AssignedTo != userId)
+                    {
+                        _logger.LogWarning("SalesMan {UserId} attempted to access PDF for offer {OfferId} which is not assigned to them", userId, offerId);
+                        return StatusCode(403, ResponseHelper.CreateErrorResponse("You can only access PDFs for offers assigned to you"));
+                    }
+                }
+
+                // For Customer/Doctor/Technician, verify they are the client for this offer
+                if (isCustomer && !isManagerOrAdmin)
+                {
+                    var client = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                    if (client == null || string.IsNullOrEmpty(client.Email))
+                    {
+                        _logger.LogWarning("Customer {UserId} attempted to access PDF for offer {OfferId} with invalid client", userId, offerId);
+                        return StatusCode(403, ResponseHelper.CreateErrorResponse("You do not have permission to access this offer PDF"));
+                    }
+
+                    // Check if user email matches client email (case-insensitive)
+                    if (!string.Equals(user.Email, client.Email, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogWarning("Customer {UserId} attempted to access PDF for offer {OfferId} which belongs to a different client", userId, offerId);
+                        return StatusCode(403, ResponseHelper.CreateErrorResponse("You can only access PDFs for your own offers"));
+                    }
                 }
 
                 // Generate PDF on-demand (no storage - streams directly to client)

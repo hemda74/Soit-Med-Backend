@@ -109,6 +109,10 @@ namespace SoitMed.Models
 
         #region Legal and Completion
         public DateTime? SentToLegalAt { get; set; }
+        public DateTime? ReturnedToSalesmanAt { get; set; }
+        public DateTime? LegalReviewedAt { get; set; }
+        [MaxLength(1000)]
+        public string? LegalReturnNotes { get; set; }
         
         public DateTime? CompletedAt { get; set; }
         
@@ -204,6 +208,37 @@ namespace SoitMed.Models
         {
             Status = DealStatus.SentToLegal;
             SentToLegalAt = DateTime.UtcNow;
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Return deal to salesman for new report
+        /// </summary>
+        public void ReturnToSalesmanForNewReport(string? returnNotes = null)
+        {
+            if (Status != DealStatus.SentToLegal)
+                throw new InvalidOperationException($"Deal must be in SentToLegal status to return to salesman. Current status: {Status}");
+
+            Status = DealStatus.ReturnedToSalesman;
+            ReturnedToSalesmanAt = DateTime.UtcNow;
+            LegalReturnNotes = returnNotes;
+            // Clear previous report to allow new submission
+            ReportText = null;
+            ReportAttachments = null;
+            ReportSubmittedAt = null;
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Mark deal as reviewed by legal (archive/mark as read)
+        /// </summary>
+        public void MarkAsLegalReviewed()
+        {
+            if (Status != DealStatus.SentToLegal)
+                throw new InvalidOperationException($"Deal must be in SentToLegal status to mark as reviewed. Current status: {Status}");
+
+            Status = DealStatus.LegalReviewed;
+            LegalReviewedAt = DateTime.UtcNow;
             UpdatedAt = DateTime.UtcNow;
         }
 
@@ -345,13 +380,16 @@ namespace SoitMed.Models
         public const string AwaitingSalesManReport = "AwaitingSalesManReport";
         public const string AwaitingSalesmenReviewsAndAccountSetup = "AwaitingSalesmenReviewsAndAccountSetup";
         public const string SentToLegal = "SentToLegal";
+        public const string ReturnedToSalesman = "ReturnedToSalesman";
+        public const string LegalReviewed = "LegalReviewed";
         public const string Failed = "Failed";
         public const string Success = "Success";
         
         public static readonly string[] AllStatuses = { 
             PendingManagerApproval, RejectedByManager, PendingSuperAdminApproval, 
             RejectedBySuperAdmin, Approved, AwaitingClientAccountCreation, 
-            AwaitingSalesManReport, AwaitingSalesmenReviewsAndAccountSetup, SentToLegal, Failed, Success 
+            AwaitingSalesManReport, AwaitingSalesmenReviewsAndAccountSetup, SentToLegal, 
+            ReturnedToSalesman, LegalReviewed, Failed, Success 
         };
     }
 

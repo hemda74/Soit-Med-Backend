@@ -21,7 +21,7 @@ namespace SoitMed.Controllers
 
         [HttpGet]
         [Authorize]
-        [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin")]
+        [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin", "SalesManager", "SalesSupport")]
         public async Task<IActionResult> GetGovernorates()
         {
             var governorates = await context.Governorates
@@ -40,7 +40,7 @@ namespace SoitMed.Controllers
 
         [HttpGet("{id}")]
         [Authorize]
-        [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin")]
+        [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin", "SalesManager", "SalesSupport")]
         public async Task<IActionResult> GetGovernorate(int id)
         {
             var governorate = await context.Governorates

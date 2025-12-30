@@ -474,7 +474,7 @@ namespace SoitMed.Services
             return true;
         }
 
-        public async Task<WeeklyPlanResponseDTO?> GetCurrentWeeklyPlanAsync(string userId)
+        private async Task<WeeklyPlanResponseDTO?> GetCurrentWeeklyPlanInternalAsync(string userId)
         {
             // Get current week's plan using GetByEmployeeIdAsync and filter
             var allPlans = await UnitOfWork.WeeklyPlans.GetByEmployeeIdAsync(userId);
@@ -931,6 +931,44 @@ namespace SoitMed.Services
             if (!result) return null;
 
             return await GetWeeklyPlanByIdAsync(id, cancellationToken);
+        }
+
+        public async Task<WeeklyPlanResponseDto?> GetCurrentWeeklyPlanAsync(string userId)
+        {
+            var result = await GetCurrentWeeklyPlanInternalAsync(userId);
+            if (result == null) return null;
+
+            return new WeeklyPlanResponseDto
+            {
+                Id = (int)result.Id,
+                Title = result.Title,
+                Description = result.Description,
+                WeekStartDate = DateOnly.FromDateTime(result.WeekStartDate),
+                WeekEndDate = DateOnly.FromDateTime(result.WeekEndDate),
+                EmployeeId = result.EmployeeId,
+                EmployeeName = result.Employee?.FirstName + " " + result.Employee?.LastName ?? "",
+                Rating = result.Rating,
+                ManagerComment = result.ManagerComment,
+                ManagerReviewedAt = result.ManagerReviewedAt,
+                CreatedAt = result.CreatedAt,
+                UpdatedAt = result.UpdatedAt,
+                IsActive = result.IsActive,
+                Tasks = result.Tasks?.Select(t => new WeeklyPlanTaskResponseDto
+                {
+                    Id = (int)t.Id,
+                    WeeklyPlanId = t.WeeklyPlanId,
+                    Title = t.Title,
+                    Description = t.Notes,
+                    IsCompleted = false,
+                    DisplayOrder = 0,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                }).ToList() ?? new List<WeeklyPlanTaskResponseDto>(),
+                DailyProgresses = new List<DailyProgressResponseDto>(),
+                TotalTasks = result.Tasks?.Count ?? 0,
+                CompletedTasks = 0,
+                CompletionPercentage = 0
+            };
         }
     }
 }

@@ -25,6 +25,9 @@ namespace SoitMed.Services
         
         // Manager Review operations
         Task<WeeklyPlanResponseDto?> ReviewWeeklyPlanAsync(long id, ReviewWeeklyPlanDto reviewDto, CancellationToken cancellationToken = default);
+        
+        // Current week plan
+        Task<WeeklyPlanResponseDto?> GetCurrentWeeklyPlanAsync(string userId);
     }
 }
 

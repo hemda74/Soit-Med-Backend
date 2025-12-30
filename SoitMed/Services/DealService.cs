@@ -4,6 +4,7 @@ using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Identity;
 using SoitMed.Repositories;
+using System.Text.Json;
 
 namespace SoitMed.Services
 {
@@ -567,7 +568,7 @@ namespace SoitMed.Services
                 superAdminApproved = string.IsNullOrEmpty(deal.SuperAdminRejectionReason);
             }
 
-            return new DealResponseDTO
+            var dealDto = new DealResponseDTO
             {
                 Id = deal.Id,
                 OfferId = deal.OfferId,
@@ -609,6 +610,175 @@ namespace SoitMed.Services
                 ClientCredentialsSetAt = deal.ClientCredentialsSetAt,
                 ClientCredentialsSetByName = credentialsSetBy != null ? $"{credentialsSetBy.FirstName} {credentialsSetBy.LastName}" : null
             };
+
+            // Include offer data when deal is sent to legal
+            if (deal.Status == DealStatus.SentToLegal && deal.OfferId.HasValue)
+            {
+                try
+                {
+                    dealDto.Offer = await MapOfferToEnhancedDTOAsync(deal.OfferId.Value);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to load offer data for deal {DealId}, offer {OfferId}. Continuing without offer data.", 
+                        deal.Id, deal.OfferId.Value);
+                    // Continue without offer data rather than failing the whole operation
+                }
+            }
+
+            return dealDto;
+        }
+
+        private async Task<EnhancedOfferResponseDTO?> MapOfferToEnhancedDTOAsync(long offerId)
+        {
+            try
+            {
+                var offer = await _unitOfWork.SalesOffers.GetByIdAsync(offerId);
+                if (offer == null)
+                    return null;
+
+                var offerClient = await _unitOfWork.Clients.GetByIdAsync(offer.ClientId);
+                var creator = await _unitOfWork.Users.GetByIdAsync(offer.CreatedBy);
+                var salesman = await _unitOfWork.Users.GetByIdAsync(offer.AssignedTo);
+
+                // Get OfferRequest information if linked
+                string? requesterId = null;
+                string? requesterName = null;
+                if (offer.OfferRequestId.HasValue)
+                {
+                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId.Value);
+                    if (offerRequest != null)
+                    {
+                        requesterId = offerRequest.RequestedBy;
+                        var requester = await _unitOfWork.Users.GetByIdAsync(offerRequest.RequestedBy);
+                        if (requester != null)
+                        {
+                            requesterName = $"{requester.FirstName} {requester.LastName}".Trim();
+                        }
+                    }
+                }
+
+                // Load equipment
+                var equipment = await _unitOfWork.OfferEquipment.GetByOfferIdAsync(offerId);
+                var equipmentDtos = equipment.Select(e => new OfferEquipmentDTO
+                {
+                    Id = e.Id,
+                    OfferId = e.OfferId,
+                    Name = e.Name,
+                    Model = e.Model,
+                    Provider = e.Provider,
+                    Country = e.Country,
+                    Year = e.Year,
+                    ImagePath = e.ImagePath,
+                    ProviderImagePath = e.ProviderImagePath,
+                    Price = e.Price,
+                    Description = e.Description,
+                    InStock = e.InStock
+                }).ToList();
+
+                // Load terms
+                var terms = await _unitOfWork.OfferTerms.GetByOfferIdAsync(offerId);
+                OfferTermsDTO? termsDto = null;
+                if (terms != null)
+                {
+                    termsDto = new OfferTermsDTO
+                    {
+                        Id = terms.Id,
+                        OfferId = terms.OfferId,
+                        WarrantyPeriod = terms.WarrantyPeriod,
+                        DeliveryTime = terms.DeliveryTime,
+                        MaintenanceTerms = terms.MaintenanceTerms,
+                        OtherTerms = terms.OtherTerms
+                    };
+                }
+
+                // Load installments
+                var installments = await _unitOfWork.InstallmentPlans.GetByOfferIdAsync(offerId);
+                var installmentDtos = installments.Select(i => new InstallmentPlanDTO
+                {
+                    Id = i.Id,
+                    OfferId = i.OfferId,
+                    InstallmentNumber = i.InstallmentNumber,
+                    Amount = i.Amount,
+                    DueDate = i.DueDate,
+                    Status = i.Status,
+                    Notes = i.Notes
+                }).ToList();
+
+                // Calculate discount amount
+                decimal? discountAmount = null;
+                if (offer.FinalPrice.HasValue && offer.FinalPrice.Value < offer.TotalAmount)
+                {
+                    discountAmount = offer.TotalAmount - offer.FinalPrice.Value;
+                }
+
+                return new EnhancedOfferResponseDTO
+                {
+                    Id = offer.Id,
+                    OfferRequestId = offer.OfferRequestId,
+                    OfferRequestRequesterId = requesterId,
+                    OfferRequestRequesterName = requesterName,
+                    ClientId = offer.ClientId,
+                    ClientName = offerClient?.Name ?? "Unknown Client",
+                    CreatedBy = offer.CreatedBy,
+                    CreatedByName = creator != null ? $"{creator.FirstName} {creator.LastName}" : "Unknown Creator",
+                    AssignedTo = offer.AssignedTo,
+                    AssignedToName = salesman != null ? $"{salesman.FirstName} {salesman.LastName}" : "Unknown SalesMan",
+                    Products = offer.Products,
+                    TotalAmount = offer.TotalAmount,
+                    PaymentTerms = DeserializeStringList(offer.PaymentTerms),
+                    DeliveryTerms = DeserializeStringList(offer.DeliveryTerms),
+                    WarrantyTerms = DeserializeStringList(offer.WarrantyTerms),
+                    ValidUntil = DeserializeStringList(offer.ValidUntil),
+                    Status = offer.Status,
+                    SentToClientAt = offer.SentToClientAt,
+                    ClientResponse = offer.ClientResponse,
+                    SalesManagerApprovedBy = offer.SalesManagerApprovedBy,
+                    SalesManagerApprovedAt = offer.SalesManagerApprovedAt,
+                    SalesManagerComments = offer.SalesManagerComments,
+                    SalesManagerRejectionReason = offer.SalesManagerRejectionReason,
+                    CreatedAt = offer.CreatedAt,
+                    UpdatedAt = offer.UpdatedAt,
+                    IsSalesManagerApproved = offer.Status == "Sent" && !string.IsNullOrEmpty(offer.SalesManagerApprovedBy),
+                    CanSendToSalesMan = offer.Status == "Sent",
+                    PdfPath = offer.PdfPath,
+                    PdfGeneratedAt = offer.PdfGeneratedAt,
+                    PaymentType = offer.PaymentType,
+                    FinalPrice = offer.FinalPrice,
+                    DiscountAmount = discountAmount,
+                    OfferDuration = offer.OfferDuration,
+                    Notes = offer.Notes,
+                    Equipment = equipmentDtos,
+                    Terms = termsDto,
+                    Installments = installmentDtos
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error mapping offer to enhanced DTO. OfferId: {OfferId}", offerId);
+                throw;
+            }
+        }
+
+        private List<string>? DeserializeStringList(string? jsonOrString)
+        {
+            if (string.IsNullOrWhiteSpace(jsonOrString))
+                return null;
+
+            // Try to deserialize as JSON array first
+            try
+            {
+                var list = JsonSerializer.Deserialize<List<string>>(jsonOrString);
+                if (list != null && list.Count > 0)
+                    return list;
+            }
+            catch
+            {
+                // Not JSON, try as single string (backward compatibility)
+            }
+
+            // Fallback: treat as single string value (backward compatibility)
+            return new List<string> { jsonOrString };
         }
 
         #endregion
@@ -851,7 +1021,8 @@ namespace SoitMed.Services
                 if (deal == null)
                     throw new ArgumentException("Deal not found", nameof(dealId));
 
-                if (deal.Status != "AwaitingSalesManReport")
+                // Use case-insensitive comparison to handle any status string variations
+                if (!string.Equals(deal.Status, DealStatus.AwaitingSalesManReport, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException($"Deal is not awaiting salesman report. Current status: {deal.Status}");
 
                 if (deal.SalesManId != salesmanId)
@@ -881,19 +1052,104 @@ namespace SoitMed.Services
         {
             try
             {
-                var deals = await _unitOfWork.SalesDeals.GetDealsByStatusAsync("SentToLegal");
+                // Get all deals that are in legal workflow (SentToLegal, LegalReviewed)
+                var query = _unitOfWork.SalesDeals.GetQueryable()
+                    .Where(d => 
+                        d.Status == DealStatus.SentToLegal || 
+                        d.Status == DealStatus.LegalReviewed
+                    );
+                
+                var legalDeals = await query.ToListAsync();
                 var result = new List<DealResponseDTO>();
 
-                foreach (var deal in deals)
+                foreach (var deal in legalDeals)
                 {
                     result.Add(await MapToDealResponseDTO(deal));
                 }
 
-                return result.OrderByDescending(d => d.SentToLegalAt).ToList();
+                return result.OrderByDescending(d => d.SentToLegalAt ?? d.CreatedAt).ToList();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting deals for legal");
+                throw;
+            }
+        }
+
+        public async Task<DealResponseDTO> MarkDealAsLegalReviewedAsync(long dealId, string legalUserId)
+        {
+            try
+            {
+                var deal = await _unitOfWork.SalesDeals.GetByIdAsync(dealId);
+                if (deal == null)
+                    throw new ArgumentException("Deal not found", nameof(dealId));
+
+                if (deal.Status != DealStatus.SentToLegal)
+                    throw new InvalidOperationException($"Deal must be in SentToLegal status to mark as reviewed. Current status: {deal.Status}");
+
+                deal.MarkAsLegalReviewed();
+                await _unitOfWork.SalesDeals.UpdateAsync(deal);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Deal {DealId} marked as reviewed by legal user {LegalUserId}", dealId, legalUserId);
+                return await MapToDealResponseDTO(deal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking deal as legal reviewed. DealId: {DealId}", dealId);
+                throw;
+            }
+        }
+
+        public async Task<int> GetTotalDealsCountAsync()
+        {
+            try
+            {
+                // Use GetQueryable to get count without loading all deals into memory
+                var count = await _unitOfWork.SalesDeals.GetQueryable().CountAsync();
+                return count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting total deals count");
+                throw;
+            }
+        }
+
+        public async Task<DealStatisticsDTO> GetDealStatisticsAsync()
+        {
+            try
+            {
+                var allDeals = await _unitOfWork.SalesDeals.GetQueryable().ToListAsync();
+                
+                var totalDeals = allDeals.Count;
+                var totalDealValue = allDeals.Sum(d => d.DealValue);
+                var averageDealValue = totalDeals > 0 ? totalDealValue / totalDeals : 0;
+
+                // Get all unique statuses
+                var allStatuses = allDeals.Select(d => d.Status).Distinct().ToList();
+                
+                var dealsByStatus = new Dictionary<string, int>();
+                var dealValueByStatus = new Dictionary<string, decimal>();
+
+                foreach (var status in allStatuses)
+                {
+                    dealsByStatus[status] = await _unitOfWork.SalesDeals.GetDealCountByStatusAsync(status);
+                    dealValueByStatus[status] = await _unitOfWork.SalesDeals.GetTotalDealValueByStatusAsync(status);
+                }
+
+                return new DealStatisticsDTO
+                {
+                    TotalDeals = totalDeals,
+                    TotalDealValue = totalDealValue,
+                    AverageDealValue = averageDealValue,
+                    DealsByStatus = dealsByStatus,
+                    DealValueByStatus = dealValueByStatus
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting deal statistics");
                 throw;
             }
         }
@@ -1042,6 +1298,37 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting deals awaiting reviews and account setup");
+                throw;
+            }
+        }
+
+        public async Task<List<DealResponseDTO>> GetDealsAwaitingReportAsync(string userId, string userRole)
+        {
+            try
+            {
+                var query = _unitOfWork.SalesDeals.GetQueryable()
+                    .Where(d => d.Status == DealStatus.AwaitingSalesManReport);
+
+                // Apply authorization: SalesMan can only see their own deals
+                if (userRole == "SalesMan")
+                {
+                    query = query.Where(d => d.SalesManId == userId);
+                }
+                // SalesManager and SuperAdmin can see all deals awaiting report
+
+                var deals = await query.OrderByDescending(d => d.SuperAdminApprovedAt ?? d.ManagerApprovedAt ?? d.CreatedAt).ToListAsync();
+                var result = new List<DealResponseDTO>();
+
+                foreach (var deal in deals)
+                {
+                    result.Add(await MapToDealResponseDTO(deal));
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting deals awaiting report");
                 throw;
             }
         }

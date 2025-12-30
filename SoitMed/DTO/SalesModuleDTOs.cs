@@ -574,6 +574,8 @@ namespace SoitMed.DTO
         public string? ClientUsername { get; set; }
         public DateTime? ClientCredentialsSetAt { get; set; }
         public string? ClientCredentialsSetByName { get; set; }
+        // Offer data (included when deal is sent to legal)
+        public EnhancedOfferResponseDTO? Offer { get; set; }
     }
 
     public class DealSummaryDTO
@@ -682,6 +684,12 @@ namespace SoitMed.DTO
         public string? ReportAttachments { get; set; } // JSON array of file paths/URLs
     }
 
+    public class ReturnToSalesmanDTO
+    {
+        [MaxLength(1000, ErrorMessage = "Return notes cannot exceed 1000 characters")]
+        public string? ReturnNotes { get; set; }
+    }
+
     public class SubmitReviewDTO
     {
         [Required(ErrorMessage = "Review text is required")]
@@ -742,6 +750,15 @@ namespace SoitMed.DTO
         public int FailedDeals { get; set; }
         public decimal? TotalRevenue { get; set; }
         public double? AverageSatisfaction { get; set; }
+    }
+
+    public class DealStatisticsDTO
+    {
+        public int TotalDeals { get; set; }
+        public decimal TotalDealValue { get; set; }
+        public decimal AverageDealValue { get; set; }
+        public Dictionary<string, int> DealsByStatus { get; set; } = new();
+        public Dictionary<string, decimal> DealValueByStatus { get; set; } = new();
     }
 
     public static class NextStepConstants

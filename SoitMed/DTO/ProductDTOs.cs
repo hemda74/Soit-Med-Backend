@@ -87,7 +87,9 @@ namespace SoitMed.DTO
         public string? Provider { get; set; }
         public string? ProviderImagePath { get; set; }
         public string? Country { get; set; }
-        public string? Category { get; set; }
+        public string? Category { get; set; } // Legacy field - kept for backward compatibility
+        public long? CategoryId { get; set; } // New: Foreign key to ProductCategory
+        public string? CategoryName { get; set; } // New: Category name from ProductCategory relationship
         public decimal BasePrice { get; set; }
         public string? Description { get; set; }
         public string? ImagePath { get; set; }

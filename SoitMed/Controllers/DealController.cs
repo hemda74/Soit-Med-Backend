@@ -18,15 +18,18 @@ namespace SoitMed.Controllers
     {
         private readonly IDealService _dealService;
         private readonly ILogger<DealController> _logger;
+        private readonly IImageUploadService _imageUploadService;
 
         public DealController(
             IDealService dealService,
             ILogger<DealController> logger,
-            UserManager<ApplicationUser> userManager) 
+            UserManager<ApplicationUser> userManager,
+            IImageUploadService imageUploadService) 
             : base(userManager)
         {
             _dealService = dealService;
             _logger = logger;
+            _imageUploadService = imageUploadService;
         }
 
         /// <summary>
@@ -84,9 +87,38 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
+        /// Get deals awaiting salesman report
+        /// Returns deals that have been approved and account created, but report not yet submitted
+        /// SalesMan can only see their own deals, SalesManager and SuperAdmin can see all
+        /// </summary>
+        [HttpGet("awaiting-report")]
+        [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
+        public async Task<IActionResult> GetDealsAwaitingReport()
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("User not authenticated"));
+                }
+
+                var userRole = GetCurrentUserRole();
+                var result = await _dealService.GetDealsAwaitingReportAsync(userId, userRole);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Deals awaiting report retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving deals awaiting report");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving deals awaiting report"));
+            }
+        }
+
+        /// <summary>
         /// Get deal by ID
         /// </summary>
-        [HttpGet("{id}")]
+        [HttpGet("{id:long}")]
         [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin,Admin")]
         public async Task<IActionResult> GetDeal(long id)
         {
@@ -379,6 +411,48 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
+        /// Upload report attachment image
+        /// </summary>
+        [HttpPost("upload-report-attachment")]
+        [Authorize(Roles = "SalesMan")]
+        public async Task<IActionResult> UploadReportAttachment([FromForm] IFormFile file)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("File is required"));
+                }
+
+                // Validate file type
+                if (!_imageUploadService.IsValidImageFile(file))
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse("Invalid image file. Please upload a valid JPG, JPEG, PNG, or GIF image (max 5MB)."));
+                }
+
+                // Upload image to deal-reports folder
+                var uploadResult = await _imageUploadService.UploadImageAsync(file, "deal-reports");
+
+                if (!uploadResult.Success)
+                {
+                    return BadRequest(ResponseHelper.CreateErrorResponse(uploadResult.ErrorMessage ?? "Failed to upload image"));
+                }
+
+                // Return the file path that can be used to construct the URL
+                // The path will be relative like "deal-reports/guid.jpg"
+                return Ok(ResponseHelper.CreateSuccessResponse(new { 
+                    filePath = uploadResult.FilePath,
+                    fileName = uploadResult.FileName 
+                }, "Image uploaded successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error uploading report attachment");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while uploading image"));
+            }
+        }
+
+        /// <summary>
         /// Submit salesman report
         /// </summary>
         [HttpPost("{id}/submit-report")]
@@ -423,19 +497,92 @@ namespace SoitMed.Controllers
         /// Get deals for legal department
         /// </summary>
         [HttpGet("legal")]
-        [Authorize(Roles = "LegalManager,LegalEmployee")]
+        [CaseInsensitiveRoleAuthorization("LegalManager", "LegalEmployee", "SuperAdmin")]
         public async Task<IActionResult> GetDealsForLegal()
         {
             try
             {
                 var result = await _dealService.GetDealsForLegalAsync();
-
-                return Ok(ResponseHelper.CreateSuccessResponse(result, "Legal deals retrieved successfully"));
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Deals retrieved successfully"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving legal deals");
-                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving legal deals"));
+                _logger.LogError(ex, "Error retrieving deals for legal");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving deals"));
+            }
+        }
+
+        /// <summary>
+        /// Get total deals count
+        /// </summary>
+        [HttpGet("total-count")]
+        [Authorize(Roles = "LegalManager,LegalEmployee,SuperAdmin,SalesManager")]
+        public async Task<IActionResult> GetTotalDealsCount()
+        {
+            try
+            {
+                var count = await _dealService.GetTotalDealsCountAsync();
+                return Ok(ResponseHelper.CreateSuccessResponse(new { totalCount = count }, "Total deals count retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving total deals count");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving total deals count"));
+            }
+        }
+
+        /// <summary>
+        /// Get deal statistics for accounting dashboard
+        /// </summary>
+        [HttpGet("statistics")]
+        [Authorize(Roles = "FinanceManager,FinanceEmployee,SuperAdmin")]
+        public async Task<IActionResult> GetDealStatistics()
+        {
+            try
+            {
+                var statistics = await _dealService.GetDealStatisticsAsync();
+                return Ok(ResponseHelper.CreateSuccessResponse(statistics, "Deal statistics retrieved successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving deal statistics");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while retrieving deal statistics"));
+            }
+        }
+
+        /// <summary>
+        /// Mark deal as reviewed by legal (archive)
+        /// </summary>
+        [HttpPost("{id}/mark-as-reviewed")]
+        [Authorize(Roles = "LegalManager,LegalEmployee")]
+        public async Task<IActionResult> MarkDealAsLegalReviewed(long id)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(ResponseHelper.CreateErrorResponse("User not authenticated"));
+                }
+
+                var result = await _dealService.MarkDealAsLegalReviewedAsync(id, userId);
+
+                return Ok(ResponseHelper.CreateSuccessResponse(result, "Deal marked as reviewed successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for marking deal as reviewed");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation for marking deal as reviewed");
+                return BadRequest(ResponseHelper.CreateErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking deal as reviewed");
+                return StatusCode(500, ResponseHelper.CreateErrorResponse("An error occurred while marking deal as reviewed"));
             }
         }
 

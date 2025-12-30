@@ -16,12 +16,14 @@ namespace SoitMed.Repositories
         {
             return await _context.WeeklyPlanTasks
                 .Include(t => t.WeeklyPlan)
+                .Include(t => t.Progresses)
                 .FirstOrDefaultAsync(t => t.Id == id && t.IsActive, cancellationToken);
         }
 
         public async Task<IEnumerable<WeeklyPlanTask>> GetByWeeklyPlanIdAsync(long weeklyPlanId, CancellationToken cancellationToken = default)
         {
             return await _context.WeeklyPlanTasks
+                .Include(t => t.Progresses)
                 .Where(t => t.WeeklyPlanId == weeklyPlanId && t.IsActive)
                 .OrderBy(t => t.DisplayOrder)
                 .ThenBy(t => t.CreatedAt)
