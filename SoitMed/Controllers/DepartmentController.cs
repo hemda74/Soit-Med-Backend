@@ -2,6 +2,8 @@ using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Core;
 using SoitMed.Repositories;
+using SoitMed.Services;
+using SoitMed.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,26 +15,35 @@ namespace SoitMed.Controllers
     public class DepartmentController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ICacheService _cacheService;
 
-        public DepartmentController(IUnitOfWork unitOfWork)
+        public DepartmentController(IUnitOfWork unitOfWork, ICacheService cacheService)
         {
             _unitOfWork = unitOfWork;
+            _cacheService = cacheService;
         }
 
         [HttpGet]
         [Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
         public async Task<IActionResult> GetDepartments()
         {
-            var departments = await _unitOfWork.Departments.GetDepartmentsWithUsersAsync();
-            
-            var response = departments.Select(d => new DepartmentResponseDTO
-            {
-                Id = d.Id,
-                Name = d.Name,
-                Description = d.Description,
-                CreatedAt = d.CreatedAt,
-                UserCount = d.Users.Count()
-            });
+            var response = await _cacheService.GetOrCreateAsync(
+                CacheKeys.Reference.Departments,
+                async () =>
+                {
+                    var departments = await _unitOfWork.Departments.GetDepartmentsWithUsersAsync();
+                    
+                    return departments.Select(d => new DepartmentResponseDTO
+                    {
+                        Id = d.Id,
+                        Name = d.Name,
+                        Description = d.Description,
+                        CreatedAt = d.CreatedAt,
+                        UserCount = d.Users.Count()
+                    }).ToList();
+                },
+                TimeSpan.FromHours(24)
+            );
 
             return Ok(response);
         }
@@ -41,21 +52,33 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SuperAdmin,Admin,FinanceManager,LegalManager")]
         public async Task<IActionResult> GetDepartment(int id)
         {
-            var department = await _unitOfWork.Departments.GetDepartmentWithUsersAsync(id);
+            var response = await _cacheService.GetOrCreateAsync(
+                $"Departments:{id}",
+                async () =>
+                {
+                    var department = await _unitOfWork.Departments.GetDepartmentWithUsersAsync(id);
 
-            if (department == null)
+                    if (department == null)
+                    {
+                        return null;
+                    }
+
+                    return new DepartmentResponseDTO
+                    {
+                        Id = department.Id,
+                        Name = department.Name,
+                        Description = department.Description,
+                        CreatedAt = department.CreatedAt,
+                        UserCount = department.Users.Count()
+                    };
+                },
+                TimeSpan.FromHours(12)
+            );
+
+            if (response == null)
             {
                 return NotFound($"Department with ID {id} not found");
             }
-
-            var response = new DepartmentResponseDTO
-            {
-                Id = department.Id,
-                Name = department.Name,
-                Description = department.Description,
-                CreatedAt = department.CreatedAt,
-                UserCount = department.Users.Count()
-            };
 
             return Ok(response);
         }
@@ -84,6 +107,9 @@ namespace SoitMed.Controllers
 
             await _unitOfWork.Departments.CreateAsync(department);
             await _unitOfWork.SaveChangesAsync();
+
+            // Invalidate cache
+            await _cacheService.RemoveAsync(CacheKeys.Reference.Departments);
 
             return Ok($"Department '{department.Name}' created successfully");
         }
@@ -115,6 +141,10 @@ namespace SoitMed.Controllers
             await _unitOfWork.Departments.UpdateAsync(department);
             await _unitOfWork.SaveChangesAsync();
 
+            // Invalidate cache
+            await _cacheService.RemoveAsync(CacheKeys.Reference.Departments);
+            await _cacheService.RemoveAsync($"Departments:{id}");
+
             return Ok($"Department '{department.Name}' updated successfully");
         }
 
@@ -136,6 +166,10 @@ namespace SoitMed.Controllers
 
             await _unitOfWork.Departments.DeleteAsync(department);
             await _unitOfWork.SaveChangesAsync();
+
+            // Invalidate cache
+            await _cacheService.RemoveAsync(CacheKeys.Reference.Departments);
+            await _cacheService.RemoveAsync($"Departments:{id}");
 
             return Ok($"Department '{department.Name}' deleted successfully");
         }

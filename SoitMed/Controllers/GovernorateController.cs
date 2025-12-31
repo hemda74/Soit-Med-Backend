@@ -2,6 +2,7 @@ using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Location;
 using SoitMed.Common;
+using SoitMed.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,10 +14,12 @@ namespace SoitMed.Controllers
     public class GovernorateController : ControllerBase
     {
         private readonly Context context;
+        private readonly ICacheService _cacheService;
 
-        public GovernorateController(Context _context)
+        public GovernorateController(Context _context, ICacheService cacheService)
         {
             context = _context;
+            _cacheService = cacheService;
         }
 
         [HttpGet]
@@ -24,16 +27,20 @@ namespace SoitMed.Controllers
         [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin", "SalesManager", "SalesSupport")]
         public async Task<IActionResult> GetGovernorates()
         {
-            var governorates = await context.Governorates
-                .Select(g => new GovernorateResponseDTO
-                {
-                    GovernorateId = g.GovernorateId,
-                    Name = g.Name,
-                    CreatedAt = g.CreatedAt,
-                    IsActive = g.IsActive,
-                    EngineerCount = g.EngineerGovernorates.Count(eg => eg.IsActive)
-                })
-                .ToListAsync();
+            var governorates = await _cacheService.GetOrCreateAsync(
+                CacheKeys.Reference.Governorates,
+                async () => await context.Governorates
+                    .Select(g => new GovernorateResponseDTO
+                    {
+                        GovernorateId = g.GovernorateId,
+                        Name = g.Name,
+                        CreatedAt = g.CreatedAt,
+                        IsActive = g.IsActive,
+                        EngineerCount = g.EngineerGovernorates.Count(eg => eg.IsActive)
+                    })
+                    .ToListAsync(),
+                TimeSpan.FromHours(24)
+            );
 
             return Ok(governorates);
         }
@@ -43,24 +50,36 @@ namespace SoitMed.Controllers
         [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin", "SalesManager", "SalesSupport")]
         public async Task<IActionResult> GetGovernorate(int id)
         {
-            var governorate = await context.Governorates
-                .Include(g => g.EngineerGovernorates)
-                .ThenInclude(eg => eg.Engineer)
-                .FirstOrDefaultAsync(g => g.GovernorateId == id);
+            var response = await _cacheService.GetOrCreateAsync(
+                $"Governorates:{id}",
+                async () =>
+                {
+                    var governorate = await context.Governorates
+                        .Include(g => g.EngineerGovernorates)
+                        .ThenInclude(eg => eg.Engineer)
+                        .FirstOrDefaultAsync(g => g.GovernorateId == id);
 
-            if (governorate == null)
+                    if (governorate == null)
+                    {
+                        return null;
+                    }
+
+                    return new GovernorateResponseDTO
+                    {
+                        GovernorateId = governorate.GovernorateId,
+                        Name = governorate.Name,
+                        CreatedAt = governorate.CreatedAt,
+                        IsActive = governorate.IsActive,
+                        EngineerCount = governorate.EngineerGovernorates.Count(eg => eg.IsActive)
+                    };
+                },
+                TimeSpan.FromHours(12)
+            );
+
+            if (response == null)
             {
                 return NotFound($"Governorate with ID {id} not found");
             }
-
-            var response = new GovernorateResponseDTO
-            {
-                GovernorateId = governorate.GovernorateId,
-                Name = governorate.Name,
-                CreatedAt = governorate.CreatedAt,
-                IsActive = governorate.IsActive,
-                EngineerCount = governorate.EngineerGovernorates.Count(eg => eg.IsActive)
-            };
 
             return Ok(response);
         }
@@ -126,6 +145,9 @@ namespace SoitMed.Controllers
             context.Governorates.Add(governorate);
             await context.SaveChangesAsync();
 
+            // Invalidate cache
+            await _cacheService.RemoveAsync(CacheKeys.Reference.Governorates);
+
             return Ok($"Governorate '{governorate.Name}' created successfully");
         }
 
@@ -154,6 +176,10 @@ namespace SoitMed.Controllers
 
             await context.SaveChangesAsync();
 
+            // Invalidate cache
+            await _cacheService.RemoveAsync(CacheKeys.Reference.Governorates);
+            await _cacheService.RemoveAsync($"Governorates:{id}");
+
             return Ok($"Governorate '{governorate.Name}' updated successfully");
         }
 
@@ -177,6 +203,10 @@ namespace SoitMed.Controllers
 
             context.Governorates.Remove(governorate);
             await context.SaveChangesAsync();
+
+            // Invalidate cache
+            await _cacheService.RemoveAsync(CacheKeys.Reference.Governorates);
+            await _cacheService.RemoveAsync($"Governorates:{id}");
 
             return Ok($"Governorate '{governorate.Name}' deleted successfully");
         }
@@ -231,6 +261,10 @@ namespace SoitMed.Controllers
 
             await context.SaveChangesAsync();
 
+            // Invalidate cache
+            await _cacheService.RemoveAsync(CacheKeys.Reference.Governorates);
+            await _cacheService.RemoveAsync($"Governorates:{governorateId}");
+
             return Ok($"Engineer '{Engineer.Name}' assigned to governorate '{governorate.Name}' successfully");
         }
 
@@ -251,6 +285,10 @@ namespace SoitMed.Controllers
             assignment.IsActive = false;
 
             await context.SaveChangesAsync();
+
+            // Invalidate cache
+            await _cacheService.RemoveAsync(CacheKeys.Reference.Governorates);
+            await _cacheService.RemoveAsync($"Governorates:{governorateId}");
 
             return Ok($"Engineer '{assignment.Engineer.Name}' removed from governorate '{assignment.Governorate.Name}' successfully");
         }

@@ -2,6 +2,7 @@ using SoitMed.DTO;
 using SoitMed.Models;
 using SoitMed.Models.Identity;
 using SoitMed.Repositories;
+using SoitMed.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace SoitMed.Services
@@ -13,76 +14,100 @@ namespace SoitMed.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ProductService> _logger;
+        private readonly ICacheService _cacheService;
 
-        public ProductService(IUnitOfWork unitOfWork, ILogger<ProductService> logger)
+        public ProductService(IUnitOfWork unitOfWork, ILogger<ProductService> logger, ICacheService cacheService)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _cacheService = cacheService;
         }
 
         public async Task<List<ProductResponseDTO>> GetAllProductsAsync(string? category = null, long? categoryId = null, bool? inStock = null)
         {
             try
             {
-                IEnumerable<Product> products;
-
-                // Priority: categoryId > category > inStock > all
+                // Build cache key based on parameters
+                string cacheKey;
                 if (categoryId.HasValue && inStock.HasValue)
-                {
-                    products = await _unitOfWork.Products.GetByCategoryIdAsync(categoryId);
-                    products = products.Where(p => p.InStock == inStock.Value);
-                }
+                    cacheKey = $"Products:CategoryId:{categoryId}:InStock:{inStock}";
                 else if (categoryId.HasValue)
-                {
-                    products = await _unitOfWork.Products.GetByCategoryIdAsync(categoryId);
-                }
+                    cacheKey = CacheKeys.Products.ByCategory(categoryId.Value);
                 else if (!string.IsNullOrWhiteSpace(category) && inStock.HasValue)
-                {
-                    products = await _unitOfWork.Products.GetByCategoryAsync(category);
-                    products = products.Where(p => p.InStock == inStock.Value);
-                }
+                    cacheKey = $"Products:Category:{category}:InStock:{inStock}";
                 else if (!string.IsNullOrWhiteSpace(category))
-                {
-                    products = await _unitOfWork.Products.GetByCategoryAsync(category);
-                }
+                    cacheKey = $"Products:Category:{category}";
                 else if (inStock.HasValue && inStock.Value)
-                {
-                    products = await _unitOfWork.Products.GetInStockAsync();
-                }
+                    cacheKey = CacheKeys.Products.InStock;
                 else
-                {
-                    products = await _unitOfWork.Products.GetAllActiveAsync();
-                }
+                    cacheKey = CacheKeys.Products.All;
 
-                // OPTIMIZATION: Pre-load all related data in batches, then map synchronously to avoid DbContext concurrency issues
-                var productsList = products.ToList();
-                if (!productsList.Any())
-                    return new List<ProductResponseDTO>();
+                return await _cacheService.GetOrCreateAsync(
+                    cacheKey,
+                    async () =>
+                    {
+                        IEnumerable<Product> products;
 
-                // Pre-load all user IDs that created products
-                var userIds = productsList
-                    .Where(p => !string.IsNullOrWhiteSpace(p.CreatedBy))
-                    .Select(p => p.CreatedBy!)
-                    .Distinct()
-                    .ToList();
+                        // Priority: categoryId > category > inStock > all
+                        if (categoryId.HasValue && inStock.HasValue)
+                        {
+                            products = await _unitOfWork.Products.GetByCategoryIdAsync(categoryId);
+                            products = products.Where(p => p.InStock == inStock.Value);
+                        }
+                        else if (categoryId.HasValue)
+                        {
+                            products = await _unitOfWork.Products.GetByCategoryIdAsync(categoryId);
+                        }
+                        else if (!string.IsNullOrWhiteSpace(category) && inStock.HasValue)
+                        {
+                            products = await _unitOfWork.Products.GetByCategoryAsync(category);
+                            products = products.Where(p => p.InStock == inStock.Value);
+                        }
+                        else if (!string.IsNullOrWhiteSpace(category))
+                        {
+                            products = await _unitOfWork.Products.GetByCategoryAsync(category);
+                        }
+                        else if (inStock.HasValue && inStock.Value)
+                        {
+                            products = await _unitOfWork.Products.GetInStockAsync();
+                        }
+                        else
+                        {
+                            products = await _unitOfWork.Products.GetAllActiveAsync();
+                        }
 
-                var usersDict = userIds.Any()
-                    ? (await _unitOfWork.Users.GetByIdsAsync(userIds)).ToDictionary(u => u.Id)
-                    : new Dictionary<string, ApplicationUser>();
+                        // OPTIMIZATION: Pre-load all related data in batches, then map synchronously to avoid DbContext concurrency issues
+                        var productsList = products.ToList();
+                        if (!productsList.Any())
+                            return new List<ProductResponseDTO>();
 
-                // Pre-load all category IDs
-                var categoryIds = productsList
-                    .Where(p => p.CategoryId.HasValue)
-                    .Select(p => p.CategoryId!.Value)
-                    .Distinct()
-                    .ToList();
+                        // Pre-load all user IDs that created products
+                        var userIds = productsList
+                            .Where(p => !string.IsNullOrWhiteSpace(p.CreatedBy))
+                            .Select(p => p.CreatedBy!)
+                            .Distinct()
+                            .ToList();
 
-                var categoriesDict = categoryIds.Any()
-                    ? (await _unitOfWork.ProductCategories.GetByIdsAsync(categoryIds)).ToDictionary(c => c.Id)
-                    : new Dictionary<long, ProductCategory>();
+                        var usersDict = userIds.Any()
+                            ? (await _unitOfWork.Users.GetByIdsAsync(userIds)).ToDictionary(u => u.Id)
+                            : new Dictionary<string, ApplicationUser>();
 
-                // Map synchronously using pre-loaded data
-                return productsList.Select(p => MapToProductResponseDTO(p, usersDict, categoriesDict)).ToList();
+                        // Pre-load all category IDs
+                        var categoryIds = productsList
+                            .Where(p => p.CategoryId.HasValue)
+                            .Select(p => p.CategoryId!.Value)
+                            .Distinct()
+                            .ToList();
+
+                        var categoriesDict = categoryIds.Any()
+                            ? (await _unitOfWork.ProductCategories.GetByIdsAsync(categoryIds)).ToDictionary(c => c.Id)
+                            : new Dictionary<long, ProductCategory>();
+
+                        // Map synchronously using pre-loaded data
+                        return productsList.Select(p => MapToProductResponseDTO(p, usersDict, categoriesDict)).ToList();
+                    },
+                    TimeSpan.FromHours(6)
+                );
             }
             catch (Exception ex)
             {
@@ -95,11 +120,18 @@ namespace SoitMed.Services
         {
             try
             {
-                var product = await _unitOfWork.Products.GetByIdAsync(id);
-                if (product == null)
-                    return null;
+                return await _cacheService.GetOrCreateAsync(
+                    CacheKeys.Products.ById(id),
+                    async () =>
+                    {
+                        var product = await _unitOfWork.Products.GetByIdAsync(id);
+                        if (product == null)
+                            return null;
 
-                return await MapToProductResponseDTO(product);
+                        return await MapToProductResponseDTO(product);
+                    },
+                    TimeSpan.FromHours(2)
+                );
             }
             catch (Exception ex)
             {
@@ -219,6 +251,11 @@ namespace SoitMed.Services
                 await _unitOfWork.Products.CreateAsync(product);
                 await _unitOfWork.SaveChangesAsync();
 
+                // Invalidate cache
+                await _cacheService.RemoveAsync(CacheKeys.Products.All);
+                await _cacheService.RemoveAsync(CacheKeys.Products.InStock);
+                await _cacheService.RemoveByPatternAsync(CacheKeys.Patterns.AllProducts);
+
                 _logger.LogInformation("Product created successfully. ProductId: {ProductId}, Name: {Name}", product.Id, product.Name);
 
                 return await MapToProductResponseDTO(product);
@@ -305,6 +342,12 @@ namespace SoitMed.Services
                 await _unitOfWork.Products.UpdateAsync(product);
                 await _unitOfWork.SaveChangesAsync();
 
+                // Invalidate cache
+                await _cacheService.RemoveAsync(CacheKeys.Products.ById(id));
+                await _cacheService.RemoveAsync(CacheKeys.Products.All);
+                await _cacheService.RemoveAsync(CacheKeys.Products.InStock);
+                await _cacheService.RemoveByPatternAsync(CacheKeys.Patterns.AllProducts);
+
                 _logger.LogInformation("Product updated successfully. ProductId: {ProductId}", id);
 
                 return await MapToProductResponseDTO(product);
@@ -331,6 +374,12 @@ namespace SoitMed.Services
                 await _unitOfWork.Products.UpdateAsync(product);
                 await _unitOfWork.SaveChangesAsync();
 
+                // Invalidate cache
+                await _cacheService.RemoveAsync(CacheKeys.Products.ById(id));
+                await _cacheService.RemoveAsync(CacheKeys.Products.All);
+                await _cacheService.RemoveAsync(CacheKeys.Products.InStock);
+                await _cacheService.RemoveByPatternAsync(CacheKeys.Patterns.AllProducts);
+
                 _logger.LogInformation("Product deleted (soft) successfully. ProductId: {ProductId}", id);
 
                 return true;
@@ -355,6 +404,9 @@ namespace SoitMed.Services
 
                 await _unitOfWork.Products.UpdateAsync(product);
                 await _unitOfWork.SaveChangesAsync();
+
+                // Invalidate cache
+                await _cacheService.RemoveAsync(CacheKeys.Products.ById(id));
 
                 _logger.LogInformation("Product image updated. ProductId: {ProductId}, ImagePath: {ImagePath}", id, imagePath);
 

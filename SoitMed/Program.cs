@@ -205,8 +205,31 @@ namespace SoitMed
                 builder.Services.AddScoped<IValidator<UpdateDailyProgressDto>, UpdateDailyProgressDtoValidator>();
                 builder.Services.AddScoped<IValidator<ReviewWeeklyPlanDto>, ReviewWeeklyPlanDtoValidator>();
                 builder.Services.AddScoped<IValidator<FilterWeeklyPlansDto>, FilterWeeklyPlansDtoValidator>();
+                
+                // Configure caching (Redis for distributed caching, fallback to memory cache)
+                var redisConnection = builder.Configuration.GetConnectionString("Redis");
+                if (!string.IsNullOrEmpty(redisConnection))
+                {
+                    // Use Redis distributed cache for production scalability
+                    builder.Services.AddStackExchangeRedisCache(options =>
+                    {
+                        options.Configuration = redisConnection;
+                        options.InstanceName = "SoitMed:";
+                    });
+                    logger.LogInformation("Redis distributed cache configured");
+                }
+                else
+                {
+                    // Fallback to memory cache if Redis is not configured
+                    builder.Services.AddDistributedMemoryCache();
+                    logger.LogWarning("Redis not configured, using in-memory distributed cache");
+                }
+                
                 builder.Services.AddMemoryCache();
                 builder.Services.AddResponseCaching();
+                
+                // Register caching service
+                builder.Services.AddScoped<ICacheService, RedisCacheService>();
 
                 // Configure Rate Limiting
                 builder.Services.AddRateLimiter(options =>
