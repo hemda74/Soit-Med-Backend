@@ -14,15 +14,18 @@ namespace SoitMed.Controllers
     public class MaintenanceVisitController : BaseController
     {
         private readonly IMaintenanceVisitService _maintenanceVisitService;
+        private readonly IMaintenanceService _maintenanceService;
         private readonly ILogger<MaintenanceVisitController> _logger;
 
         public MaintenanceVisitController(
             IMaintenanceVisitService maintenanceVisitService,
+            IMaintenanceService maintenanceService,
             UserManager<ApplicationUser> userManager,
             ILogger<MaintenanceVisitController> logger)
             : base(userManager)
         {
             _maintenanceVisitService = maintenanceVisitService;
+            _maintenanceService = maintenanceService;
             _logger = logger;
         }
 
@@ -133,6 +136,29 @@ namespace SoitMed.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting equipment by serial code");
+                return ErrorResponse(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Verifies machine QR code and starts visit (transitions to InProgress)
+        /// </summary>
+        [HttpPost("{visitId}/verify-machine")]
+        [Authorize(Roles = "Engineer")]
+        public async Task<IActionResult> VerifyMachineAndStartVisit(int visitId, [FromBody] VerifyMachineDTO dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized();
+
+                var result = await _maintenanceService.VerifyMachineAndStartVisitAsync(visitId, dto.ScannedQrCode, userId);
+                return SuccessResponse(result, "Machine verified and visit started successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error verifying machine and starting visit {VisitId}", visitId);
                 return ErrorResponse(ex.Message);
             }
         }

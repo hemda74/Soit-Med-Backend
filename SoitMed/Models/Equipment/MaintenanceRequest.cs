@@ -71,6 +71,18 @@ namespace SoitMed.Models.Equipment
         [Column(TypeName = "decimal(18,2)")]
         public decimal? RemainingAmount { get; set; }
 
+        // Labor fees (service fees)
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? LaborFees { get; set; }
+
+        // Future-proofing: Installment payment fields (reserved, not implemented yet)
+        public Enums.PaymentPlan? PaymentPlan { get; set; } // Reserved for future
+        public int? InstallmentMonths { get; set; } // Reserved for future
+        [MaxLength(450)]
+        public string? CollectionDelegateId { get; set; } // Reserved for future
+        [ForeignKey("CollectionDelegateId")]
+        public virtual ApplicationUser? CollectionDelegate { get; set; } // Reserved for future
+
         // Timestamps
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? StartedAt { get; set; }

@@ -32,6 +32,9 @@ namespace SoitMed.Repositories
         private ISparePartRequestRepository? _sparePartRequests;
         private IMaintenanceRequestAttachmentRepository? _maintenanceRequestAttachments;
         
+        // Audit repositories
+        private IEntityChangeLogRepository? _entityChangeLogs;
+        
         // Payment repositories
         private IPaymentRepository? _payments;
 
@@ -130,6 +133,9 @@ namespace SoitMed.Repositories
         
         public ISparePartRequestRepository SparePartRequests => 
             _sparePartRequests ??= new SparePartRequestRepository(_context);
+        
+        public IEntityChangeLogRepository EntityChangeLogs => 
+            _entityChangeLogs ??= new EntityChangeLogRepository(_context);
         
         public IMaintenanceRequestAttachmentRepository MaintenanceRequestAttachments => 
             _maintenanceRequestAttachments ??= new MaintenanceRequestAttachmentRepository(_context);

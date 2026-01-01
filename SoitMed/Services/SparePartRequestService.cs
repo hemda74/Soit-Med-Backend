@@ -273,6 +273,61 @@ namespace SoitMed.Services
             return await MapToResponseDTO(request);
         }
 
+        public async Task<SparePartRequestResponseDTO> WarehouseApprovalAsync(int sparePartRequestId, WarehouseApprovalDTO dto, string warehouseKeeperId)
+        {
+            var request = await _unitOfWork.SparePartRequests.GetByIdAsync(sparePartRequestId);
+            if (request == null)
+                throw new ArgumentException("Spare part request not found", nameof(sparePartRequestId));
+
+            // Verify user has WarehouseKeeper role
+            var warehouseKeeper = await _userManager.FindByIdAsync(warehouseKeeperId);
+            if (warehouseKeeper == null)
+                throw new ArgumentException("Warehouse keeper not found", nameof(warehouseKeeperId));
+
+            if (!await _userManager.IsInRoleAsync(warehouseKeeper, "WarehouseKeeper"))
+                throw new UnauthorizedAccessException("User does not have WarehouseKeeper role");
+
+            // Update approval status
+            request.WarehouseApproved = dto.Approved;
+            request.ApprovedByWarehouseKeeperId = warehouseKeeperId;
+            request.WarehouseApprovedAt = DateTime.UtcNow;
+            request.WarehouseRejectionReason = dto.Approved ? null : dto.RejectionReason;
+
+            if (dto.Approved)
+            {
+                // If approved, mark as ready for engineer
+                request.Status = SparePartAvailabilityStatus.ReadyForEngineer;
+                request.ReadyAt = DateTime.UtcNow;
+            }
+            else
+            {
+                // If rejected, mark as cancelled
+                request.Status = SparePartAvailabilityStatus.Cancelled;
+            }
+
+            await _unitOfWork.SparePartRequests.UpdateAsync(request);
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogInformation("Warehouse approval processed for spare part request {RequestId}. Approved: {Approved}", 
+                sparePartRequestId, dto.Approved);
+
+            // Notify engineer about the decision
+            var maintenanceRequest = await _unitOfWork.MaintenanceRequests.GetByIdAsync(request.MaintenanceRequestId);
+            if (maintenanceRequest?.AssignedToEngineerId != null)
+            {
+                await _notificationService.CreateNotificationAsync(
+                    maintenanceRequest.AssignedToEngineerId,
+                    "Spare Part Request Decision",
+                    dto.Approved 
+                        ? $"Spare part '{request.PartName}' has been approved and is ready for installation."
+                        : $"Spare part '{request.PartName}' has been rejected. Reason: {dto.RejectionReason}",
+                    "SparePartRequest",
+                    sparePartRequestId.ToString());
+            }
+
+            return await MapToResponseDTO(request);
+        }
+
         private async Task<SparePartRequestResponseDTO> MapToResponseDTO(SparePartRequest request)
         {
             var coordinator = request.AssignedToCoordinatorId != null

@@ -168,6 +168,36 @@ namespace SoitMed.DTO
         public string? RejectionReason { get; set; }
     }
 
+    public class WarehouseApprovalDTO
+    {
+        [Required]
+        public bool Approved { get; set; }
+
+        [MaxLength(1000)]
+        public string? RejectionReason { get; set; }
+    }
+
+    public class FinalizeJobDTO
+    {
+        [Required]
+        public int MaintenanceRequestId { get; set; }
+
+        [Required]
+        public PaymentMethod PaymentMethod { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? LaborFees { get; set; }
+
+        [MaxLength(2000)]
+        public string? Notes { get; set; }
+
+        // For gateway payments
+        [MaxLength(500)]
+        public string? PaymentToken { get; set; }
+
+        public Dictionary<string, object>? AdditionalPaymentData { get; set; }
+    }
+
     // Maintenance Request Attachment DTOs
     public class MaintenanceRequestAttachmentResponseDTO
     {

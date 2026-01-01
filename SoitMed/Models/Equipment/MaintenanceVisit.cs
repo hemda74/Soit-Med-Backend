@@ -10,13 +10,59 @@ namespace SoitMed.Models.Equipment
         [Key]
         public int Id { get; set; }
 
+        // Unique ticket number (auto-generated)
+        [Required]
+        [MaxLength(50)]
+        public string TicketNumber { get; set; } = string.Empty;
+
         [Required]
         public int MaintenanceRequestId { get; set; }
 
         [ForeignKey("MaintenanceRequestId")]
         public virtual MaintenanceRequest MaintenanceRequest { get; set; } = null!;
 
-        // Engineer/Technician who performed the visit
+        // Customer information
+        [Required]
+        [MaxLength(450)]
+        public string CustomerId { get; set; } = string.Empty; // ApplicationUser (Customer)
+
+        [ForeignKey("CustomerId")]
+        public virtual ApplicationUser Customer { get; set; } = null!;
+
+        // Device/Equipment information
+        [Required]
+        public int DeviceId { get; set; } // FK to Equipment
+
+        [ForeignKey("DeviceId")]
+        public virtual Equipment Device { get; set; } = null!;
+
+        // Scheduled date for the visit
+        [Required]
+        public DateTime ScheduledDate { get; set; }
+
+        // Origin of the visit request
+        [Required]
+        public VisitOrigin Origin { get; set; }
+
+        // Visit status (replaces MaintenanceVisitOutcome)
+        [Required]
+        public VisitStatus Status { get; set; } = VisitStatus.PendingApproval;
+
+        // Self-reference for rescheduled visits
+        public int? ParentVisitId { get; set; }
+
+        [ForeignKey("ParentVisitId")]
+        public virtual MaintenanceVisit? ParentVisit { get; set; }
+
+        public virtual ICollection<MaintenanceVisit> ChildVisits { get; set; } = new List<MaintenanceVisit>();
+
+        // Payment information
+        public bool IsPaidVisit { get; set; } = false;
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? Cost { get; set; }
+
+        // Engineer/Technician who performed the visit (primary engineer)
         [Required]
         [MaxLength(450)]
         public string EngineerId { get; set; } = string.Empty; // ApplicationUser (Engineer role)
@@ -44,6 +90,7 @@ namespace SoitMed.Models.Equipment
         [Column(TypeName = "decimal(18,2)")]
         public decimal? ServiceFee { get; set; }
 
+        // Legacy field - kept for backward compatibility, but Status should be used instead
         [Required]
         public MaintenanceVisitOutcome Outcome { get; set; }
 
@@ -62,6 +109,13 @@ namespace SoitMed.Models.Equipment
         public string? Notes { get; set; }
 
         public bool IsActive { get; set; } = true;
+
+        // Legacy system migration support
+        public int? LegacyVisitId { get; set; } // Maps to old system visit ID
+
+        // Navigation properties
+        public virtual ICollection<VisitAssignees> Assignees { get; set; } = new List<VisitAssignees>();
+        public virtual VisitReport? VisitReport { get; set; }
     }
 }
 

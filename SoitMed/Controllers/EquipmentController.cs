@@ -17,11 +17,16 @@ namespace SoitMed.Controllers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IQRCodeService _qrCodeService;
+        private readonly ILogger<EquipmentController> _logger;
 
-        public EquipmentController(IUnitOfWork unitOfWork, IQRCodeService qrCodeService)
+        public EquipmentController(
+            IUnitOfWork unitOfWork, 
+            IQRCodeService qrCodeService,
+            ILogger<EquipmentController> logger)
         {
             _unitOfWork = unitOfWork;
             _qrCodeService = qrCodeService;
+            _logger = logger;
         }
 
         [HttpGet]
@@ -48,7 +53,9 @@ namespace SoitMed.Controllers
                 Status = e.Status,
                 CreatedAt = e.CreatedAt,
                 LastMaintenanceDate = e.LastMaintenanceDate,
-                IsActive = e.IsActive
+                IsActive = e.IsActive,
+                QrToken = e.QrToken,
+                IsQrPrinted = e.IsQrPrinted
             });
 
             return Ok(response);
@@ -81,7 +88,9 @@ namespace SoitMed.Controllers
                 Status = equipment.Status,
                 CreatedAt = equipment.CreatedAt,
                 LastMaintenanceDate = equipment.LastMaintenanceDate,
-                IsActive = equipment.IsActive
+                IsActive = equipment.IsActive,
+                QrToken = equipment.QrToken,
+                IsQrPrinted = equipment.IsQrPrinted
             };
 
             return Ok(response);
@@ -114,7 +123,9 @@ namespace SoitMed.Controllers
                 Status = equipment.Status,
                 CreatedAt = equipment.CreatedAt,
                 LastMaintenanceDate = equipment.LastMaintenanceDate,
-                IsActive = equipment.IsActive
+                IsActive = equipment.IsActive,
+                QrToken = equipment.QrToken,
+                IsQrPrinted = equipment.IsQrPrinted
             };
 
             return Ok(response);
@@ -150,7 +161,9 @@ namespace SoitMed.Controllers
                     Status = e.Status,
                     CreatedAt = e.CreatedAt,
                     LastMaintenanceDate = e.LastMaintenanceDate,
-                    IsActive = e.IsActive
+                    IsActive = e.IsActive,
+                    QrToken = e.QrToken,
+                    IsQrPrinted = e.IsQrPrinted
                 });
 
             return Ok(new
@@ -237,7 +250,9 @@ namespace SoitMed.Controllers
                     Status = equipment.Status,
                     CreatedAt = equipment.CreatedAt,
                     LastMaintenanceDate = equipment.LastMaintenanceDate,
-                    IsActive = equipment.IsActive
+                    IsActive = equipment.IsActive,
+                    QrToken = equipment.QrToken,
+                    IsQrPrinted = equipment.IsQrPrinted
                 }
             });
         }
@@ -355,6 +370,58 @@ namespace SoitMed.Controllers
                 TotalRepairVisits = equipment.RepairVisitCount,
                 RepairHistory = repairHistory
             });
+        }
+
+        /// <summary>
+        /// Mark QR code as printed for an equipment
+        /// POST /api/Equipment/Qr/MarkPrinted
+        /// </summary>
+        [HttpPost("Qr/MarkPrinted")]
+        [Authorize(Roles = "SuperAdmin,Admin,Support")]
+        public async Task<IActionResult> MarkQrPrinted([FromBody] DTO.MarkQrPrintedDTO dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var equipment = await _unitOfWork.Equipment.GetByIdAsync(dto.EquipmentId);
+                if (equipment == null)
+                {
+                    return NotFound(new { message = $"Equipment with ID {dto.EquipmentId} not found" });
+                }
+
+                // Mark as printed
+                equipment.IsQrPrinted = true;
+                equipment.QrLastPrintedDate = DateTime.UtcNow;
+
+                await _unitOfWork.Equipment.UpdateAsync(equipment);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("QR code marked as printed for Equipment {EquipmentId} by {CurrentUser}", 
+                    dto.EquipmentId, User.Identity?.Name);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = $"QR code for equipment '{equipment.Name}' marked as printed",
+                    data = new
+                    {
+                        equipmentId = equipment.Id,
+                        equipmentName = equipment.Name,
+                        qrToken = equipment.QrToken,
+                        isQrPrinted = equipment.IsQrPrinted,
+                        qrLastPrintedDate = equipment.QrLastPrintedDate
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking QR as printed for equipment {EquipmentId}", dto.EquipmentId);
+                return StatusCode(500, new { message = "An error occurred while marking QR as printed", error = ex.Message });
+            }
         }
     }
 }

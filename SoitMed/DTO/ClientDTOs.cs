@@ -281,6 +281,9 @@ namespace SoitMed.DTO
         
         [JsonPropertyName("legalDocumentsSubmittedAt")]
         public DateTime? LegalDocumentsSubmittedAt { get; set; }
+        
+        [JsonPropertyName("hasAccount")]
+        public bool HasAccount { get; set; }
     }
 
     public class SubmitClientLegalDocumentsDTO

@@ -59,6 +59,19 @@ namespace SoitMed.Models.Equipment
         public DateTime? LastMaintenanceDate { get; set; }
         public bool IsActive { get; set; } = true;
 
+        // QR Code Token (unique identifier for QR code generation)
+        [Required]
+        public Guid QrToken { get; set; } = Guid.NewGuid();
+
+        // QR Code printing tracking
+        public bool IsQrPrinted { get; set; } = false;
+
+        public DateTime? QrLastPrintedDate { get; set; }
+
+        // Legacy system migration support
+        [MaxLength(100)]
+        public string? LegacySourceId { get; set; } // Maps to old system OOI_ID
+
         // Navigation property for repair requests
         public virtual ICollection<RepairRequest> RepairRequests { get; set; } = new List<RepairRequest>();
     }

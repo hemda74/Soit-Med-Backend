@@ -533,7 +533,8 @@ namespace SoitMed.Services
                 NationalIdBackImage = client.NationalIdBackImage,
                 TaxCardNumber = client.TaxCardNumber,
                 TaxCardImage = client.TaxCardImage,
-                LegalDocumentsSubmittedAt = client.LegalDocumentsSubmittedAt
+                LegalDocumentsSubmittedAt = client.LegalDocumentsSubmittedAt,
+                HasAccount = client.RelatedUserId != null
             };
         }
 

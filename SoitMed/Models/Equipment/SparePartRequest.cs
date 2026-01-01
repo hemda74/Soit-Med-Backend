@@ -21,6 +21,15 @@ namespace SoitMed.Models.Equipment
         [ForeignKey("MaintenanceVisitId")]
         public virtual MaintenanceVisit? MaintenanceVisit { get; set; }
 
+        // Visit ID for direct link (alternative to MaintenanceVisitId)
+        public int? VisitId { get; set; }
+
+        [ForeignKey("VisitId")]
+        public virtual MaintenanceVisit? Visit { get; set; }
+
+        // Part ID reference (if part catalog exists)
+        public int? PartId { get; set; }
+
         // Spare part details
         [Required]
         [MaxLength(200)]
@@ -48,6 +57,20 @@ namespace SoitMed.Models.Equipment
         // Availability and workflow
         [Required]
         public SparePartAvailabilityStatus Status { get; set; } = SparePartAvailabilityStatus.Checking;
+
+        // Warehouse approval workflow
+        [MaxLength(450)]
+        public string? ApprovedByWarehouseKeeperId { get; set; } // WarehouseKeeper who approved/rejected
+
+        [ForeignKey("ApprovedByWarehouseKeeperId")]
+        public virtual ApplicationUser? ApprovedByWarehouseKeeper { get; set; }
+
+        public DateTime? WarehouseApprovedAt { get; set; }
+
+        [MaxLength(1000)]
+        public string? WarehouseRejectionReason { get; set; }
+
+        public bool? WarehouseApproved { get; set; } // null = pending, true = approved, false = rejected
 
         // Assignment
         [MaxLength(450)]

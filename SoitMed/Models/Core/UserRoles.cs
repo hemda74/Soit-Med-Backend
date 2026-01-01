@@ -27,6 +27,7 @@ namespace SoitMed.Models.Core
         // Finance Department Roles
         public const string FinanceManager = "FinanceManager";
         public const string FinanceEmployee = "FinanceEmployee";
+        public const string CollectionDelegate = "CollectionDelegate";
         
         // Legal Department Roles
         public const string LegalManager = "LegalManager";
@@ -47,6 +48,7 @@ namespace SoitMed.Models.Core
                 Engineer,
                 FinanceManager,
                 FinanceEmployee,
+                CollectionDelegate,
                 LegalManager,
                 LegalEmployee,
                 MaintenanceManager,
@@ -65,7 +67,7 @@ namespace SoitMed.Models.Core
                 { "Medical", new List<string> { Doctor, Technician } },
                 { "Sales", new List<string> { SalesManager, SalesMan, SalesSupport } },
                 { "Engineering", new List<string> { Engineer, MaintenanceManager, MaintenanceSupport, SparePartsCoordinator, InventoryManager } },
-                { "Finance", new List<string> { FinanceManager, FinanceEmployee } },
+                { "Finance", new List<string> { FinanceManager, FinanceEmployee, CollectionDelegate } },
                 { "Legal", new List<string> { LegalManager, LegalEmployee } }
             };
         }

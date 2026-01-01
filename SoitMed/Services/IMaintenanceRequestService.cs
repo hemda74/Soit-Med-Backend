@@ -13,6 +13,7 @@ namespace SoitMed.Services
         Task<MaintenanceRequestResponseDTO> AssignToEngineerAsync(int requestId, AssignMaintenanceRequestDTO dto, string maintenanceSupportId);
         Task<MaintenanceRequestResponseDTO> UpdateStatusAsync(int requestId, MaintenanceRequestStatus status, string? notes = null);
         Task<MaintenanceRequestResponseDTO> CancelRequestAsync(int requestId, string userId, string? reason = null);
+        Task<MaintenanceRequestResponseDTO> FinalizeJobAndProcessPaymentAsync(int requestId, FinalizeJobDTO dto, string engineerId);
     }
 }
 

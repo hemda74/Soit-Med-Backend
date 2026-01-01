@@ -12,6 +12,7 @@ namespace SoitMed.Services
         Task<SparePartRequestResponseDTO> CustomerDecisionAsync(int sparePartRequestId, CustomerSparePartDecisionDTO dto, string customerId);
         Task<SparePartRequestResponseDTO> MarkAsReadyAsync(int sparePartRequestId, string inventoryManagerId);
         Task<SparePartRequestResponseDTO> MarkAsDeliveredToEngineerAsync(int sparePartRequestId);
+        Task<SparePartRequestResponseDTO> WarehouseApprovalAsync(int sparePartRequestId, WarehouseApprovalDTO dto, string warehouseKeeperId);
     }
 }
 

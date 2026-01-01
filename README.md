@@ -1,4 +1,4 @@
-# SoitMed Backend - Dev Branch
+# SoitMed Backend - Comprehensive Documentation
 
 ## Business Overview
 
@@ -7,9 +7,6 @@ SoitMed is a comprehensive medical equipment management and sales system designe
 ### Core Business Functions
 
 #### 1. Sales Module
-
-The sales module manages the complete sales lifecycle from initial client contact to deal closure:
-
 - **Client Management**: Track and manage client information including hospitals, clinics, Doctors, and Technicians
 - **Offer Management**: Create, manage, and track sales offers with detailed equipment specifications, pricing, and terms
 - **Deal Processing**: Handle deal creation, approval workflows, and deal closure
@@ -17,449 +14,670 @@ The sales module manages the complete sales lifecycle from initial client contac
 - **Sales Reports**: Generate comprehensive sales reports and analytics
 
 #### 2. Maintenance Module
-
-The maintenance module handles the complete lifecycle of equipment maintenance requests:
-
-- **Maintenance Requests**: Customers can submit maintenance requests for their equipment with descriptions, symptoms, and multimedia attachments (images, videos, audio)
-- **Visit Management**: Engineers can create maintenance visits, scan QR codes or enter serial numbers to load equipment data, and create detailed visit reports
-- **Spare Parts Management**: Handle spare part requests with local/global availability checks, pricing by maintenance managers, and customer approval workflows
-- **Engineer Assignment**: Automatic assignment of Engineers based on location and workload, with manual assignment options
-- **Customer Rating**: Customers can rate Engineers after service completion
-- **Status Tracking**: Real-time status tracking similar to delivery systems, allowing customers to see the current state of their maintenance requests
+- **Maintenance Requests**: Customers can submit maintenance requests for their equipment with descriptions, symptoms, and multimedia attachments
+- **Visit Management**: Engineers can create maintenance visits, scan QR codes, and create detailed visit reports
+- **Spare Parts Management**: Handle spare part requests with warehouse approval workflow
+- **Engineer Assignment**: Automatic assignment of Engineers based on location and workload
+- **Payment Processing**: Complete payment workflow with Cash and Gateway payment methods
+- **Status Tracking**: Real-time status tracking for maintenance requests
 
 #### 3. Payment Module
-
-The payment module manages all financial transactions:
-
-- **Multiple Payment Methods**: Support for various payment methods including payment gateways (Stripe, PayPal, local gateways), cash, and bank transfers
-- **Payment Processing**: Secure payment processing with transaction tracking
-- **Accounting Management**: Accounting roles can confirm or reject payments with detailed notes
-- **Payment Tracking**: Track payment status, amounts, and transaction history
+- **Multiple Payment Methods**: Support for Cash, Credit Card, Paymob, and other gateways
+- **Payment Strategy Pattern**: Extensible architecture for future installment payments
+- **Invoice Management**: Automatic invoice generation with cost breakdown
+- **Accounting Management**: Accounting roles can confirm or reject payments
 
 #### 4. Equipment Management
-
-Comprehensive equipment tracking and management:
-
 - **Equipment Registration**: Register equipment with QR codes, serial numbers, and detailed specifications
-- **Equipment Linking**: Equipment can be linked to hospitals or directly to customers (Doctors)
+- **QR Code Management**: Generate and track QR codes for equipment
+- **Equipment Linking**: Equipment can be linked to hospitals or directly to customers
 - **Maintenance History**: Track maintenance history and repair visits for each equipment
-- **Equipment Status**: Monitor equipment operational status
 
-#### 5. User Management
-
-Role-based access control with multiple user types:
-
-- **Doctors**: Can submit maintenance requests, view equipment, and manage their profile
-- **Technicians**: Similar to Doctors with Technician-specific permissions
-- **Engineers**: Handle maintenance visits, create reports, and manage spare part requests
-- **Salesmen**: Manage clients, create offers, track deals, and manage weekly plans
-- **Sales Support**: Support sales operations, manage offer requests, and handle client interactions
-- **Maintenance Support**: Coordinate maintenance requests, assign Engineers, and manage workflows
-- **Maintenance Manager**: Set spare part prices, approve global purchases, and manage maintenance operations
-- **Spare Parts Coordinator**: Check spare part availability (local/global) and coordinate with inventory managers
-- **Inventory Manager**: Prepare spare parts for Engineers when available locally
-- **Finance Manager & Finance Employee**: Handle payment confirmations, rejections, and accounting operations
-- **Super Admin**: Full system access and oversight
-- **Admin**: Administrative access with tracking capabilities
-
-#### 6. Notification System
-
-Real-time notifications for all system activities:
-
-- **Request Notifications**: Notify relevant users when maintenance requests are created, assigned, or updated
-- **Payment Notifications**: Notify customers and accounting staff about payment status changes
-- **Spare Part Notifications**: Notify coordinators, managers, and Engineers about spare part availability and pricing
-- **Visit Notifications**: Notify maintenance support when visits are completed
-- **Push Notifications**: Mobile push notifications for critical updates
-
-### Business Workflows
-
-#### Maintenance Request Workflow
-
-1. Customer submits maintenance request with equipment selection, description, and attachments
-2. Request appears in maintenance support dashboard
-3. Maintenance support reviews and assigns to Engineer (or auto-assignment based on location)
-4. Engineer receives notification and creates maintenance visit
-5. Engineer scans QR code or enters serial number to load equipment data
-6. Engineer creates visit report with outcome (completed, needs second visit, needs spare part)
-7. If spare part needed: Coordinator checks availability → If local: Inventory manager prepares → If global: Maintenance manager sets price → Customer approves/rejects
-8. Customer can rate Engineer after completion
-
-#### Payment Workflow
-
-1. Payment created for maintenance request or spare part
-2. Customer selects payment method (gateway, cash, bank transfer)
-3. Payment processed based on method
-4. For cash/bank transfer: Accounting staff confirms or rejects
-5. Customer receives notification about payment status
-
-#### Sales Workflow
-
-1. SalesMan creates client record
-2. SalesMan creates offer request or directly creates offer
-3. Offer includes equipment, pricing, terms, and payment plans
-4. Client reviews and responds to offer
-5. Deal created upon acceptance
-6. Sales reports generated for tracking
-
-### System Benefits
-
-- **Streamlined Operations**: Automated workflows reduce manual coordination
-- **Real-time Tracking**: Customers and staff can track request status in real-time
-- **Comprehensive Reporting**: Detailed analytics for sales, maintenance, and payments
-- **Multi-role Support**: System supports various user roles with appropriate permissions
-- **Mobile Support**: Mobile applications for customers and Engineers
-- **Flexible Payment Options**: Multiple payment methods to accommodate different customer preferences
-- **Equipment Lifecycle Management**: Complete tracking from purchase to maintenance
+#### 5. Legacy Data Integration
+- **Legacy Data Import**: Import clients, equipment, and maintenance visits from legacy SOIT system
+- **Legacy Media Files**: Serve legacy media files through integrated media API
+- **Data Migration**: Comprehensive migration tools for historical data
 
 ---
 
-## Technical Implementation
+## Technical Architecture
 
 ### Technology Stack
-
 - **Framework**: ASP.NET Core 8.0
 - **Database**: SQL Server with Entity Framework Core
 - **Authentication**: ASP.NET Core Identity with JWT tokens
 - **Real-time Communication**: SignalR for notifications
 - **API Documentation**: Swagger/OpenAPI
 - **Architecture**: Repository Pattern with Unit of Work
-- **Dependency Injection**: Built-in ASP.NET Core DI container
+- **Payment Integration**: Paymob Egypt payment gateway
 
-### Architecture
+### Project Structure
+```
+SoitMed/
+├── Controllers/          # API endpoint controllers
+├── Services/            # Business logic services
+│   └── Payment/        # Payment strategy implementations
+├── Repositories/        # Data access layer
+├── Models/             # Entity Framework models
+│   ├── Equipment/      # Maintenance-related entities
+│   ├── Payment/        # Payment entities
+│   └── Legacy/         # Legacy system models
+├── DTO/                # Data Transfer Objects
+├── Common/             # Shared utilities and helpers
+├── Integrations/       # Third-party integrations
+│   └── Paymob/         # Paymob payment gateway DTOs
+├── Documentation/      # Technical documentation
+└── Scripts/            # Database migration scripts
+```
 
-#### Repository Pattern
+---
 
-- **Base Repository**: Generic repository with common CRUD operations
-- **Specific Repositories**: Specialized repositories for each entity with custom query methods
-- **Unit of Work**: Centralized transaction management and repository access
+## Key Features Implementation
 
-#### Service Layer
+### 1. Maintenance Request & Lifecycle Module
 
-- **Business Logic**: All business logic encapsulated in service classes
-- **DTOs**: Data Transfer Objects for API communication
-- **Validation**: Input validation using Data Annotations and custom validators
-- **Mapping**: Entity to DTO mapping using MappingService
+Complete end-to-end workflow for maintenance requests from creation to payment closure.
 
-#### Controllers
+#### Workflow
+1. **Request Creation**: Customer or Call Center creates ticket with description and images
+2. **Assignment**: Admin/Coordinator assigns Engineer
+3. **QR Verification**: Engineer scans QR code to verify arrival
+4. **Diagnosis**: Engineer diagnoses the issue
+5. **Spare Parts Request**: Engineer requests parts if needed
+6. **Warehouse Approval**: Warehouse Keeper approves/rejects parts in Dashboard
+7. **Customer Approval**: Customer approves part pricing
+8. **Cost Calculation**: System calculates Total Cost (Labor Fees + Approved Spare Parts)
+9. **Payment Processing**: Engineer collects payment (Cash or Gateway)
+10. **Closure**: Ticket marked as completed
 
-- **RESTful APIs**: RESTful endpoints following REST conventions
-- **Authorization**: Role-based authorization using [Authorize] attributes
-- **Response Format**: Consistent response format using BaseController helpers
+#### Database Schema
+- **MaintenanceRequest**: Extended with `LaborFees`, future installment fields
+- **SparePartRequest**: Added warehouse approval workflow fields
+- **Invoice**: New entity for invoice management with cost breakdown
+- **PaymentTransaction**: Enhanced with payment method and status tracking
 
-### Database Design
+#### API Endpoints
+- `POST /api/MaintenanceRequest` - Create maintenance request
+- `POST /api/MaintenanceRequest/{id}/assign` - Assign engineer
+- `POST /api/SparePartRequest` - Request spare parts (Engineer)
+- `POST /api/SparePartRequest/{id}/warehouse-approval` - Approve/reject parts (Warehouse)
+- `POST /api/MaintenanceRequest/{id}/finalize-job` - Finalize job and process payment
 
-#### Key Models
+**See**: `Documentation/MAINTENANCE_LIFECYCLE_IMPLEMENTATION.md` for complete details
 
-**Maintenance Module:**
+### 2. Payment Strategy Pattern
 
-- `MaintenanceRequest`: Core maintenance request entity
-- `MaintenanceVisit`: Engineer visit records
-- `MaintenanceRequestAttachment`: File attachments (images, videos, audio)
-- `SparePartRequest`: Spare part requests with availability tracking
-- `MaintenanceRequestRating`: Customer ratings for Engineers
+Extensible payment processing architecture using Strategy Pattern for future installment support.
 
-**Payment Module:**
+#### Implemented Strategies
+- **CashPaymentStrategy**: Handles cash payments (requires manual confirmation)
+- **VisaPaymentStrategy**: Handles credit card and gateway payments (Paymob, Stripe, etc.)
+- **InstallmentPaymentStrategy**: Reserved for future implementation
 
-- `Payment`: Payment records with multiple payment methods
-- `PaymentTransaction`: Transaction history for each payment
-- `PaymentGatewayConfig`: Configuration for payment gateways
+#### Architecture Benefits
+- Easy to add new payment methods
+- Installment payment support ready (database fields and strategy class exist)
+- Clean separation of concerns
+- Testable payment processing logic
 
-**Sales Module:**
+**Location**: `Services/Payment/`
 
-- `Client`: Client information
-- `Offer`: Sales offers with equipment and terms
-- `Deal`: Closed deals
-- `SalesOffer`: Enhanced offer management
-- `WeeklyPlan`: SalesMan weekly planning
-- `TaskProgress`: Task tracking
+### 3. Legacy Data Integration
 
-**Equipment:**
+Comprehensive integration with legacy SOIT system for data migration and media file access.
 
-- `Equipment`: Equipment information with QR codes
-- Supports linking to hospitals or customers directly
+#### Legacy Data Import
+- **Service**: `LegacyImporterService`
+- **Models**: `LegacyCustomer`, `LegacyOrderOutItem`, `LegacyMaintenanceVisit`, `LegacyMaintenanceContract`
+- **Features**:
+  - Import clients from `Stk_Customers`
+  - Import equipment from `Stk_Order_Out_Items`
+  - Import maintenance visits from `MNT_Visiting`
+  - Automatic QR token generation for equipment
+  - Client-to-User linking support
+  - File-based error logging
 
-### Key Features Implementation
+#### Legacy Media Files Integration
+- **Service**: `LegacyMediaService`
+- **Controller**: `LegacyMediaController`
+- **Integration**: Proxies requests to legacy media API (`soitmed_data_backend`)
+- **Media Paths**:
+  - `D:\Soit-Med\legacy\SOIT\Ar\MNT\FileUploaders\Reports`
+  - `D:\Soit-Med\legacy\SOIT\UploadFiles\Images`
+  - `D:\Soit-Med\legacy\SOIT\UploadFiles\Files`
 
-#### Auto-Assignment Logic
+#### API Endpoints
+- `GET /api/LegacyMedia/files/{fileName}` - Serve legacy media files (proxy)
+- `GET /api/LegacyMedia/url/{fileName}` - Get media file URL
+- `GET /api/LegacyMedia/check/{fileName}` - Check if file exists
+- `POST /api/LegacyImport/import-all` - Import all legacy data
+- `POST /api/LegacyImport/import-clients` - Import clients only
+- `POST /api/LegacyImport/import-equipment` - Import equipment only
+- `POST /api/LegacyImport/import-visits` - Import maintenance visits only
 
-- Engineers assigned automatically based on:
-     - Equipment location (hospital location)
-     - Engineer governorate assignments
-     - Current workload (round-robin with least active requests)
-- Falls back to manual assignment if no Engineers available
+**See**: `Documentation/LEGACY_MEDIA_INTEGRATION.md` for complete details
 
-#### File Upload Service
+### 4. Connection Settings (Local/Remote Modes)
 
-- `MaintenanceAttachmentService`: Handles file uploads for maintenance requests
-- Supports multiple file types: Images (JPG, PNG, GIF), Videos (MP4, AVI, MOV), Audio (MP3, WAV), Documents (PDF, DOC)
-- File size limits: Images (10MB), Videos (100MB), Audio (20MB), Documents (10MB)
-- Files stored in `wwwroot/maintenance-requests/{requestId}/attachments/`
+Flexible connection management for local development and remote server access.
 
-#### Payment Processing
+#### Configuration
+```json
+{
+  "ConnectionSettings": {
+    "Mode": "Remote",  // "Local" or "Remote"
+    "LocalConnectionString": "...",
+    "RemoteConnectionString": "...",
+    "LocalMediaPath": "C:\\LegacyMedia",
+    "RemoteMediaPath": "\\\\10.10.9.104\\LegacyMedia",
+    "LegacyMediaApiBaseUrl": "http://10.10.9.104:5266",
+    "LegacyMediaPaths": "D:\\Soit-Med\\legacy\\SOIT\\..."
+  }
+}
+```
 
-- `PaymentService`: Handles payment creation and processing
-- Supports multiple payment methods:
-     - Stripe integration (ready for API integration)
-     - PayPal integration (ready for API integration)
-     - Local payment gateways (Fawry, Paymob, etc.)
-     - Cash payments (requires accounting confirmation)
-     - Bank transfers (requires accounting confirmation)
-- `AccountingService`: Handles payment confirmation and rejection
+#### Usage
+- Switch between Local and Remote modes by changing `Mode` in appsettings.json
+- Automatic connection string selection based on mode
+- Media file path selection based on mode
+- Legacy media API URL configuration
 
-#### Notification System
+**Location**: `Common/ConnectionSettings.cs`
 
-- `NotificationService`: Centralized notification management
-- `SignalR Hub`: Real-time notifications via WebSocket
-- `MobileNotificationService`: Push notifications for mobile apps
-- Notifications sent at each workflow step:
-     - Request creation → Maintenance Support
-     - Assignment → Engineer
-     - Visit completion → Maintenance Support
-     - Spare part requests → Coordinators
-     - Price setting → Customers
-     - Payment status → Customers and Accounting
+### 5. Admin & Support Capabilities
 
-### API Endpoints
+#### Admin: Client-to-User Linking
+- `POST /api/Admin/Client/LinkAccount` - Link Client to User account
+- `POST /api/Admin/Client/UnlinkAccount` - Unlink Client from User account
+- Updates `Client.RelatedUserId` field
+- Validates Client and User existence
 
-#### Maintenance Module
+#### Support: QR Code Management
+- `POST /api/Equipment/Qr/MarkPrinted` - Mark QR code as printed
+- Updates `Equipment.IsQrPrinted` and `Equipment.QrLastPrintedDate`
+- Role: Support, Admin, SuperAdmin
 
-- `GET /api/MaintenanceRequest` - Get all requests (filtered by role)
-- `POST /api/MaintenanceRequest` - Create new request
+#### DTO Updates
+- **ClientResponseDTO**: Added `HasAccount` (bool) - indicates if client is linked to user
+- **EquipmentResponseDTO**: Added `QrToken` (Guid) and `IsQrPrinted` (bool)
+
+### 6. Paymob Payment Gateway Integration
+
+Complete Paymob Egypt payment gateway integration with DTOs and configuration.
+
+#### Configuration
+```json
+{
+  "Paymob": {
+    "ApiKey": "",
+    "HmacSecret": "",
+    "IntegrationId_Card": "",
+    "IntegrationId_Wallet": "",
+    "IntegrationId_Fawry": "",
+    "IframeId": ""
+  }
+}
+```
+
+#### DTOs
+All DTOs use `[JsonPropertyName("snake_case")]` to match Paymob API:
+- `PaymobAuthResponse` - Authentication response
+- `PaymobOrderRequest/Response` - Order creation
+- `PaymobKeyRequest/Response` - Payment key generation
+- `PaymobPayRequest/Response` - Payment processing
+- `PaymobBillingData` - Billing information
+- `PaymobPaymentSource` - Wallet/Fawry payment source
+
+**Location**: `Integrations/Paymob/DTOs/`
+
+---
+
+## Database Schema
+
+### Key Entities
+
+#### MaintenanceRequest
+- Core maintenance request entity
+- Fields: `LaborFees`, `TotalAmount`, `PaidAmount`, `RemainingAmount`
+- Future-proofing: `PaymentPlan?`, `InstallmentMonths?`, `CollectionDelegateId?`
+
+#### SparePartRequest
+- Spare part request with warehouse approval workflow
+- Fields: `WarehouseApproved`, `ApprovedByWarehouseKeeperId`, `WarehouseApprovedAt`
+- Pricing: `OriginalPrice`, `CompanyPrice`, `CustomerPrice`
+
+#### Invoice
+- Invoice entity for maintenance requests
+- Cost breakdown: `LaborFees`, `SparePartsTotal`, `TotalAmount`
+- Payment tracking: `PaidAmount`, `RemainingAmount`, `Status`
+- Future-proofing: `PaymentPlan?`, `InstallmentMonths?`, `CollectionDelegateId?`
+
+#### Equipment
+- Equipment with QR code support
+- Fields: `QrToken` (unique), `IsQrPrinted`, `QrLastPrintedDate`
+- Legacy support: `LegacySourceId`
+
+#### Client
+- Client entity with user linking
+- Fields: `RelatedUserId` (FK to ApplicationUser), `LegacyCustomerId`
+- DTO includes: `HasAccount` (computed property)
+
+### Enums
+
+#### PaymentMethod
+- `Cash = 1`, `BankTransfer = 2`, `CreditCard = 3`, `DebitCard = 4`
+- `Stripe = 5`, `PayPal = 6`, `Fawry = 7`, `Paymob = 8`
+- `MobileWallet = 9`, `Check = 10`, `CompanyCredit = 11`
+- `Delegate = 12`, `Gateway = 13`, `Installment = 14` (reserved)
+
+#### PaymentPlan
+- `OneTime = 1`, `Installment = 2` (reserved)
+
+#### PaymentStatus
+- `NotRequired = 0`, `Pending = 1`, `Processing = 2`, `Completed = 3`
+- `Failed = 4`, `Cancelled = 5`, `Refunded = 6`
+- `Unpaid = 7`, `PendingCollection = 8`, `Collected = 9`, `PaidOnline = 10`
+
+---
+
+## API Endpoints
+
+### Maintenance Module
+- `POST /api/MaintenanceRequest` - Create request
 - `GET /api/MaintenanceRequest/{id}` - Get request details
-- `PUT /api/MaintenanceRequest/{id}/assign` - Assign to Engineer
-- `POST /api/MaintenanceVisit` - Create visit
-- `GET /api/MaintenanceVisit/request/{requestId}` - Get visits for request
-- `POST /api/SparePartRequest` - Create spare part request
-- `PUT /api/SparePartRequest/{id}/set-price` - Set customer price
-- `POST /api/MaintenanceAttachment/upload` - Upload attachment
-- `GET /api/MaintenanceAttachment/request/{requestId}` - Get attachments
+- `POST /api/MaintenanceRequest/{id}/assign` - Assign engineer
+- `POST /api/MaintenanceRequest/{id}/finalize-job` - Finalize job and process payment
+- `POST /api/SparePartRequest` - Request spare parts
+- `POST /api/SparePartRequest/{id}/warehouse-approval` - Warehouse approval
+- `POST /api/SparePartRequest/{id}/customer-decision` - Customer approval
 
-#### Payment Module
+### Admin Module
+- `POST /api/Admin/Client/LinkAccount` - Link client to user
+- `POST /api/Admin/Client/UnlinkAccount` - Unlink client from user
 
+### Equipment Module
+- `POST /api/Equipment/Qr/MarkPrinted` - Mark QR as printed
+- `GET /api/Equipment` - Get all equipment
+- `GET /api/Equipment/{id}` - Get equipment details
+
+### Legacy Integration
+- `POST /api/LegacyImport/import-all` - Import all legacy data
+- `POST /api/LegacyImport/import-clients` - Import clients
+- `POST /api/LegacyImport/import-equipment` - Import equipment
+- `POST /api/LegacyImport/import-visits` - Import maintenance visits
+- `GET /api/LegacyMedia/files/{fileName}` - Serve legacy media files
+- `GET /api/LegacyMedia/url/{fileName}` - Get media file URL
+- `GET /api/LegacyMedia/check/{fileName}` - Check file existence
+
+### Payment Module
 - `POST /api/Payment` - Create payment
 - `POST /api/Payment/{id}/stripe` - Process Stripe payment
 - `POST /api/Payment/{id}/paypal` - Process PayPal payment
 - `POST /api/Payment/{id}/cash` - Record cash payment
-- `POST /api/Payment/{id}/bank-transfer` - Record bank transfer
 - `POST /api/Accounting/{paymentId}/confirm` - Confirm payment
 - `POST /api/Accounting/{paymentId}/reject` - Reject payment
-- `GET /api/Accounting/dashboard` - Get accounting dashboard
-
-### Database Migrations
-
-- Migration: `MaintenanceAndPaymentModule`
-- Includes all new tables for maintenance and payment modules
-- Foreign key relationships configured with proper cascade behaviors
-- Check constraints for data integrity (e.g., Equipment must be linked to either hospital or customer, not both)
-
-### Security
-
-- **Authentication**: JWT token-based authentication
-- **Authorization**: Role-based authorization with [Authorize(Roles = "...")] attributes
-- **Input Validation**: Data annotations and custom validators
-- **SQL Injection Protection**: Entity Framework Core parameterized queries
-- **File Upload Security**: File type and size validation
-
-### Testing
-
-- All endpoints tested and verified
-- Migration tested and applied successfully
-- Auto-assignment logic tested
-- File upload functionality tested
-- Payment processing flow tested
-
-### Deployment Notes
-
-- Database migration must be applied before deployment
-- File upload directories must have write permissions
-- Payment gateway credentials must be configured in appsettings
-- SignalR requires WebSocket support on server
 
 ---
 
-## Performance Optimization & Caching
+## Configuration
 
-### Caching Layer (✅ Implemented)
+### appsettings.json Structure
 
-The application includes a comprehensive caching layer to handle high-concurrency scenarios (10,000+ concurrent users).
-
-#### Caching Infrastructure
-
-- **Cache Service**: `ICacheService` interface with `RedisCacheService` implementation
-- **Distributed Cache**: Supports both Redis and in-memory caching with automatic fallback
-- **Cache Key Management**: Centralized cache key definitions in `CacheKeys.cs`
-- **Automatic Invalidation**: Cache automatically cleared on data modifications
-
-#### Cached Endpoints
-
-| Endpoint | Cache Duration | Benefit |
-|----------|---------------|---------|
-| Product Listings | 2-6 hours | 10-20x faster response time |
-| Product Categories | 24 hours | 15x faster response time |
-| Departments | 12-24 hours | 10x faster response time |
-| Governorates | 24 hours | 10x faster response time |
-| Individual Products | 2 hours | 10x faster response time |
-
-#### Cache Configuration
-
-**In-Memory Cache (Development)**:
 ```json
 {
   "ConnectionStrings": {
-    "Redis": ""
-  }
-}
-```
-
-**Redis Cache (Production)**:
-```json
-{
-  "ConnectionStrings": {
+    "DefaultConnection": "...",
     "Redis": "localhost:6379"
+  },
+  "ConnectionSettings": {
+    "Mode": "Remote",
+    "LocalConnectionString": "...",
+    "RemoteConnectionString": "...",
+    "LocalMediaPath": "C:\\LegacyMedia",
+    "RemoteMediaPath": "\\\\10.10.9.104\\LegacyMedia",
+    "LegacyMediaApiBaseUrl": "http://10.10.9.104:5266",
+    "LegacyMediaPaths": "D:\\Soit-Med\\legacy\\SOIT\\..."
+  },
+  "Paymob": {
+    "ApiKey": "",
+    "HmacSecret": "",
+    "IntegrationId_Card": "",
+    "IntegrationId_Wallet": "",
+    "IntegrationId_Fawry": "",
+    "IframeId": ""
+  },
+  "ContractMaintenance": {
+    "ScheduleDaysAhead": 7,
+    "RunHour": 2
+  },
+  "JWT": {
+    "ValidIss": "http://localhost:58868",
+    "ValidAud": "http://localhost:4200",
+    "SecritKey": "..."
   }
 }
 ```
 
-#### Integrated Controllers/Services
+---
 
-- ✅ **GovernorateController** - All GET operations cached
-- ✅ **DepartmentController** - All GET operations cached
-- ✅ **ProductService** - Product listings and details cached
-- ✅ **ProductCategoryService** - Categories and hierarchy cached
+## Database Migrations
+
+### Key Migrations
+- `AddLegacyAndQrSupport` - Adds QR token, legacy fields to Equipment and Client
+- `MaintenanceLifecycleModule_Migration` - Complete maintenance lifecycle schema
+- Manual SQL scripts available in `Scripts/` directory
+
+### Migration Commands
+```bash
+# Create migration
+dotnet ef migrations add MigrationName --project SoitMed
+
+# Apply migration
+dotnet ef database update --project SoitMed
+
+# Generate SQL script
+dotnet ef migrations script --project SoitMed
+```
+
+---
+
+## Development Setup
+
+### Prerequisites
+- .NET 8.0 SDK
+- SQL Server (Local or Remote)
+- Visual Studio 2022 or VS Code
+- Redis (optional, for distributed caching)
+
+### Setup Steps
+1. Clone repository
+2. Update `appsettings.json` with connection strings
+3. Restore NuGet packages: `dotnet restore`
+4. Apply database migrations: `dotnet ef database update`
+5. Run application: `dotnet run`
+
+### Swagger Documentation
+Access Swagger UI at: `http://localhost:58868/swagger`
+
+---
+
+## Important Notes for Future Development
+
+### 1. Installment Payment Support (Reserved)
+- **Database Fields**: Already added to `MaintenanceRequest` and `Invoice` entities
+  - `PaymentPlan?` (enum)
+  - `InstallmentMonths?` (int)
+  - `CollectionDelegateId?` (FK to ApplicationUser)
+- **Code Structure**: `InstallmentPaymentStrategy` class exists but returns error
+- **Enum**: `PaymentMethod.Installment` exists but not used in UI
+- **To Implement**: 
+  - Implement `InstallmentPaymentStrategy.ProcessPaymentAsync()`
+  - Create `InstallmentSchedule` entity
+  - Add monthly payment tracking
+  - Add collection delegate assignment
+  - Update UI to show installment option
+
+### 2. Legacy Media Files
+- **Legacy Media API**: Separate API project (`soitmed_data_backend`) serves legacy files
+- **Integration**: Main backend proxies requests to legacy API
+- **File Paths**: Configured in `ConnectionSettings.LegacyMediaPaths`
+- **Media API URL**: Configured in `ConnectionSettings.LegacyMediaApiBaseUrl`
+- **Important**: Ensure legacy media API is running and accessible
+
+### 3. Connection Settings
+- **Mode Switching**: Change `ConnectionSettings.Mode` to switch between Local/Remote
+- **Media Paths**: Different paths for local vs remote access
+- **Legacy API**: URL must be accessible from main backend server
+
+### 4. Payment Gateway Integration
+- **Paymob**: DTOs ready, configuration needed in appsettings.json
+- **Strategy Pattern**: Easy to add new payment gateways
+- **Current Support**: Cash and Gateway (Credit Card) payments only
+- **Future**: Installment payments reserved but not implemented
+
+### 5. Warehouse Approval Workflow
+- **Required Step**: Warehouse Keeper must approve spare parts before engineer can proceed
+- **Status Flow**: `Checking` → `ReadyForEngineer` (if approved) or `Cancelled` (if rejected)
+- **Notification**: Engineer notified of approval/rejection decision
+
+### 6. Cost Calculation
+- **Formula**: `TotalAmount = LaborFees + Sum(Approved Spare Parts CustomerPrice)`
+- **Approved Parts Only**: Only spare parts with `WarehouseApproved = true` and `CustomerApproved = true` are included
+- **Invoice**: Automatically created when job is finalized
+
+---
+
+## Session Summary: Recent Implementation
+
+### Implemented Features (This Session)
+
+#### 1. Maintenance Request & Lifecycle Module
+- Complete workflow from request creation to payment closure
+- Warehouse approval workflow for spare parts
+- Cost calculation (Labor Fees + Approved Spare Parts)
+- Payment processing with Strategy Pattern
+- Invoice generation and tracking
+
+#### 2. Payment Strategy Pattern
+- `IPaymentStrategy` interface for extensible payment processing
+- `CashPaymentStrategy` for cash payments
+- `VisaPaymentStrategy` for gateway payments
+- `InstallmentPaymentStrategy` reserved for future
+- `PaymentStrategyFactory` for automatic strategy selection
+
+#### 3. Legacy Data Integration
+- `LegacyImporterService` for importing clients, equipment, and visits
+- Support for Local/Remote connection modes
+- File-based error logging
+- Automatic QR token generation
+- Client-to-User linking support
+
+#### 4. Legacy Media Files Integration
+- `LegacyMediaService` for accessing legacy media files
+- Proxy endpoints to legacy media API
+- File existence checking
+- URL generation for media files
+- Integration with `soitmed_data_backend` API
+
+#### 5. Admin & Support Capabilities
+- Client-to-User account linking
+- QR code print status tracking
+- Enhanced DTOs with new fields
+
+#### 6. Paymob Payment Gateway
+- Complete DTO structure with snake_case JSON properties
+- Configuration support in appsettings.json
+- Ready for API integration
+
+#### 7. Database Schema Updates
+- `Invoice` entity for invoice management
+- Extended `MaintenanceRequest` with labor fees and installment fields
+- Extended `SparePartRequest` with warehouse approval fields
+- Extended `Equipment` with QR code fields
+- Extended `Client` with user linking fields
+- Future-proofing fields for installment payments
+
+### Key Architectural Decisions
+
+1. **Strategy Pattern for Payments**: Allows easy extension for installment payments without modifying existing code
+2. **Future-Proofing**: Database fields and code structure ready for installment payments (not implemented yet)
+3. **Legacy Integration**: Separate service layer for legacy data and media access
+4. **Connection Flexibility**: Support for both local and remote development modes
+5. **Warehouse Workflow**: Required approval step ensures proper inventory management
+
+### Files Created/Modified
+
+#### New Files
+- `Services/Payment/IPaymentStrategy.cs`
+- `Services/Payment/CashPaymentStrategy.cs`
+- `Services/Payment/VisaPaymentStrategy.cs`
+- `Services/Payment/InstallmentPaymentStrategy.cs`
+- `Services/Payment/PaymentStrategyFactory.cs`
+- `Services/ILegacyMediaService.cs`
+- `Services/LegacyMediaService.cs`
+- `Controllers/LegacyMediaController.cs`
+- `Models/Payment/Invoice.cs`
+- `Models/Enums/PaymentPlan.cs`
+- `Integrations/Paymob/DTOs/*` (11 DTO files)
+- `Documentation/MAINTENANCE_LIFECYCLE_IMPLEMENTATION.md`
+- `Documentation/LEGACY_MEDIA_INTEGRATION.md`
+
+#### Modified Files
+- `Models/Equipment/MaintenanceRequest.cs` - Added labor fees and installment fields
+- `Models/Equipment/SparePartRequest.cs` - Added warehouse approval fields
+- `Models/Equipment/Equipment.cs` - Added QR code fields
+- `Models/Client.cs` - Added user linking fields
+- `Models/Enums/PaymentMethod.cs` - Added Installment option
+- `Services/MaintenanceRequestService.cs` - Added FinalizeJobAndProcessPaymentAsync
+- `Services/SparePartRequestService.cs` - Added WarehouseApprovalAsync
+- `Controllers/MaintenanceRequestController.cs` - Added finalize-job endpoint
+- `Controllers/SparePartRequestController.cs` - Added warehouse-approval endpoint
+- `Controllers/AdminController.cs` - Added client linking endpoints
+- `Controllers/EquipmentController.cs` - Added QR mark-printed endpoint
+- `Common/ConnectionSettings.cs` - Added legacy media API configuration
+- `DTO/MaintenanceDTOs.cs` - Added FinalizeJobDTO and WarehouseApprovalDTO
+- `DTO/ClientDTOs.cs` - Added HasAccount to ClientResponseDTO
+- `DTO/EquipmentDTO.cs` - Added QrToken and IsQrPrinted to EquipmentResponseDTO
+
+### Testing Checklist
+- [ ] Create maintenance request
+- [ ] Assign engineer
+- [ ] Request spare parts
+- [ ] Warehouse approves parts
+- [ ] Warehouse rejects parts
+- [ ] Customer approves parts
+- [ ] Finalize job with Cash payment
+- [ ] Finalize job with Gateway payment
+- [ ] Verify invoice creation
+- [ ] Verify payment transaction recording
+- [ ] Test legacy data import
+- [ ] Test legacy media file access
+- [ ] Test client-to-user linking
+- [ ] Test QR code marking
+
+---
+
+## Performance & Caching
+
+### Caching Layer
+- **Redis Support**: Distributed caching with Redis
+- **Memory Fallback**: Automatic fallback to in-memory cache
+- **Cache Keys**: Centralized in `CacheKeys.cs`
+- **Cache Duration**: Configurable per data type (2-24 hours)
 
 ### Database Optimization
+- **Connection Pooling**: Max 300, Min 20 connections
+- **Performance Indexes**: Comprehensive indexes on frequently queried fields
+- **AsNoTracking**: Used for read-only legacy data queries
 
-#### Performance Indexes
+---
 
-Run the `Scripts/ADD_PERFORMANCE_INDEXES.sql` script to create performance indexes:
+## Security
 
-```sql
--- Indexes created for:
-- AspNetUsers (UserName, Email, Department, Active status)
-- Clients (Status, Priority, Name, CreatedBy, CreatedAt)
-- SalesOffers (ClientId, Status, CreatedAt, CreatedBy)
-- OfferRequests (AssignedTo, Status, ClientId, RequestDate)
-- SalesDeals (ClientId, Status, SalesManId, CreatedAt)
-- Products (CategoryId, InStock, IsActive, Name)
-- ProductCategories (ParentCategoryId, IsActive)
-- And many more...
-```
+### Authentication & Authorization
+- JWT token-based authentication
+- Role-based authorization with `[Authorize(Roles = "...")]`
+- Custom authorization helpers for complex scenarios
 
-#### Connection Pool Optimization
+### Input Validation
+- Data annotations on DTOs
+- FluentValidation for complex validations
+- Custom validation extensions
 
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "...;Max Pool Size=300;Min Pool Size=20;..."
-  }
-}
-```
+### File Security
+- Path traversal protection for file access
+- File type and size validation
+- Secure file upload handling
 
-- **Max Pool Size**: 300 connections
-- **Min Pool Size**: 20 connections
-- **Connection Lifetime**: 300 seconds
-- **Pooling**: Enabled
+---
 
-### Performance Testing
+## Documentation
 
-#### Test Scripts (Mac/Linux)
+### Technical Documentation
+- `Documentation/MAINTENANCE_LIFECYCLE_IMPLEMENTATION.md` - Complete maintenance lifecycle guide
+- `Documentation/LEGACY_MEDIA_INTEGRATION.md` - Legacy media files integration guide
+- `Documentation/API_DOCUMENTATION_REACT_TEAMS.md` - API reference for React teams
+- Additional documentation files in `Documentation/` directory
 
-**Quick Performance Test**:
-```bash
-cd Scripts
-./quick-test.sh http://localhost:5117
-```
+### Code Documentation
+- XML comments on all public APIs
+- Inline comments for complex business logic
+- README files for major modules
 
-**Authenticated Load Test**:
-```bash
-cd Scripts
-./test-authenticated.sh user@example.com password
-```
+---
 
-**Create Test Data**:
-```bash
-cd Scripts
-# Run CREATE_TEST_DATA.sql in your SQL client
-# This creates 10,000 test clients, 5,000 offers, 2,500 deals, etc.
-```
+## Deployment
 
-#### Expected Performance Metrics
+### Pre-Deployment Checklist
+1. Update `appsettings.json` with production connection strings
+2. Configure `ConnectionSettings.Mode` (Remote for production)
+3. Set `LegacyMediaApiBaseUrl` to production legacy API URL
+4. Configure Paymob credentials in `Paymob` section
+5. Apply database migrations
+6. Verify legacy media API is accessible
+7. Test all critical endpoints
+8. Configure Redis for distributed caching (if using)
 
-With caching and optimization:
+### Environment Variables
+Consider using environment variables for sensitive configuration:
+- Database connection strings
+- JWT secret key
+- Payment gateway credentials
+- Legacy media API URL
 
-- **Average Response Time**: < 200ms (for cached endpoints)
-- **Requests per Second**: 500+ RPS
-- **Concurrent Users**: 10,000+ supported
-- **Cache Hit Rate**: 85-95%
-- **Database Load**: Reduced by 80-90%
+---
 
-### Monitoring & Logging
+## Troubleshooting
 
-The application logs cache performance:
+### Common Issues
 
-```
-[Debug] Cache hit for key: SoitMed:Product:All (Distributed Cache)
-[Debug] Cache miss for key: SoitMed:Product:Id:123
-[Debug] Set cache for key: SoitMed:Product:Id:123 (2 hour expiration)
-```
+#### Legacy Media Files Not Found
+1. Verify legacy media API is running
+2. Check `LegacyMediaApiBaseUrl` in appsettings.json
+3. Verify network connectivity to legacy API server
+4. Check file paths in legacy file system
 
-### Scaling Recommendations
+#### Payment Processing Errors
+1. Verify payment gateway credentials
+2. Check payment strategy registration in DI container
+3. Review payment transaction logs
+4. Verify invoice creation succeeded
 
-#### Current Capacity (Single Instance)
-- ✅ Up to 10,000 concurrent users
-- ✅ 500+ requests/second
-- ✅ In-memory caching for fast access
+#### Database Connection Issues
+1. Check connection string format
+2. Verify SQL Server is accessible
+3. Check firewall rules
+4. Verify connection pool settings
 
-#### Scaling to 50,000+ Users
-1. **Deploy Redis** for distributed caching across multiple instances
-2. **Load Balancer** to distribute traffic across multiple API servers
-3. **Database Read Replicas** for read-heavy operations
-4. **CDN** for static content delivery
-5. **Microservices** architecture for high-demand modules
+---
 
-### Documentation
+## Future Enhancements
 
-- `CACHING_INTEGRATION_COMPLETE.md` - Detailed caching implementation guide
-- `PERFORMANCE_TEST_RESULTS.md` - Performance test results and analysis
-- `PERFORMANCE_TESTING_GUIDE.md` - Complete testing guide
-- `Scripts/ADD_PERFORMANCE_INDEXES.sql` - Database indexes script
-- `Scripts/CREATE_TEST_DATA.sql` - Test data generation script
+### Planned Features
+1. **Installment Payments**: Complete implementation of installment payment strategy
+2. **Collection Delegates**: Assignment and tracking of collection delegates
+3. **File Migration**: Option to migrate legacy files to new storage
+4. **Thumbnail Generation**: Automatic thumbnail generation for images
+5. **CDN Integration**: Serve media files through CDN
+6. **Advanced Analytics**: Enhanced reporting and analytics dashboard
 
-### Quick Start
+### Reserved for Future
+- Installment payment processing logic
+- Collection delegate assignment workflow
+- Monthly payment tracking and reminders
+- Installment schedule management
 
-1. **Apply Performance Indexes**:
-   ```sql
-   -- Run Scripts/ADD_PERFORMANCE_INDEXES.sql in SQL Server Management Studio
-   ```
+---
 
-2. **Configure Caching** (Optional - Redis):
-   ```bash
-   # Install Redis (Mac)
-   brew install redis
-   redis-server
-   ```
+## License
 
-3. **Update Configuration**:
-   ```json
-   {
-     "ConnectionStrings": {
-       "Redis": "localhost:6379"
-     }
-   }
-   ```
+Proprietary - SoitMed Medical Equipment Management System
 
-4. **Test Performance**:
-   ```bash
-   cd Scripts
-   ./test-authenticated.sh your-email@example.com your-password
-   ```
+---
 
-### Status
+## Support
 
-- ✅ Caching layer implemented and tested
-- ✅ Database indexes created and optimized
-- ✅ Connection pool configured for high load
-- ✅ Performance testing scripts ready
-- ✅ Ready for production deployment
-- 📊 Expected to handle 10,000+ concurrent users
+For technical support or questions, refer to:
+- Technical documentation in `Documentation/` directory
+- API documentation via Swagger UI
+- Code comments and XML documentation

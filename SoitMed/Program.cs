@@ -75,10 +75,27 @@ namespace SoitMed
                 builder.Services.AddEndpointsApiExplorer();
                 builder.Services.AddSwaggerGen();
                 
+                // Configure ConnectionSettings
+                builder.Services.Configure<SoitMed.Common.ConnectionSettings>(
+                    builder.Configuration.GetSection(SoitMed.Common.ConnectionSettings.SectionName));
+
+                // Get connection settings
+                var connectionSettings = new SoitMed.Common.ConnectionSettings();
+                builder.Configuration.GetSection(SoitMed.Common.ConnectionSettings.SectionName).Bind(connectionSettings);
+
+                // Use connection string based on Mode (Local or Remote)
+                var activeConnectionString = connectionSettings.GetActiveConnectionString();
+                if (string.IsNullOrEmpty(activeConnectionString))
+                {
+                    // Fallback to DefaultConnection if ConnectionSettings not configured
+                    activeConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? 
+                        throw new InvalidOperationException("No connection string configured");
+                }
+
                 builder.Services.AddDbContext<Context>(option =>
                 {
                     option
-                    .UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"), sqlOptions =>
+                    .UseSqlServer(activeConnectionString, sqlOptions =>
                     {
                         sqlOptions.EnableRetryOnFailure(
                             maxRetryCount: 3,
@@ -193,6 +210,13 @@ namespace SoitMed
                 builder.Services.AddScoped<IRequestWorkflowService, RequestWorkflowService>();
                 builder.Services.AddHttpContextAccessor(); // Required for ChatService
                 builder.Services.AddApplicationServices();
+                
+                // Configure ContractMaintenance options
+                builder.Services.Configure<SoitMed.Services.ContractMaintenanceOptions>(
+                    builder.Configuration.GetSection(SoitMed.Services.ContractMaintenanceOptions.SectionName));
+                
+                // Register background workers
+                builder.Services.AddHostedService<SoitMed.Services.ContractMaintenanceWorker>();
                 builder.Services.AddSignalR();
                 builder.Services.AddFluentValidationAutoValidation();
                 
@@ -206,6 +230,17 @@ namespace SoitMed
                 builder.Services.AddScoped<IValidator<ReviewWeeklyPlanDto>, ReviewWeeklyPlanDtoValidator>();
                 builder.Services.AddScoped<IValidator<FilterWeeklyPlansDto>, FilterWeeklyPlansDtoValidator>();
                 
+                // Configure HttpClient for Legacy Media API
+                builder.Services.AddHttpClient("LegacyMediaApi", client =>
+                {
+                    var legacyApiUrl = builder.Configuration.GetSection("ConnectionSettings:LegacyMediaApiBaseUrl").Value;
+                    if (!string.IsNullOrEmpty(legacyApiUrl))
+                    {
+                        client.BaseAddress = new Uri(legacyApiUrl);
+                    }
+                    client.Timeout = TimeSpan.FromSeconds(30);
+                });
+
                 // Configure caching (Redis for distributed caching, fallback to memory cache)
                 var redisConnection = builder.Configuration.GetConnectionString("Redis");
                 if (!string.IsNullOrEmpty(redisConnection))

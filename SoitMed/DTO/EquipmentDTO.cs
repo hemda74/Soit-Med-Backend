@@ -49,12 +49,8 @@ namespace SoitMed.DTO
         public DateTime CreatedAt { get; set; }
         public DateTime? LastMaintenanceDate { get; set; }
         public bool IsActive { get; set; }
-        public Guid? QrToken { get; set; }
+        public Guid QrToken { get; set; }
         public bool IsQrPrinted { get; set; }
-        public DateTime? QrLastPrintedDate { get; set; }
-        public string? CustomerId { get; set; }
-        public string? CustomerName { get; set; }
-        public bool HasLoginAccount => !string.IsNullOrEmpty(CustomerId);
     }
 
     public class RepairRequestDTO

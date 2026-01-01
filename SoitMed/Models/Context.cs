@@ -6,6 +6,7 @@ using SoitMed.Models.Hospital;
 using SoitMed.Models.Location;
 using SoitMed.Models.Equipment;
 using SoitMed.Models.Payment;
+using SoitMed.Models.Legacy;
 
 namespace SoitMed.Models
 {
@@ -36,6 +37,14 @@ namespace SoitMed.Models
         public DbSet<MaintenanceRequestAttachment> MaintenanceRequestAttachments { get; set; }
         public DbSet<SparePartRequest> SparePartRequests { get; set; }
         public DbSet<MaintenanceRequestRating> MaintenanceRequestRatings { get; set; }
+        
+        // Payment entities
+        public DbSet<Payment.Invoice> Invoices { get; set; }
+        public DbSet<VisitAssignees> VisitAssignees { get; set; }
+        public DbSet<VisitReport> VisitReports { get; set; }
+        
+        // Audit entities
+        public DbSet<Core.EntityChangeLog> EntityChangeLogs { get; set; }
         
         // Payment entities
         public DbSet<Payment.Payment> Payments { get; set; }
@@ -90,6 +99,12 @@ namespace SoitMed.Models
         // Products catalog
         public DbSet<Product> Products { get; set; }
         public DbSet<ProductCategory> ProductCategories { get; set; }
+        
+        // Legacy tables (from old SOIT system - same database)
+        public DbSet<Legacy.LegacyCustomer> LegacyCustomers { get; set; }
+        public DbSet<Legacy.LegacyOrderOutItem> LegacyOrderOutItems { get; set; }
+        public DbSet<Legacy.LegacyMaintenanceVisit> LegacyMaintenanceVisits { get; set; }
+        public DbSet<Legacy.LegacyMaintenanceContract> LegacyMaintenanceContracts { get; set; }
         
         public Context(DbContextOptions options) : base(options)
         {
@@ -209,6 +224,18 @@ namespace SoitMed.Models
             modelBuilder.Entity<Equipment.Equipment>()
                 .HasIndex(e => e.QRCode)
                 .IsUnique();
+
+            // Ensure unique QrToken
+            modelBuilder.Entity<Equipment.Equipment>()
+                .HasIndex(e => e.QrToken)
+                .IsUnique();
+
+            // Configure Client relationships
+            modelBuilder.Entity<Client>()
+                .HasOne(c => c.RelatedUser)
+                .WithMany()
+                .HasForeignKey(c => c.RelatedUserId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Configure RepairRequest relationships
             modelBuilder.Entity<RepairRequest>()
@@ -597,6 +624,17 @@ namespace SoitMed.Models
                 .Property(mr => mr.RemainingAmount)
                 .HasPrecision(18, 2);
 
+            modelBuilder.Entity<MaintenanceRequest>()
+                .Property(mr => mr.LaborFees)
+                .HasPrecision(18, 2);
+
+            // MaintenanceRequest future-proofing relationships
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasOne(mr => mr.CollectionDelegate)
+                .WithMany()
+                .HasForeignKey(mr => mr.CollectionDelegateId)
+                .OnDelete(DeleteBehavior.NoAction);
+
             // MaintenanceRequestAttachment relationships
             modelBuilder.Entity<MaintenanceRequestAttachment>()
                 .HasOne(mra => mra.MaintenanceRequest)
@@ -618,10 +656,29 @@ namespace SoitMed.Models
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<MaintenanceVisit>()
+                .HasOne(mv => mv.Customer)
+                .WithMany()
+                .HasForeignKey(mv => mv.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasOne(mv => mv.Device)
+                .WithMany()
+                .HasForeignKey(mv => mv.DeviceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MaintenanceVisit>()
                 .HasOne(mv => mv.Engineer)
                 .WithMany()
                 .HasForeignKey(mv => mv.EngineerId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Self-referencing relationship for rescheduled visits
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasOne(mv => mv.ParentVisit)
+                .WithMany(mv => mv.ChildVisits)
+                .HasForeignKey(mv => mv.ParentVisitId)
+                .OnDelete(DeleteBehavior.NoAction);
 
             modelBuilder.Entity<MaintenanceVisit>()
                 .HasOne(mv => mv.SparePartRequest)
@@ -629,9 +686,89 @@ namespace SoitMed.Models
                 .HasForeignKey<MaintenanceVisit>(mv => mv.SparePartRequestId)
                 .OnDelete(DeleteBehavior.NoAction);
 
+            // One-to-one relationship with VisitReport
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasOne(mv => mv.VisitReport)
+                .WithOne(vr => vr.Visit)
+                .HasForeignKey<VisitReport>(vr => vr.VisitId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure decimal precision
             modelBuilder.Entity<MaintenanceVisit>()
                 .Property(mv => mv.ServiceFee)
                 .HasPrecision(18, 2);
+
+            modelBuilder.Entity<MaintenanceVisit>()
+                .Property(mv => mv.Cost)
+                .HasPrecision(18, 2);
+
+            // Indexes for MaintenanceVisit
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasIndex(mv => mv.TicketNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasIndex(mv => mv.Status);
+
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasIndex(mv => mv.ScheduledDate);
+
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasIndex(mv => new { mv.CustomerId, mv.Status });
+
+            modelBuilder.Entity<MaintenanceVisit>()
+                .HasIndex(mv => new { mv.EngineerId, mv.Status });
+
+            // VisitAssignees relationships (many-to-many)
+            modelBuilder.Entity<VisitAssignees>()
+                .HasKey(va => new { va.VisitId, va.EngineerId });
+
+            modelBuilder.Entity<VisitAssignees>()
+                .HasOne(va => va.Visit)
+                .WithMany(mv => mv.Assignees)
+                .HasForeignKey(va => va.VisitId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<VisitAssignees>()
+                .HasOne(va => va.Engineer)
+                .WithMany()
+                .HasForeignKey(va => va.EngineerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<VisitAssignees>()
+                .HasOne(va => va.AssignedBy)
+                .WithMany()
+                .HasForeignKey(va => va.AssignedById)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Indexes for VisitAssignees
+            modelBuilder.Entity<VisitAssignees>()
+                .HasIndex(va => va.VisitId);
+
+            modelBuilder.Entity<VisitAssignees>()
+                .HasIndex(va => va.EngineerId);
+
+            // VisitReport relationships (one-to-one)
+            modelBuilder.Entity<VisitReport>()
+                .HasIndex(vr => vr.VisitId)
+                .IsUnique();
+
+            // EntityChangeLog relationships
+            modelBuilder.Entity<Core.EntityChangeLog>()
+                .HasOne(ecl => ecl.User)
+                .WithMany()
+                .HasForeignKey(ecl => ecl.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Indexes for EntityChangeLog
+            modelBuilder.Entity<Core.EntityChangeLog>()
+                .HasIndex(ecl => new { ecl.EntityName, ecl.EntityId });
+
+            modelBuilder.Entity<Core.EntityChangeLog>()
+                .HasIndex(ecl => ecl.UserId);
+
+            modelBuilder.Entity<Core.EntityChangeLog>()
+                .HasIndex(ecl => ecl.ChangeDate);
 
             // SparePartRequest relationships
             modelBuilder.Entity<SparePartRequest>()
@@ -639,6 +776,18 @@ namespace SoitMed.Models
                 .WithMany()
                 .HasForeignKey(spr => spr.MaintenanceRequestId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<SparePartRequest>()
+                .HasOne(spr => spr.ApprovedByWarehouseKeeper)
+                .WithMany()
+                .HasForeignKey(spr => spr.ApprovedByWarehouseKeeperId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<SparePartRequest>()
+                .HasOne(spr => spr.Visit)
+                .WithMany()
+                .HasForeignKey(spr => spr.VisitId)
+                .OnDelete(DeleteBehavior.NoAction);
 
             modelBuilder.Entity<SparePartRequest>()
                 .HasOne(spr => spr.AssignedToCoordinator)
@@ -729,10 +878,74 @@ namespace SoitMed.Models
                 .HasForeignKey(pt => pt.PaymentId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Payment.PaymentTransaction>()
+                .HasOne(pt => pt.Visit)
+                .WithMany()
+                .HasForeignKey(pt => pt.VisitId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<Payment.PaymentTransaction>()
+                .HasOne(pt => pt.CollectionDelegate)
+                .WithMany()
+                .HasForeignKey(pt => pt.CollectionDelegateId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<Payment.PaymentTransaction>()
+                .HasOne(pt => pt.AccountsApprover)
+                .WithMany()
+                .HasForeignKey(pt => pt.AccountsApproverId)
+                .OnDelete(DeleteBehavior.NoAction);
+
             // Configure decimal precision for transaction amount
             modelBuilder.Entity<Payment.PaymentTransaction>()
                 .Property(pt => pt.Amount)
                 .HasPrecision(18, 2);
+
+            // Invoice relationships
+            modelBuilder.Entity<Payment.Invoice>()
+                .HasOne(i => i.MaintenanceRequest)
+                .WithMany()
+                .HasForeignKey(i => i.MaintenanceRequestId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Payment.Invoice>()
+                .HasOne(i => i.CollectionDelegate)
+                .WithMany()
+                .HasForeignKey(i => i.CollectionDelegateId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Configure decimal precision for invoice amounts
+            modelBuilder.Entity<Payment.Invoice>()
+                .Property(i => i.LaborFees)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Payment.Invoice>()
+                .Property(i => i.SparePartsTotal)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Payment.Invoice>()
+                .Property(i => i.TotalAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Payment.Invoice>()
+                .Property(i => i.PaidAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Payment.Invoice>()
+                .Property(i => i.RemainingAmount)
+                .HasPrecision(18, 2);
+
+            // Unique index on InvoiceNumber
+            modelBuilder.Entity<Payment.Invoice>()
+                .HasIndex(i => i.InvoiceNumber)
+                .IsUnique();
+
+            // Indexes for Invoice
+            modelBuilder.Entity<Payment.Invoice>()
+                .HasIndex(i => new { i.MaintenanceRequestId, i.Status });
+
+            modelBuilder.Entity<Payment.Invoice>()
+                .HasIndex(i => new { i.Status, i.CreatedAt });
 
             // Indexes for performance
             modelBuilder.Entity<MaintenanceRequest>()

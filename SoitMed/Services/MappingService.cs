@@ -40,7 +40,8 @@ namespace SoitMed.Services
                 CreatedBy = client.CreatedBy,
                 AssignedTo = client.AssignedTo,
                 CreatedAt = client.CreatedAt,
-                UpdatedAt = client.UpdatedAt
+                UpdatedAt = client.UpdatedAt,
+                HasAccount = client.RelatedUserId != null
             };
         }
 

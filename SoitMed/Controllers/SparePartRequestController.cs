@@ -136,6 +136,26 @@ namespace SoitMed.Controllers
             }
         }
 
+        [HttpPost("{id}/warehouse-approval")]
+        [Authorize(Roles = "WarehouseKeeper")]
+        public async Task<IActionResult> WarehouseApproval(int id, [FromBody] WarehouseApprovalDTO dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized();
+
+                var result = await _sparePartRequestService.WarehouseApprovalAsync(id, dto, userId);
+                return SuccessResponse(result, dto.Approved ? "Spare part approved" : "Spare part rejected");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing warehouse approval for spare part {RequestId}", id);
+                return ErrorResponse(ex.Message);
+            }
+        }
+
         [HttpPost("{id}/mark-ready")]
         [Authorize(Roles = "InventoryManager")]
         public async Task<IActionResult> MarkAsReady(int id)

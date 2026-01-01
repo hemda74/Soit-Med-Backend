@@ -14,17 +14,20 @@ namespace SoitMed.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly INotificationService _notificationService;
+        private readonly Payment.PaymentStrategyFactory _paymentStrategyFactory;
         private readonly ILogger<MaintenanceRequestService> _logger;
 
         public MaintenanceRequestService(
             IUnitOfWork unitOfWork,
             UserManager<ApplicationUser> userManager,
             INotificationService notificationService,
+            Payment.PaymentStrategyFactory paymentStrategyFactory,
             ILogger<MaintenanceRequestService> logger)
         {
             _unitOfWork = unitOfWork;
             _userManager = userManager;
             _notificationService = notificationService;
+            _paymentStrategyFactory = paymentStrategyFactory;
             _logger = logger;
         }
 
@@ -330,6 +333,103 @@ namespace SoitMed.Services
             );
 
             await Task.WhenAll(notifications);
+
+            return await MapToResponseDTO(request);
+        }
+
+        public async Task<MaintenanceRequestResponseDTO> FinalizeJobAndProcessPaymentAsync(int requestId, FinalizeJobDTO dto, string engineerId)
+        {
+            var request = await _unitOfWork.MaintenanceRequests.GetByIdAsync(requestId);
+            if (request == null)
+                throw new ArgumentException("Maintenance request not found", nameof(requestId));
+
+            // Verify engineer is assigned to this request
+            if (request.AssignedToEngineerId != engineerId)
+                throw new UnauthorizedAccessException("Engineer is not assigned to this request");
+
+            // Get all approved spare part requests
+            var sparePartRequests = await _unitOfWork.SparePartRequests.GetByMaintenanceRequestIdAsync(requestId);
+            var approvedParts = sparePartRequests
+                .Where(spr => spr.WarehouseApproved == true && spr.CustomerApproved == true && spr.CustomerPrice.HasValue)
+                .ToList();
+
+            // Calculate costs
+            var laborFees = dto.LaborFees ?? 0;
+            var sparePartsTotal = approvedParts.Sum(spr => spr.CustomerPrice ?? 0);
+            var totalAmount = laborFees + sparePartsTotal;
+
+            // Update maintenance request
+            request.LaborFees = laborFees;
+            request.TotalAmount = totalAmount;
+            request.PaidAmount = 0;
+            request.RemainingAmount = totalAmount;
+            request.PaymentStatus = PaymentStatus.Pending;
+            request.Status = MaintenanceRequestStatus.Completed;
+            request.CompletedAt = DateTime.UtcNow;
+            if (!string.IsNullOrEmpty(dto.Notes))
+                request.Notes = dto.Notes;
+
+            // Create invoice
+            var invoice = new Models.Payment.Invoice
+            {
+                InvoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{requestId:D6}",
+                MaintenanceRequestId = requestId,
+                LaborFees = laborFees,
+                SparePartsTotal = sparePartsTotal,
+                TotalAmount = totalAmount,
+                PaidAmount = 0,
+                RemainingAmount = totalAmount,
+                Status = PaymentStatus.Pending,
+                Method = dto.PaymentMethod,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.GetContext().Invoices.AddAsync(invoice);
+            await _unitOfWork.MaintenanceRequests.UpdateAsync(request);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Process payment using strategy pattern
+            var paymentTransaction = new Models.Payment.PaymentTransaction
+            {
+                PaymentId = 0, // Will be set when Payment entity is created
+                TransactionType = "Payment",
+                Amount = totalAmount,
+                Method = dto.PaymentMethod,
+                Status = PaymentStatus.Pending,
+                VisitId = request.Visits.FirstOrDefault()?.Id,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var paymentStrategy = _paymentStrategyFactory.GetStrategy(dto.PaymentMethod);
+            var paymentResult = await paymentStrategy.ProcessPaymentAsync(
+                paymentTransaction,
+                totalAmount,
+                dto.AdditionalPaymentData
+            );
+
+            if (paymentResult.Success)
+            {
+                paymentTransaction.Status = PaymentStatus.Completed;
+                paymentTransaction.GatewayTransactionId = paymentResult.TransactionId;
+                request.PaidAmount = totalAmount;
+                request.RemainingAmount = 0;
+                request.PaymentStatus = PaymentStatus.Completed;
+                invoice.PaidAmount = totalAmount;
+                invoice.RemainingAmount = 0;
+                invoice.Status = PaymentStatus.Completed;
+                invoice.PaidAt = DateTime.UtcNow;
+            }
+            else
+            {
+                paymentTransaction.Status = PaymentStatus.Failed;
+                paymentTransaction.Notes = paymentResult.ErrorMessage;
+            }
+
+            await _unitOfWork.GetContext().PaymentTransactions.AddAsync(paymentTransaction);
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogInformation("Job finalized and payment processed. RequestId: {RequestId}, Amount: {Amount}, Method: {Method}, Success: {Success}",
+                requestId, totalAmount, dto.PaymentMethod, paymentResult.Success);
 
             return await MapToResponseDTO(request);
         }

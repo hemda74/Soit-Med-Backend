@@ -35,7 +35,7 @@ namespace SoitMed.Services
                 if (customer == null)
                     throw new ArgumentException("Customer not found", nameof(customerId));
 
-                var payment = new Payment
+                var payment = new Models.Payment.Payment
                 {
                     MaintenanceRequestId = dto.MaintenanceRequestId,
                     SparePartRequestId = dto.SparePartRequestId,
@@ -103,7 +103,7 @@ namespace SoitMed.Services
             await _unitOfWork.SaveChangesAsync();
 
             // Create payment transaction record
-            await CreatePaymentTransactionAsync(paymentId, "Payment", payment.Amount, dto.Token, PaymentTransactionStatus.Success, "Stripe payment completed");
+            await CreatePaymentTransactionAsync(paymentId, "Payment", payment.Amount, dto.Token, PaymentStatus.Completed, "Stripe payment completed");
 
             _logger.LogInformation("Stripe payment processed. PaymentId: {PaymentId}", paymentId);
 
@@ -130,7 +130,7 @@ namespace SoitMed.Services
             await _unitOfWork.SaveChangesAsync();
 
             // Create payment transaction record
-            await CreatePaymentTransactionAsync(paymentId, "Payment", payment.Amount, dto.PaymentId, PaymentTransactionStatus.Success, "PayPal payment completed");
+            await CreatePaymentTransactionAsync(paymentId, "Payment", payment.Amount, dto.PaymentId, PaymentStatus.Completed, "PayPal payment completed");
 
             return await MapToResponseDTO(payment);
         }
@@ -155,7 +155,7 @@ namespace SoitMed.Services
             await _unitOfWork.SaveChangesAsync();
 
             // Create payment transaction record
-            await CreatePaymentTransactionAsync(paymentId, "Payment", payment.Amount, dto.PaymentToken, PaymentTransactionStatus.Success, "Local gateway payment completed");
+            await CreatePaymentTransactionAsync(paymentId, "Payment", payment.Amount, dto.PaymentToken, PaymentStatus.Completed, "Local gateway payment completed");
 
             return await MapToResponseDTO(payment);
         }
@@ -235,7 +235,7 @@ namespace SoitMed.Services
                 PaymentId = paymentId,
                 TransactionType = "Refund",
                 Amount = refundAmount,
-                Status = PaymentTransactionStatus.Success,
+                Status = PaymentStatus.Completed,
                 Notes = dto.Reason
             };
 
@@ -255,7 +255,7 @@ namespace SoitMed.Services
             string transactionType,
             decimal amount,
             string? gatewayTransactionId,
-            PaymentTransactionStatus status,
+            PaymentStatus status,
             string? notes = null)
         {
             try

@@ -180,6 +180,26 @@ namespace SoitMed.Controllers
                 return ErrorResponse(ex.Message);
             }
         }
+
+        [HttpPost("{id}/finalize-job")]
+        [Authorize(Roles = "Engineer")]
+        public async Task<IActionResult> FinalizeJobAndProcessPayment(int id, [FromBody] FinalizeJobDTO dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized();
+
+                var result = await _maintenanceRequestService.FinalizeJobAndProcessPaymentAsync(id, dto, userId);
+                return SuccessResponse(result, "Job finalized and payment processed successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error finalizing job and processing payment for request {RequestId}", id);
+                return ErrorResponse(ex.Message);
+            }
+        }
     }
 }
 

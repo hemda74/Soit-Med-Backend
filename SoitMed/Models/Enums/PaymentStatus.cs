@@ -8,7 +8,11 @@ namespace SoitMed.Models.Enums
         Completed = 3,
         Failed = 4,
         Cancelled = 5,
-        Refunded = 6
+        Refunded = 6,
+        Unpaid = 7,
+        PendingCollection = 8,
+        Collected = 9,
+        PaidOnline = 10
     }
 }
 

@@ -12,7 +12,10 @@ namespace SoitMed.Models.Enums
         Paymob = 8,
         MobileWallet = 9,
         Check = 10,
-        CompanyCredit = 11
+        CompanyCredit = 11,
+        Delegate = 12,
+        Gateway = 13,
+        Installment = 14 // Reserved for future implementation
     }
 }
 

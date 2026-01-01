@@ -116,6 +116,16 @@ namespace SoitMed.Models
         public string CreatedBy { get; set; } = string.Empty;
 
         public string? AssignedTo { get; set; }
+
+        // Related user account (FK to ApplicationUser)
+        [MaxLength(450)]
+        public string? RelatedUserId { get; set; }
+
+        [ForeignKey("RelatedUserId")]
+        public virtual Identity.ApplicationUser? RelatedUser { get; set; }
+
+        // Legacy system migration support
+        public int? LegacyCustomerId { get; set; } // Maps to old system CusId
         #endregion
 
         #region Navigation Properties - Complete History

@@ -29,6 +29,9 @@ namespace SoitMed.Repositories
         ISparePartRequestRepository SparePartRequests { get; }
         IMaintenanceRequestAttachmentRepository MaintenanceRequestAttachments { get; }
         
+        // Audit repositories
+        IEntityChangeLogRepository EntityChangeLogs { get; }
+        
         // Payment repositories
         IPaymentRepository Payments { get; }
 
