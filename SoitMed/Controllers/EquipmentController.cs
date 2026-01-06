@@ -17,15 +17,18 @@ namespace SoitMed.Controllers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IQRCodeService _qrCodeService;
+        private readonly IEquipmentService _equipmentService;
         private readonly ILogger<EquipmentController> _logger;
 
         public EquipmentController(
             IUnitOfWork unitOfWork, 
             IQRCodeService qrCodeService,
+            IEquipmentService equipmentService,
             ILogger<EquipmentController> logger)
         {
             _unitOfWork = unitOfWork;
             _qrCodeService = qrCodeService;
+            _equipmentService = equipmentService;
             _logger = logger;
         }
 
@@ -172,6 +175,61 @@ namespace SoitMed.Controllers
                 EquipmentCount = response.Count(),
                 Equipment = response
             });
+        }
+
+        /// <summary>
+        /// Get all equipment for a client using comprehensive relationship checking
+        /// Similar to soitmed_data_backend's approach - checks multiple relationship paths
+        /// </summary>
+        /// <param name="clientId">Client ID</param>
+        /// <returns>List of equipment associated with the client through any relationship</returns>
+        [HttpGet("client/{clientId}")]
+        [Authorize(Roles = "SuperAdmin,Admin,Doctor,Technician")]
+        public async Task<IActionResult> GetClientEquipment(long clientId)
+        {
+            try
+            {
+                var equipment = await _equipmentService.GetEquipmentByClientIdAsync(clientId);
+                
+                return Ok(new
+                {
+                    ClientId = clientId,
+                    EquipmentCount = equipment.Count(),
+                    Equipment = equipment
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving equipment for client {ClientId}", clientId);
+                return StatusCode(500, $"An error occurred while retrieving equipment for client: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get all equipment for a customer (ApplicationUser) using comprehensive relationship checking
+        /// </summary>
+        /// <param name="customerId">Customer ID (ApplicationUser Id)</param>
+        /// <returns>List of equipment associated with the customer through any relationship</returns>
+        [HttpGet("customer/{customerId}")]
+        [Authorize(Roles = "SuperAdmin,Admin,Doctor,Technician")]
+        public async Task<IActionResult> GetCustomerEquipment(string customerId)
+        {
+            try
+            {
+                var equipment = await _equipmentService.GetEquipmentByCustomerIdAsync(customerId);
+                
+                return Ok(new
+                {
+                    CustomerId = customerId,
+                    EquipmentCount = equipment.Count(),
+                    Equipment = equipment
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving equipment for customer {CustomerId}", customerId);
+                return StatusCode(500, $"An error occurred while retrieving equipment for customer: {ex.Message}");
+            }
         }
 
         [HttpPost]

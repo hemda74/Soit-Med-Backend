@@ -79,6 +79,9 @@ namespace SoitMed.Repositories
         IProductRepository Products { get; }
         IProductCategoryRepository ProductCategories { get; }
 
+        // Contract repositories
+        IContractRepository Contracts { get; }
+
         // Transaction management
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
         Task BeginTransactionAsync(CancellationToken cancellationToken = default);

@@ -82,6 +82,28 @@ namespace SoitMed.Controllers
             }
         }
 
+        /// <summary>
+        /// Get all visits for a specific equipment (similar to soitmed_data_backend)
+        /// </summary>
+        [HttpGet("equipment/{equipmentId}")]
+        public async Task<IActionResult> GetVisitsByEquipment(int equipmentId)
+        {
+            try
+            {
+                var result = await _maintenanceVisitService.GetVisitsByEquipmentIdAsync(equipmentId);
+                if (result == null || !result.Any())
+                {
+                    return NotFound(ErrorResponse($"No visits found for equipment {equipmentId}"));
+                }
+                return SuccessResponse(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting visits for equipment {EquipmentId}", equipmentId);
+                return ErrorResponse(ex.Message);
+            }
+        }
+
         [HttpGet("Engineer/my-visits")]
         [Authorize(Roles = "Engineer")]
         public async Task<IActionResult> GetMyVisits()

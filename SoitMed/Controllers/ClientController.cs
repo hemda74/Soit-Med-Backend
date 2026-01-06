@@ -266,6 +266,51 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
+        /// Get all clients with pagination (similar to soitmed_data_backend)
+        /// </summary>
+        [HttpGet("all")]
+        [Authorize]
+        public async Task<IActionResult> GetAllClients(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 25)
+        {
+            try
+            {
+                _logger.LogInformation("GetAllClients called with pageNumber={PageNumber}, pageSize={PageSize}", pageNumber, pageSize);
+
+                // Validate pagination parameters
+                if (pageNumber < 1)
+                {
+                    _logger.LogWarning("Invalid pageNumber: {PageNumber}", pageNumber);
+                    return BadRequest(CreateErrorResponse("PageNumber must be greater than 0"));
+                }
+
+                if (pageSize < 1 || pageSize > 100)
+                {
+                    _logger.LogWarning("Invalid pageSize: {PageSize}", pageSize);
+                    return BadRequest(CreateErrorResponse("PageSize must be between 1 and 100"));
+                }
+
+                var (clients, totalCount, _, _) = await _clientService.GetAllClientsAsync(pageNumber, pageSize);
+                
+                _logger.LogInformation("GetAllClients returning {Count} clients out of {TotalCount}", clients.Count(), totalCount);
+                
+                return Ok(CreateSuccessResponse(new
+                {
+                    Clients = clients,
+                    TotalCount = totalCount,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                }));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all clients. PageNumber: {PageNumber}, PageSize: {PageSize}", pageNumber, pageSize);
+                return StatusCode(500, CreateErrorResponse("حدث خطأ في جلب العملاء"));
+            }
+        }
+
+        /// <summary>
         /// Get complete client profile with history (NEW - matches plan)
         /// </summary>
         [HttpGet("{id}/profile")]

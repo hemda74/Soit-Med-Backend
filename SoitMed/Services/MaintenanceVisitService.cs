@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SoitMed.DTO;
 using SoitMed.Models.Equipment;
 using SoitMed.Models.Enums;
 using SoitMed.Models.Identity;
+using SoitMed.Models.Legacy;
 using SoitMed.Repositories;
 using System.Collections.Generic;
 
@@ -14,17 +17,20 @@ namespace SoitMed.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly INotificationService _notificationService;
         private readonly ILogger<MaintenanceVisitService> _logger;
+        private readonly IConfiguration _configuration;
 
         public MaintenanceVisitService(
             IUnitOfWork unitOfWork,
             UserManager<ApplicationUser> userManager,
             INotificationService notificationService,
-            ILogger<MaintenanceVisitService> logger)
+            ILogger<MaintenanceVisitService> logger,
+            IConfiguration configuration)
         {
             _unitOfWork = unitOfWork;
             _userManager = userManager;
             _notificationService = notificationService;
             _logger = logger;
+            _configuration = configuration;
         }
 
         public async Task<MaintenanceVisitResponseDTO> CreateVisitAsync(CreateMaintenanceVisitDTO dto, string EngineerId)
@@ -145,6 +151,147 @@ namespace SoitMed.Services
             }
 
             return result;
+        }
+
+        public async Task<IEnumerable<MaintenanceVisitResponseDTO>> GetVisitsByEquipmentIdAsync(int equipmentId)
+        {
+            // First check if equipment exists in current database
+            var equipment = await _unitOfWork.Equipment.GetByIdAsync(equipmentId);
+            
+            // If equipment doesn't exist in current database, check legacy database
+            if (equipment == null)
+            {
+                _logger.LogInformation("Equipment {EquipmentId} not found in current database, checking legacy database", equipmentId);
+                return await GetLegacyVisitsByMachineIdAsync(equipmentId);
+            }
+
+            // Equipment exists in current database, get visits normally
+            var visits = await _unitOfWork.MaintenanceVisits.GetVisitsByEquipmentIdAsync(equipmentId);
+            var result = new List<MaintenanceVisitResponseDTO>();
+
+            foreach (var visit in visits)
+            {
+                result.Add(await MapToResponseDTO(visit));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Get visits from legacy TBS database for a machine (OOI_ID)
+        /// </summary>
+        private async Task<List<MaintenanceVisitResponseDTO>> GetLegacyVisitsByMachineIdAsync(int machineId)
+        {
+            var result = new List<MaintenanceVisitResponseDTO>();
+
+            try
+            {
+                var tbsConnectionString = _configuration.GetConnectionString("TbsConnection");
+                if (string.IsNullOrEmpty(tbsConnectionString))
+                {
+                    _logger.LogWarning("TbsConnection string not configured, cannot query legacy database");
+                    return result;
+                }
+
+                var optionsBuilder = new DbContextOptionsBuilder<TbsDbContext>();
+                optionsBuilder.UseSqlServer(tbsConnectionString);
+
+                using var tbsContext = new TbsDbContext(optionsBuilder.Options);
+
+                // Verify machine exists in legacy database
+                var machine = await tbsContext.StkOrderOutItems
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(ooi => ooi.OoiId == machineId);
+
+                if (machine == null)
+                {
+                    _logger.LogWarning("Machine {MachineId} not found in legacy TBS database", machineId);
+                    return result;
+                }
+
+                // Get visit history with employee names (ordered by date DESC)
+                var visitsHistory = await (from vr in tbsContext.MntVisitingReports.AsNoTracking()
+                                          where vr.OoiId == machineId
+                                          join v in tbsContext.MntVisitings.AsNoTracking() on vr.VisitingId equals v.VisitingId
+                                          orderby v.VisitingDate descending
+                                          select new
+                                          {
+                                              v.VisitingId,
+                                              v.VisitingDate,
+                                              v.VisitingTypeId,
+                                              v.EmpCode,
+                                              vr.ReportDecription,
+                                              vr.RepVisitStatusId,
+                                              VisitFiles = v.Files,
+                                              ReportFiles = vr.Files
+                                          })
+                                          .ToListAsync();
+
+                _logger.LogInformation("Found {Count} visits in legacy database for machine {MachineId}", 
+                    visitsHistory.Count, machineId);
+
+                // Map to MaintenanceVisitResponseDTO
+                foreach (var visit in visitsHistory)
+                {
+                    // Get visit type name (simplified - would need lookup table)
+                    var visitTypeName = GetLegacyVisitTypeName(visit.VisitingTypeId);
+                    
+                    // Get visit status name (simplified - would need lookup table)
+                    var visitStatusName = GetLegacyVisitStatusName(visit.RepVisitStatusId ?? 1);
+
+                    result.Add(new MaintenanceVisitResponseDTO
+                    {
+                        Id = visit.VisitingId,
+                        MaintenanceRequestId = 0, // Legacy visits don't have maintenance requests
+                        EngineerId = visit.EmpCode?.ToString() ?? string.Empty,
+                        EngineerName = visit.EmpCode?.ToString() ?? "Unknown",
+                        QRCode = machine.SerialNum,
+                        SerialCode = machine.SerialNum,
+                        Report = visit.ReportDecription ?? string.Empty,
+                        ActionsTaken = null,
+                        PartsUsed = null,
+                        ServiceFee = null,
+                        Outcome = MaintenanceVisitOutcome.Completed, // Default for legacy visits
+                        SparePartRequestId = null,
+                        VisitDate = visit.VisitingDate ?? DateTime.UtcNow,
+                        StartedAt = visit.VisitingDate,
+                        CompletedAt = visit.VisitingDate,
+                        Notes = visit.ReportDecription
+                    });
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error querying legacy database for machine {MachineId}", machineId);
+                return result; // Return empty list on error
+            }
+        }
+
+        private static string GetLegacyVisitTypeName(int visitingTypeId)
+        {
+            // Simplified mapping - would need actual lookup table
+            return visitingTypeId switch
+            {
+                1 => "تركيب (Installation)",
+                2 => "صيانة (Maintenance)",
+                3 => "طارئة (Repair)",
+                4 => "فحص (Inspection)",
+                _ => $"Type {visitingTypeId}"
+            };
+        }
+
+        private static string GetLegacyVisitStatusName(int repVisitStatusId)
+        {
+            // Simplified mapping - would need actual lookup table
+            return repVisitStatusId switch
+            {
+                1 => "تم التنفيذ (Completed)",
+                2 => "قيد التنفيذ (In Progress)",
+                3 => "ملغي (Cancelled)",
+                _ => $"Status {repVisitStatusId}"
+            };
         }
 
         public async Task<EquipmentDTO?> GetEquipmentByQRCodeAsync(string qrCode)

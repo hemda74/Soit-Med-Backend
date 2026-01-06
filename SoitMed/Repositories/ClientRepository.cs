@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SoitMed.Models;
 using SoitMed.Models.Location;
+using System.Linq;
 
 namespace SoitMed.Repositories
 {
@@ -246,6 +247,47 @@ namespace SoitMed.Repositories
                 .AsNoTracking()
                 .Where(c => idList.Contains(c.Id))
                 .ToListAsync();
+        }
+
+        public async Task<(IEnumerable<Client> Clients, int TotalCount)> GetAllClientsAsync(int pageNumber = 1, int pageSize = 25)
+        {
+            try
+            {
+                // Validate pagination parameters
+                if (pageNumber < 1) pageNumber = 1;
+                if (pageSize < 1 || pageSize > 100) pageSize = 25;
+
+                // Verify data exists - similar to soitmed_data_backend approach
+                var hasClients = await _context.Clients
+                    .AsNoTracking()
+                    .AnyAsync(c => !string.IsNullOrEmpty(c.Name));
+
+                if (!hasClients)
+                {
+                    // Return empty result if no clients exist
+                    return (Enumerable.Empty<Client>(), 0);
+                }
+
+                var query = _context.Clients
+                    .AsNoTracking()
+                    .Where(c => !string.IsNullOrEmpty(c.Name));
+
+                var totalCount = await query.CountAsync();
+
+                var clients = await query
+                    .OrderBy(c => c.Name)
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                return (clients, totalCount);
+            }
+            catch (Exception ex)
+            {
+                // Log error and return empty result
+                // In production, you might want to rethrow or handle differently
+                return (Enumerable.Empty<Client>(), 0);
+            }
         }
     }
 }

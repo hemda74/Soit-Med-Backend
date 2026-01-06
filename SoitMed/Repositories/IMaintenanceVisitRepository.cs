@@ -15,6 +15,7 @@ namespace SoitMed.Repositories
         Task<IEnumerable<MaintenanceVisit>> GetVisitsPendingApprovalAsync(CancellationToken cancellationToken = default);
         Task<IEnumerable<MaintenanceVisit>> GetVisitsByDateRangeAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
         Task<MaintenanceVisit?> GetByTicketNumberAsync(string ticketNumber, CancellationToken cancellationToken = default);
+        Task<IEnumerable<MaintenanceVisit>> GetVisitsByEquipmentIdAsync(int equipmentId, CancellationToken cancellationToken = default);
     }
 }
 

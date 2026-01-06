@@ -115,6 +115,28 @@ namespace SoitMed
                     });
                 }, ServiceLifetime.Scoped); // Explicitly set to Scoped to ensure proper disposal
 
+                // Register TBS (Legacy) database context for cross-database migration
+                var tbsConnectionString = builder.Configuration.GetConnectionString("TbsConnection");
+                if (!string.IsNullOrEmpty(tbsConnectionString))
+                {
+                    builder.Services.AddDbContext<SoitMed.Models.Legacy.TbsDbContext>(option =>
+                    {
+                        option
+                        .UseSqlServer(tbsConnectionString, sqlOptions =>
+                        {
+                            sqlOptions.EnableRetryOnFailure(
+                                maxRetryCount: 3,
+                                maxRetryDelay: TimeSpan.FromSeconds(30),
+                                errorNumbersToAdd: null);
+                            sqlOptions.CommandTimeout(300);
+                            sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                        })
+                        .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
+                        .EnableServiceProviderCaching()
+                        .EnableDetailedErrors(builder.Environment.IsDevelopment());
+                    }, ServiceLifetime.Scoped);
+                }
+
                 // Allow reasonably sized image uploads (up to 20MB)
                 builder.Services.Configure<FormOptions>(options =>
                 {
@@ -238,7 +260,8 @@ namespace SoitMed
                     {
                         client.BaseAddress = new Uri(legacyApiUrl);
                     }
-                    client.Timeout = TimeSpan.FromSeconds(30);
+                    client.Timeout = TimeSpan.FromSeconds(60); // Increased timeout for network access
+                    // Allow longer connection time for remote servers
                 });
 
                 // Configure caching (Redis for distributed caching, fallback to memory cache)

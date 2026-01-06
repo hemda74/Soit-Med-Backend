@@ -286,16 +286,25 @@ namespace SoitMed.Services
                 // Filter by governorate - need to look up governorate name from ID
                 if (searchDto.GovernorateId.HasValue)
                 {
-                    // Look up the governorate name from the Governorates table first
-                    var governorate = await context.Governorates
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(g => g.GovernorateId == searchDto.GovernorateId.Value);
-                    
-                    if (governorate != null && !string.IsNullOrWhiteSpace(governorate.Name))
+                    try
                     {
-                        var govPattern = "%" + governorate.Name + "%";
-                        baseQuery = baseQuery.Where(c => c.Governorate != null && 
-                            EF.Functions.Like(c.Governorate, govPattern));
+                        // Look up the governorate name from the Governorates table first
+                        var governorate = await context.Governorates
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(g => g.GovernorateId == searchDto.GovernorateId.Value);
+                        
+                        if (governorate != null && !string.IsNullOrWhiteSpace(governorate.Name))
+                        {
+                            var govPattern = "%" + governorate.Name + "%";
+                            baseQuery = baseQuery.Where(c => c.Governorate != null && 
+                                EF.Functions.Like(c.Governorate, govPattern));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to look up governorate {GovernorateId} for client search. Continuing without governorate filter.", 
+                            searchDto.GovernorateId.Value);
+                        // Continue without governorate filter rather than failing the entire search
                     }
                 }
 
@@ -455,6 +464,21 @@ namespace SoitMed.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting client statistics. UserId: {UserId}", userId);
+                throw;
+            }
+        }
+
+        public async Task<(IEnumerable<ClientResponseDTO> Clients, int TotalCount, int PageNumber, int PageSize)> GetAllClientsAsync(int pageNumber = 1, int pageSize = 25)
+        {
+            try
+            {
+                var (clients, totalCount) = await _unitOfWork.Clients.GetAllClientsAsync(pageNumber, pageSize);
+                var clientDtos = clients.Select(MapToClientResponseDTO).ToList();
+                return (clientDtos, totalCount, pageNumber, pageSize);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all clients. PageNumber: {PageNumber}, PageSize: {PageSize}", pageNumber, pageSize);
                 throw;
             }
         }

@@ -84,6 +84,8 @@ namespace SoitMed.Repositories
         private IProductRepository? _products;
         private IProductCategoryRepository? _productCategories;
 
+        // Contract repositories
+        private IContractRepository? _contracts;
 
         public UnitOfWork(Context context)
         {
@@ -229,6 +231,9 @@ namespace SoitMed.Repositories
 
         public IProductCategoryRepository ProductCategories =>
             _productCategories ??= new ProductCategoryRepository(_context);
+
+        public IContractRepository Contracts =>
+            _contracts ??= new ContractRepository(_context);
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

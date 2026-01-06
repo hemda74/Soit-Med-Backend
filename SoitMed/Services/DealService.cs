@@ -145,7 +145,15 @@ namespace SoitMed.Services
 
                 foreach (var deal in deals)
                 {
-                    result.Add(await MapToDealResponseDTO(deal));
+                    try
+                    {
+                        result.Add(await MapToDealResponseDTO(deal));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error mapping deal {DealId} to DTO. Skipping this deal.", deal?.Id ?? 0);
+                        // Continue processing other deals instead of failing the entire request
+                    }
                 }
 
                 return result;
@@ -382,7 +390,15 @@ namespace SoitMed.Services
 
                 foreach (var deal in deals)
                 {
-                    result.Add(await MapToDealResponseDTO(deal));
+                    try
+                    {
+                        result.Add(await MapToDealResponseDTO(deal));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error mapping deal {DealId} to DTO. Skipping this deal.", deal?.Id ?? 0);
+                        // Continue processing other deals instead of failing the entire request
+                    }
                 }
 
                 return result;
@@ -541,16 +557,75 @@ namespace SoitMed.Services
 
         private async Task<DealResponseDTO> MapToDealResponseDTO(SalesDeal deal)
         {
-            var client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
-            var salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
-            var secondSalesman = !string.IsNullOrEmpty(deal.SecondSalesManId) 
-                ? await _unitOfWork.Users.GetByIdAsync(deal.SecondSalesManId) : null;
-            var managerApprover = !string.IsNullOrEmpty(deal.ManagerApprovedBy) 
-                ? await _unitOfWork.Users.GetByIdAsync(deal.ManagerApprovedBy) : null;
-            var superAdminApprover = !string.IsNullOrEmpty(deal.SuperAdminApprovedBy) 
-                ? await _unitOfWork.Users.GetByIdAsync(deal.SuperAdminApprovedBy) : null;
-            var credentialsSetBy = !string.IsNullOrEmpty(deal.ClientCredentialsSetBy) 
-                ? await _unitOfWork.Users.GetByIdAsync(deal.ClientCredentialsSetBy) : null;
+            if (deal == null)
+                throw new ArgumentNullException(nameof(deal));
+
+            Client? client = null;
+            ApplicationUser? salesman = null;
+            ApplicationUser? secondSalesman = null;
+            ApplicationUser? managerApprover = null;
+            ApplicationUser? superAdminApprover = null;
+            ApplicationUser? credentialsSetBy = null;
+
+            try
+            {
+                if (deal.ClientId > 0)
+                    client = await _unitOfWork.Clients.GetByIdAsync(deal.ClientId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load client {ClientId} for deal {DealId}", deal.ClientId, deal.Id);
+            }
+
+            try
+            {
+                if (!string.IsNullOrEmpty(deal.SalesManId))
+                    salesman = await _unitOfWork.Users.GetByIdAsync(deal.SalesManId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load salesman {SalesManId} for deal {DealId}", deal.SalesManId, deal.Id);
+            }
+
+            try
+            {
+                if (!string.IsNullOrEmpty(deal.SecondSalesManId))
+                    secondSalesman = await _unitOfWork.Users.GetByIdAsync(deal.SecondSalesManId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load second salesman {SecondSalesManId} for deal {DealId}", deal.SecondSalesManId, deal.Id);
+            }
+
+            try
+            {
+                if (!string.IsNullOrEmpty(deal.ManagerApprovedBy))
+                    managerApprover = await _unitOfWork.Users.GetByIdAsync(deal.ManagerApprovedBy);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load manager approver {ManagerApprovedBy} for deal {DealId}", deal.ManagerApprovedBy, deal.Id);
+            }
+
+            try
+            {
+                if (!string.IsNullOrEmpty(deal.SuperAdminApprovedBy))
+                    superAdminApprover = await _unitOfWork.Users.GetByIdAsync(deal.SuperAdminApprovedBy);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load super admin approver {SuperAdminApprovedBy} for deal {DealId}", deal.SuperAdminApprovedBy, deal.Id);
+            }
+
+            try
+            {
+                if (!string.IsNullOrEmpty(deal.ClientCredentialsSetBy))
+                    credentialsSetBy = await _unitOfWork.Users.GetByIdAsync(deal.ClientCredentialsSetBy);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load credentials setter {ClientCredentialsSetBy} for deal {DealId}", deal.ClientCredentialsSetBy, deal.Id);
+            }
 
             // Determine manager approval status
             bool? managerApproved = null;

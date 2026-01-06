@@ -41,6 +41,9 @@ namespace SoitMed.Extensions
             services.AddScoped<IVisitStateService, VisitStateService>();
             services.AddScoped<IAuditService, AuditService>();
             
+            // Equipment service (comprehensive equipment retrieval by client/customer)
+            services.AddScoped<IEquipmentService, EquipmentService>();
+            
             // Domain events
             services.AddScoped<SoitMed.Common.DomainEvents.IDomainEventDispatcher, SoitMed.Common.DomainEvents.DomainEventDispatcher>();
             services.AddScoped<SoitMed.Common.DomainEvents.IDomainEventHandler<SoitMed.Common.DomainEvents.VisitScheduledEvent>, SoitMed.Common.DomainEvents.VisitScheduledEventHandler>();
@@ -63,6 +66,12 @@ namespace SoitMed.Extensions
 
             // Legacy media service
             services.AddScoped<ILegacyMediaService, LegacyMediaService>();
+
+            // Media path transformer (for legacy path transformation)
+            services.AddScoped<MediaPathTransformer>();
+
+            // Contract migration service
+            services.AddScoped<IContractMigrationService, ContractMigrationService>();
 
             return services;
         }

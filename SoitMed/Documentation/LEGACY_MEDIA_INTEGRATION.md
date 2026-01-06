@@ -195,3 +195,4 @@ const getLegacyMediaUrl = (fileName: string) => {
 3. **CDN Integration**: Serve files through CDN for better performance
 4. **File Synchronization**: Sync file availability status
 
+

@@ -675,6 +675,247 @@ namespace SoitMed.Migrations
                     b.ToTable("ClientVisits");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Contract.Contract", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("CashAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("ClientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ContractContent")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContractNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CustomerSignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomerSignedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<long?>("DealId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DocumentUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("DraftedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DraftedBy")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("FinancialConfigurationCompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FinancialConfiguredBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<decimal?>("InstallmentAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("InstallmentDurationMonths")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("InterestRate")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime?>("LastReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastReviewedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("LatePenaltyRate")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int?>("LegacyContractId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SentToCustomerAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("ContractNumber")
+                        .IsUnique();
+
+                    b.HasIndex("CustomerSignedBy");
+
+                    b.HasIndex("DealId");
+
+                    b.HasIndex("DraftedBy");
+
+                    b.HasIndex("FinancialConfiguredBy");
+
+                    b.HasIndex("LegacyContractId");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("Contracts");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Contract.ContractNegotiation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Attachments")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<long>("ContractId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SubmittedBy")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("SubmitterRole")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubmittedBy");
+
+                    b.HasIndex("ContractId", "SubmittedAt");
+
+                    b.ToTable("ContractNegotiations");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Contract.InstallmentSchedule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("ContractId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("InstallmentNumber")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("InterestAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("LastReminderSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("LatePenaltyAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("NotificationSent1Day")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotificationSent2Days")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotificationSent7Days")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("OverdueNotificationSent")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaymentNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DueDate");
+
+                    b.HasIndex("ContractId", "InstallmentNumber")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "DueDate");
+
+                    b.ToTable("InstallmentSchedules");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Core.Department", b =>
                 {
                     b.Property<int>("Id")
@@ -1099,6 +1340,10 @@ namespace SoitMed.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("CollectionDelegateId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");
 
@@ -1126,8 +1371,15 @@ namespace SoitMed.Migrations
                     b.Property<string>("HospitalId")
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<int?>("InstallmentMonths")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
+
+                    b.Property<decimal?>("LaborFees")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
@@ -1136,6 +1388,9 @@ namespace SoitMed.Migrations
                     b.Property<decimal?>("PaidAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("PaymentPlan")
+                        .HasColumnType("int");
 
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("int");
@@ -1161,6 +1416,8 @@ namespace SoitMed.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedByMaintenanceSupportId");
+
+                    b.HasIndex("CollectionDelegateId");
 
                     b.HasIndex("EquipmentId");
 
@@ -1487,6 +1744,10 @@ namespace SoitMed.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ApprovedByWarehouseKeeperId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("AssignedToCoordinatorId")
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
@@ -1575,7 +1836,19 @@ namespace SoitMed.Migrations
                     b.Property<int?>("VisitId")
                         .HasColumnType("int");
 
+                    b.Property<bool?>("WarehouseApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("WarehouseApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WarehouseRejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ApprovedByWarehouseKeeperId");
 
                     b.HasIndex("AssignedToCoordinatorId");
 
@@ -1999,6 +2272,228 @@ namespace SoitMed.Migrations
                     b.ToTable("InstallmentPlan", (string)null);
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Legacy.LegacyCustomer", b =>
+                {
+                    b.Property<int>("CusId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("CusId");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CusId"));
+
+                    b.Property<string>("CusAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("CusAddress");
+
+                    b.Property<string>("CusCity")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("CusCity");
+
+                    b.Property<DateTime?>("CusCreatedDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("CusCreatedDate");
+
+                    b.Property<string>("CusEmail")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("CusEmail");
+
+                    b.Property<string>("CusGovernorate")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("CusGovernorate");
+
+                    b.Property<string>("CusMobile")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("CusMobile");
+
+                    b.Property<string>("CusName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("CusName");
+
+                    b.Property<string>("CusNotes")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("CusNotes");
+
+                    b.Property<string>("CusPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("CusPhone");
+
+                    b.HasKey("CusId");
+
+                    b.ToTable("Stk_Customers");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Legacy.LegacyMaintenanceContract", b =>
+                {
+                    b.Property<int>("ContractId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("ContractId");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ContractId"));
+
+                    b.Property<string>("ContractNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("ContractNumber");
+
+                    b.Property<decimal?>("ContractValue")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("ContractValue");
+
+                    b.Property<DateTime?>("CreatedDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("CreatedDate");
+
+                    b.Property<int?>("CusId")
+                        .HasColumnType("int")
+                        .HasColumnName("CusId");
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("EndDate");
+
+                    b.Property<bool?>("IsActive")
+                        .HasColumnType("bit")
+                        .HasColumnName("IsActive");
+
+                    b.Property<string>("MaintenanceFrequency")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("MaintenanceFrequency");
+
+                    b.Property<int?>("OoiId")
+                        .HasColumnType("int")
+                        .HasColumnName("OoiId");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("StartDate");
+
+                    b.HasKey("ContractId");
+
+                    b.ToTable("MNT_MaintenanceContract");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Legacy.LegacyMaintenanceVisit", b =>
+                {
+                    b.Property<int>("VisitingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("VisitingId");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("VisitingId"));
+
+                    b.Property<string>("ActionsTaken")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("ActionsTaken");
+
+                    b.Property<DateTime?>("CreatedDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("CreatedDate");
+
+                    b.Property<int?>("CusId")
+                        .HasColumnType("int")
+                        .HasColumnName("CusId");
+
+                    b.Property<string>("EngineerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("EngineerName");
+
+                    b.Property<int?>("OoiId")
+                        .HasColumnType("int")
+                        .HasColumnName("OoiId");
+
+                    b.Property<string>("PartsUsed")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("PartsUsed");
+
+                    b.Property<decimal?>("ServiceFee")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("ServiceFee");
+
+                    b.Property<DateTime?>("VisitingDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("VisitingDate");
+
+                    b.Property<string>("VisitingNotes")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("VisitingNotes");
+
+                    b.Property<string>("VisitingStatus")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("VisitingStatus");
+
+                    b.HasKey("VisitingId");
+
+                    b.ToTable("MNT_Visiting");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Legacy.LegacyOrderOutItem", b =>
+                {
+                    b.Property<int>("OoiId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("OoiId");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("OoiId"));
+
+                    b.Property<DateTime?>("CreatedDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("CreatedDate");
+
+                    b.Property<int?>("CusId")
+                        .HasColumnType("int")
+                        .HasColumnName("CusId");
+
+                    b.Property<string>("ItemDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("ItemDescription");
+
+                    b.Property<string>("ItemManufacturer")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("ItemManufacturer");
+
+                    b.Property<string>("ItemModel")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("ItemModel");
+
+                    b.Property<string>("ItemName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("ItemName");
+
+                    b.Property<DateTime?>("PurchaseDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("PurchaseDate");
+
+                    b.Property<string>("SerialNum")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("SerialNum");
+
+                    b.Property<DateTime?>("WarrantyExpiry")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("WarrantyExpiry");
+
+                    b.HasKey("OoiId");
+
+                    b.ToTable("Stk_Order_Out_Items");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Location.Engineer", b =>
                 {
                     b.Property<int>("EngineerId")
@@ -2379,6 +2874,88 @@ namespace SoitMed.Migrations
                     b.ToTable("OfferTerms", (string)null);
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Payment.Invoice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CollectionDelegateId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("InstallmentMonths")
+                        .HasColumnType("int");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("LaborFees")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MaintenanceRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PaymentPlan")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("RemainingAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("SparePartsTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CollectionDelegateId");
+
+                    b.HasIndex("InvoiceNumber")
+                        .IsUnique();
+
+                    b.HasIndex("MaintenanceRequestId", "Status");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("Invoices");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Payment.Payment", b =>
                 {
                     b.Property<int>("Id")
@@ -2530,6 +3107,9 @@ namespace SoitMed.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("InvoiceId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Method")
                         .HasColumnType("int");
 
@@ -2556,6 +3136,8 @@ namespace SoitMed.Migrations
                     b.HasIndex("AccountsApproverId");
 
                     b.HasIndex("CollectionDelegateId");
+
+                    b.HasIndex("InvoiceId");
 
                     b.HasIndex("PaymentId");
 
@@ -3638,6 +4220,74 @@ namespace SoitMed.Migrations
                     b.Navigation("Client");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Contract.Contract", b =>
+                {
+                    b.HasOne("SoitMed.Models.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "CustomerSigner")
+                        .WithMany()
+                        .HasForeignKey("CustomerSignedBy");
+
+                    b.HasOne("SoitMed.Models.SalesDeal", "Deal")
+                        .WithMany()
+                        .HasForeignKey("DealId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Drafter")
+                        .WithMany()
+                        .HasForeignKey("DraftedBy")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "FinancialConfigurator")
+                        .WithMany()
+                        .HasForeignKey("FinancialConfiguredBy");
+
+                    b.Navigation("Client");
+
+                    b.Navigation("CustomerSigner");
+
+                    b.Navigation("Deal");
+
+                    b.Navigation("Drafter");
+
+                    b.Navigation("FinancialConfigurator");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Contract.ContractNegotiation", b =>
+                {
+                    b.HasOne("SoitMed.Models.Contract.Contract", "Contract")
+                        .WithMany("Negotiations")
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Submitter")
+                        .WithMany()
+                        .HasForeignKey("SubmittedBy")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Contract");
+
+                    b.Navigation("Submitter");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Contract.InstallmentSchedule", b =>
+                {
+                    b.HasOne("SoitMed.Models.Contract.Contract", "Contract")
+                        .WithMany("InstallmentSchedules")
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Contract");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Core.EntityChangeLog", b =>
                 {
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "User")
@@ -3723,6 +4373,11 @@ namespace SoitMed.Migrations
                         .HasForeignKey("AssignedToEngineerId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "CollectionDelegate")
+                        .WithMany()
+                        .HasForeignKey("CollectionDelegateId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
@@ -3743,6 +4398,8 @@ namespace SoitMed.Migrations
                     b.Navigation("AssignedByMaintenanceSupport");
 
                     b.Navigation("AssignedToEngineer");
+
+                    b.Navigation("CollectionDelegate");
 
                     b.Navigation("Customer");
 
@@ -3879,6 +4536,11 @@ namespace SoitMed.Migrations
 
             modelBuilder.Entity("SoitMed.Models.Equipment.SparePartRequest", b =>
                 {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "ApprovedByWarehouseKeeper")
+                        .WithMany()
+                        .HasForeignKey("ApprovedByWarehouseKeeperId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "AssignedToCoordinator")
                         .WithMany()
                         .HasForeignKey("AssignedToCoordinatorId")
@@ -3904,6 +4566,8 @@ namespace SoitMed.Migrations
                         .WithMany()
                         .HasForeignKey("VisitId")
                         .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("ApprovedByWarehouseKeeper");
 
                     b.Navigation("AssignedToCoordinator");
 
@@ -4171,6 +4835,24 @@ namespace SoitMed.Migrations
                     b.Navigation("Offer");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Payment.Invoice", b =>
+                {
+                    b.HasOne("SoitMed.Models.Identity.ApplicationUser", "CollectionDelegate")
+                        .WithMany()
+                        .HasForeignKey("CollectionDelegateId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("SoitMed.Models.Equipment.MaintenanceRequest", "MaintenanceRequest")
+                        .WithMany()
+                        .HasForeignKey("MaintenanceRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CollectionDelegate");
+
+                    b.Navigation("MaintenanceRequest");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Payment.Payment", b =>
                 {
                     b.HasOne("SoitMed.Models.Identity.ApplicationUser", "Customer")
@@ -4214,6 +4896,10 @@ namespace SoitMed.Migrations
                         .WithMany()
                         .HasForeignKey("CollectionDelegateId")
                         .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("SoitMed.Models.Payment.Invoice", null)
+                        .WithMany("Transactions")
+                        .HasForeignKey("InvoiceId");
 
                     b.HasOne("SoitMed.Models.Payment.Payment", "Payment")
                         .WithMany("Transactions")
@@ -4481,6 +5167,13 @@ namespace SoitMed.Migrations
                     b.Navigation("TaskProgresses");
                 });
 
+            modelBuilder.Entity("SoitMed.Models.Contract.Contract", b =>
+                {
+                    b.Navigation("InstallmentSchedules");
+
+                    b.Navigation("Negotiations");
+                });
+
             modelBuilder.Entity("SoitMed.Models.Core.Department", b =>
                 {
                     b.Navigation("Users");
@@ -4554,6 +5247,11 @@ namespace SoitMed.Migrations
             modelBuilder.Entity("SoitMed.Models.Location.Governorate", b =>
                 {
                     b.Navigation("EngineerGovernorates");
+                });
+
+            modelBuilder.Entity("SoitMed.Models.Payment.Invoice", b =>
+                {
+                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("SoitMed.Models.Payment.Payment", b =>

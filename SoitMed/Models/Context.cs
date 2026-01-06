@@ -7,6 +7,7 @@ using SoitMed.Models.Location;
 using SoitMed.Models.Equipment;
 using SoitMed.Models.Payment;
 using SoitMed.Models.Legacy;
+using SoitMed.Models.Contract;
 
 namespace SoitMed.Models
 {
@@ -100,13 +101,18 @@ namespace SoitMed.Models
         public DbSet<Product> Products { get; set; }
         public DbSet<ProductCategory> ProductCategories { get; set; }
         
+        // Contract entities
+        public DbSet<Contract.Contract> Contracts { get; set; }
+        public DbSet<Contract.ContractNegotiation> ContractNegotiations { get; set; }
+        public DbSet<Contract.InstallmentSchedule> InstallmentSchedules { get; set; }
+
         // Legacy tables (from old SOIT system - same database)
         public DbSet<Legacy.LegacyCustomer> LegacyCustomers { get; set; }
         public DbSet<Legacy.LegacyOrderOutItem> LegacyOrderOutItems { get; set; }
         public DbSet<Legacy.LegacyMaintenanceVisit> LegacyMaintenanceVisits { get; set; }
         public DbSet<Legacy.LegacyMaintenanceContract> LegacyMaintenanceContracts { get; set; }
         
-        public Context(DbContextOptions options) : base(options)
+        public Context(DbContextOptions<Context> options) : base(options)
         {
 
         }
@@ -982,6 +988,56 @@ namespace SoitMed.Models
 
             modelBuilder.Entity<Product>()
                 .HasIndex(p => p.CategoryId);
+
+            // Contract relationships
+            modelBuilder.Entity<Contract.Contract>()
+                .HasOne(c => c.Deal)
+                .WithMany()
+                .HasForeignKey(c => c.DealId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<Contract.Contract>()
+                .HasOne(c => c.Client)
+                .WithMany()
+                .HasForeignKey(c => c.ClientId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<Contract.Contract>()
+                .HasIndex(c => c.ContractNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<Contract.Contract>()
+                .HasIndex(c => c.LegacyContractId);
+
+            modelBuilder.Entity<Contract.Contract>()
+                .HasIndex(c => new { c.Status, c.CreatedAt });
+
+            // ContractNegotiation relationships
+            modelBuilder.Entity<Contract.ContractNegotiation>()
+                .HasOne(cn => cn.Contract)
+                .WithMany(c => c.Negotiations)
+                .HasForeignKey(cn => cn.ContractId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Contract.ContractNegotiation>()
+                .HasIndex(cn => new { cn.ContractId, cn.SubmittedAt });
+
+            // InstallmentSchedule relationships
+            modelBuilder.Entity<Contract.InstallmentSchedule>()
+                .HasOne(ins => ins.Contract)
+                .WithMany(c => c.InstallmentSchedules)
+                .HasForeignKey(ins => ins.ContractId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Contract.InstallmentSchedule>()
+                .HasIndex(ins => new { ins.ContractId, ins.InstallmentNumber })
+                .IsUnique();
+
+            modelBuilder.Entity<Contract.InstallmentSchedule>()
+                .HasIndex(ins => ins.DueDate);
+
+            modelBuilder.Entity<Contract.InstallmentSchedule>()
+                .HasIndex(ins => new { ins.Status, ins.DueDate });
         }
     }
 }

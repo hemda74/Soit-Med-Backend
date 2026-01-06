@@ -12,5 +12,6 @@ namespace SoitMed.Repositories
         Task<Client?> FindOrCreateClientAsync(string name, string type, string? specialization, string createdBy);
         Task<object> GetClientStatisticsAsync(string userId);
         Task<List<Client>> GetByIdsAsync(IEnumerable<long> ids);
+        Task<(IEnumerable<Client> Clients, int TotalCount)> GetAllClientsAsync(int pageNumber = 1, int pageSize = 25);
     }
 }

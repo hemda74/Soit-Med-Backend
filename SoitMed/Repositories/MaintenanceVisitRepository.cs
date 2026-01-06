@@ -106,6 +106,27 @@ namespace SoitMed.Repositories
                 .Include(mv => mv.VisitReport)
                 .FirstOrDefaultAsync(mv => mv.TicketNumber == ticketNumber, cancellationToken);
         }
+
+        public async Task<IEnumerable<MaintenanceVisit>> GetVisitsByEquipmentIdAsync(int equipmentId, CancellationToken cancellationToken = default)
+        {
+            return await _dbSet
+                .Where(mv => mv.IsActive && (
+                    mv.DeviceId == equipmentId ||
+                    (mv.MaintenanceRequest != null && mv.MaintenanceRequest.EquipmentId == equipmentId)
+                ))
+                .Include(mv => mv.MaintenanceRequest)
+                .ThenInclude(mr => mr.Customer)
+                .Include(mv => mv.MaintenanceRequest)
+                .ThenInclude(mr => mr.Equipment)
+                .Include(mv => mv.Engineer)
+                .Include(mv => mv.Device)
+                .Include(mv => mv.Customer)
+                .Include(mv => mv.Assignees)
+                .ThenInclude(a => a.Engineer)
+                .Include(mv => mv.VisitReport)
+                .OrderByDescending(mv => mv.VisitDate != default ? mv.VisitDate : mv.ScheduledDate)
+                .ToListAsync(cancellationToken);
+        }
     }
 }
 

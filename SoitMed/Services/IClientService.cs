@@ -22,6 +22,7 @@ namespace SoitMed.Services
         Task<List<ClientResponseDTO>> GetClientsByClassificationAsync(string classification, string userId);
         Task<ClientResponseDTO> FindOrCreateClientAsync(FindOrCreateClientDTO findDto, string userId);
         Task<ClientStatisticsDTO> GetClientStatisticsAsync(string userId);
+        Task<(IEnumerable<ClientResponseDTO> Clients, int TotalCount, int PageNumber, int PageSize)> GetAllClientsAsync(int pageNumber = 1, int pageSize = 25);
         #endregion
 
         #region Legal Documents
