@@ -9,28 +9,32 @@ The Contract Migration Service migrates contracts, installments, and payment dat
 ### Components
 
 1. **Contract Entity Models** (`Models/Contract/`)
-   - `Contract.cs` - Main contract entity with lifecycle management
-   - `ContractNegotiation.cs` - Negotiation history and notes
-   - `InstallmentSchedule.cs` - Installment payment schedules
+
+      - `Contract.cs` - Main contract entity with lifecycle management
+      - `ContractNegotiation.cs` - Negotiation history and notes
+      - `InstallmentSchedule.cs` - Installment payment schedules
 
 2. **Legacy TBS Context** (`Models/Legacy/TbsDbContext.cs`)
-   - Separate DbContext for reading from TBS database
-   - Models: `TbsMaintenanceContract`, `TbsSalesContract`, `TbsCustomer`, `TbsSalesInvoice`
+
+      - Separate DbContext for reading from TBS database
+      - Models: `TbsMaintenanceContract`, `TbsSalesContract`, `TbsCustomer`, `TbsSalesInvoice`
 
 3. **MediaPathTransformer Service** (`Services/MediaPathTransformer.cs`)
-   - Transforms legacy file paths to new API URL format
-   - Based on logic from `soitmed_data_backend`
-   - Example: `D:\Soit-Med\legacy\SOIT\UploadFiles\Files\image.jpg` → `/api/LegacyMedia/files/image.jpg`
+
+      - Transforms legacy file paths to new API URL format
+      - Based on logic from `soitmed_data_backend`
+      - Example: `D:\Soit-Med\legacy\SOIT\UploadFiles\Files\image.jpg` → `/api/LegacyMedia/files/image.jpg`
 
 4. **ContractMigrationService** (`Services/ContractMigrationService.cs`)
-   - Main migration logic with idempotency checks
-   - Maps TBS contracts to new schema
-   - Creates installments and negotiation notes
+
+      - Main migration logic with idempotency checks
+      - Maps TBS contracts to new schema
+      - Creates installments and negotiation notes
 
 5. **Admin Endpoint** (`Controllers/ContractMigrationController.cs`)
-   - `POST /api/ContractMigration/migrate-all` - Migrate all contracts
-   - `POST /api/ContractMigration/migrate/{legacyContractId}` - Migrate specific contract
-   - `GET /api/ContractMigration/statistics` - Get migration statistics
+      - `POST /api/ContractMigration/migrate-all` - Migrate all contracts
+      - `POST /api/ContractMigration/migrate/{legacyContractId}` - Migrate specific contract
+      - `GET /api/ContractMigration/statistics` - Get migration statistics
 
 ## Configuration
 
@@ -38,13 +42,13 @@ The Contract Migration Service migrates contracts, installments, and payment dat
 
 ```json
 {
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=...;Database=ITIWebApi44;...",
-    "TbsConnection": "Server=...;Database=TBS;..."
-  },
-  "ConnectionSettings": {
-    "LegacyMediaApiBaseUrl": "http://10.10.9.104:5266"
-  }
+	"ConnectionStrings": {
+		"DefaultConnection": "Server=...;Database=ITIWebApi44;...",
+		"TbsConnection": "Server=...;Database=TBS;..."
+	},
+	"ConnectionSettings": {
+		"LegacyMediaApiBaseUrl": "http://192.168.1.8:5266"
+	}
 }
 ```
 
@@ -52,17 +56,17 @@ The Contract Migration Service migrates contracts, installments, and payment dat
 
 ### 1. Contract Mapping (TBS → ITIWebApi44)
 
-| TBS Field | New Field | Transformation |
-|-----------|-----------|---------------|
-| `ContractId` | `LegacyContractId` | Direct mapping |
-| `ContractCode` | `ContractNumber` | Converted to string |
-| `CusId` | `ClientId` | Lookup via `LegacyCustomerId` |
-| `SoId` | `DealId` | Lookup in `SalesDeals` (nullable) |
-| `StartDate` | `DraftedAt`, `SignedAt` | Direct mapping |
-| `EndDate` | Used for status determination | - |
-| `ContractTotalValue` | `CashAmount` or `InstallmentAmount` | Based on payment plan |
-| `ScFile` | `DocumentUrl` | **Media path transformation** |
-| `NotesTech/Finance/Admin` | `ContractContent` | Combined into single field |
+| TBS Field                 | New Field                           | Transformation                    |
+| ------------------------- | ----------------------------------- | --------------------------------- |
+| `ContractId`              | `LegacyContractId`                  | Direct mapping                    |
+| `ContractCode`            | `ContractNumber`                    | Converted to string               |
+| `CusId`                   | `ClientId`                          | Lookup via `LegacyCustomerId`     |
+| `SoId`                    | `DealId`                            | Lookup in `SalesDeals` (nullable) |
+| `StartDate`               | `DraftedAt`, `SignedAt`             | Direct mapping                    |
+| `EndDate`                 | Used for status determination       | -                                 |
+| `ContractTotalValue`      | `CashAmount` or `InstallmentAmount` | Based on payment plan             |
+| `ScFile`                  | `DocumentUrl`                       | **Media path transformation**     |
+| `NotesTech/Finance/Admin` | `ContractContent`                   | Combined into single field        |
 
 ### 2. Status Determination
 
@@ -75,16 +79,18 @@ The Contract Migration Service migrates contracts, installments, and payment dat
 The `MediaPathTransformer` service:
 
 1. **Extracts filename** from legacy path:
-   - Handles paths like: `D:\Soit-Med\legacy\SOIT\UploadFiles\Files\image.jpg`
-   - Extracts: `image.jpg`
+
+      - Handles paths like: `D:\Soit-Med\legacy\SOIT\UploadFiles\Files\image.jpg`
+      - Extracts: `image.jpg`
 
 2. **Builds new API URL**:
-   - If `LegacyMediaApiBaseUrl` configured: `http://10.10.9.104:5266/api/Media/files/image.jpg`
-   - Otherwise: `/api/LegacyMedia/files/image.jpg`
+
+      - If `LegacyMediaApiBaseUrl` configured: `http://192.168.1.8:5266/api/Media/files/image.jpg`
+      - Otherwise: `/api/LegacyMedia/files/image.jpg`
 
 3. **Handles multiple files**:
-   - Input: `"file1.jpg|file2.jpg"`
-   - Output: `"/api/LegacyMedia/files/file1.jpg,/api/LegacyMedia/files/file2.jpg"`
+      - Input: `"file1.jpg|file2.jpg"`
+      - Output: `"/api/LegacyMedia/files/file1.jpg,/api/LegacyMedia/files/file2.jpg"`
 
 ### 4. Installment Schedule Creation
 
@@ -98,6 +104,7 @@ If `InstallmentMonths` and `InstallmentAmount` exist in TBS:
 ### 5. System Note Creation
 
 Every migrated contract gets a system note in `ContractNegotiations`:
+
 - **ActionType**: "System"
 - **Notes**: "Migrated from Legacy TBS"
 - **SubmittedBy**: Admin user ID
@@ -119,6 +126,7 @@ if (existingContract != null)
 ```
 
 This ensures:
+
 - Safe to run migration multiple times
 - No duplicate contracts created
 - Can resume after partial failures
@@ -140,16 +148,17 @@ Authorization: Bearer {admin_token}
 ```
 
 **Response:**
+
 ```json
 {
-  "success": true,
-  "message": "Migration completed: 150 contracts migrated, 0 errors",
-  "data": {
-    "contractsMigrated": 150,
-    "installmentsMigrated": 450,
-    "negotiationsCreated": 150,
-    "errors": 0
-  }
+	"success": true,
+	"message": "Migration completed: 150 contracts migrated, 0 errors",
+	"data": {
+		"contractsMigrated": 150,
+		"installmentsMigrated": 450,
+		"negotiationsCreated": 150,
+		"errors": 0
+	}
 }
 ```
 
@@ -168,15 +177,16 @@ Authorization: Bearer {admin_token}
 ```
 
 **Response:**
+
 ```json
 {
-  "success": true,
-  "data": {
-    "totalLegacyContracts": 200,
-    "migratedContracts": 150,
-    "pendingContracts": 50,
-    "failedContracts": 0
-  }
+	"success": true,
+	"data": {
+		"totalLegacyContracts": 200,
+		"migratedContracts": 150,
+		"pendingContracts": 50,
+		"failedContracts": 0
+	}
 }
 ```
 
@@ -203,4 +213,3 @@ Authorization: Bearer {admin_token}
 - Client lookup is done via `LegacyCustomerId` - ensure clients are migrated first
 - Deal lookup is optional - contracts can be created without deals if `SoId` is null
 - Media paths are transformed but files must be accessible via the legacy media API
-

@@ -140,6 +140,7 @@ namespace SoitMed.DTO
         public string? City { get; set; }
         public int? GovernorateId { get; set; }
         public List<string>? EquipmentCategories { get; set; } // List of equipment category names
+        public string? ClientCategory { get; set; } // "Potential" or "Existing" - filter by client type
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 20;
     }
@@ -284,6 +285,36 @@ namespace SoitMed.DTO
         
         [JsonPropertyName("hasAccount")]
         public bool HasAccount { get; set; }
+        
+        /// <summary>
+        /// Indicates if the client has any equipment, contracts, or deals (existing client vs potential client)
+        /// </summary>
+        [JsonPropertyName("hasEquipment")]
+        public bool HasEquipment { get; set; }
+        
+        /// <summary>
+        /// Client category: "Potential" (no equipment/contracts) or "Existing" (has equipment/contracts)
+        /// </summary>
+        [JsonPropertyName("clientCategory")]
+        public string ClientCategory { get; set; } = "Potential";
+        
+        /// <summary>
+        /// Number of contracts the client has
+        /// </summary>
+        [JsonPropertyName("contractCount")]
+        public int ContractCount { get; set; }
+        
+        /// <summary>
+        /// Number of deals the client has
+        /// </summary>
+        [JsonPropertyName("dealCount")]
+        public int DealCount { get; set; }
+        
+        /// <summary>
+        /// Legacy customer ID from TBS system (indicates existing client with equipment)
+        /// </summary>
+        [JsonPropertyName("legacyCustomerId")]
+        public int? LegacyCustomerId { get; set; }
     }
 
     public class SubmitClientLegalDocumentsDTO

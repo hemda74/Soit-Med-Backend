@@ -83,6 +83,10 @@ namespace SoitMed.DTO
         // Task Description
         [MaxLength(1000, ErrorMessage = "Notes cannot exceed 1000 characters")]
         public string? Notes { get; set; }
+
+        // Task Status
+        public bool? IsCompleted { get; set; }
+        public string? Status { get; set; }
     }
 
     /// <summary>
@@ -94,6 +98,10 @@ namespace SoitMed.DTO
         public long Id { get; set; }
         public long WeeklyPlanId { get; set; }
         public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsCompleted { get; set; }
+        public string? Status { get; set; }
+        public int DisplayOrder { get; set; }
         public long? ClientId { get; set; }
         public string? ClientName { get; set; }
         public string? ClientStatus { get; set; }

@@ -41,6 +41,7 @@ namespace SoitMed.Controllers
             [FromQuery] string? city = null,
             [FromQuery] int? governorateId = null,
             [FromQuery] List<string>? equipmentCategories = null,
+            [FromQuery] string? clientCategory = null,
             [FromQuery] string? status = null,
             [FromQuery] string? priority = null,
             [FromQuery] int page = 1,
@@ -61,14 +62,15 @@ namespace SoitMed.Controllers
                     City = city,
                     GovernorateId = governorateId,
                     EquipmentCategories = equipmentCategories,
+                    ClientCategory = clientCategory,
                     Page = page,
                     PageSize = pageSize
                 };
 
                 // Debug logging
-                _logger.LogInformation("SearchClients called with: Query={Query}, Classification={Classification}, AssignedSalesManId={AssignedSalesManId}, City={City}, GovernorateId={GovernorateId}, EquipmentCategories={EquipmentCategories}, Page={Page}, PageSize={PageSize}",
+                _logger.LogInformation("SearchClients called with: Query={Query}, Classification={Classification}, AssignedSalesManId={AssignedSalesManId}, City={City}, GovernorateId={GovernorateId}, EquipmentCategories={EquipmentCategories}, ClientCategory={ClientCategory}, Page={Page}, PageSize={PageSize}",
                     searchDto.Query, searchDto.Classification, searchDto.AssignedSalesManId, searchDto.City, searchDto.GovernorateId, 
-                    searchDto.EquipmentCategories != null ? string.Join(",", searchDto.EquipmentCategories) : "null", searchDto.Page, searchDto.PageSize);
+                    searchDto.EquipmentCategories != null ? string.Join(",", searchDto.EquipmentCategories) : "null", searchDto.ClientCategory, searchDto.Page, searchDto.PageSize);
 
                 // Validate search parameters
                 var validationResult = _validationService.ValidateClientSearch(searchDto);
@@ -266,17 +268,18 @@ namespace SoitMed.Controllers
         }
 
         /// <summary>
-        /// Get all clients with pagination (similar to soitmed_data_backend)
+        /// Get all clients with pagination and optional search (similar to soitmed_data_backend)
         /// </summary>
         [HttpGet("all")]
         [Authorize]
         public async Task<IActionResult> GetAllClients(
             [FromQuery] int pageNumber = 1,
-            [FromQuery] int pageSize = 25)
+            [FromQuery] int pageSize = 25,
+            [FromQuery] string? searchTerm = null)
         {
             try
             {
-                _logger.LogInformation("GetAllClients called with pageNumber={PageNumber}, pageSize={PageSize}", pageNumber, pageSize);
+                _logger.LogInformation("GetAllClients called with pageNumber={PageNumber}, pageSize={PageSize}, searchTerm={SearchTerm}", pageNumber, pageSize, searchTerm ?? "null");
 
                 // Validate pagination parameters
                 if (pageNumber < 1)
@@ -291,7 +294,7 @@ namespace SoitMed.Controllers
                     return BadRequest(CreateErrorResponse("PageSize must be between 1 and 100"));
                 }
 
-                var (clients, totalCount, _, _) = await _clientService.GetAllClientsAsync(pageNumber, pageSize);
+                var (clients, totalCount, _, _) = await _clientService.GetAllClientsAsync(pageNumber, pageSize, searchTerm);
                 
                 _logger.LogInformation("GetAllClients returning {Count} clients out of {TotalCount}", clients.Count(), totalCount);
                 
@@ -305,7 +308,7 @@ namespace SoitMed.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting all clients. PageNumber: {PageNumber}, PageSize: {PageSize}", pageNumber, pageSize);
+                _logger.LogError(ex, "Error getting all clients. PageNumber: {PageNumber}, PageSize: {PageSize}, SearchTerm: {SearchTerm}", pageNumber, pageSize, searchTerm ?? "null");
                 return StatusCode(500, CreateErrorResponse("حدث خطأ في جلب العملاء"));
             }
         }

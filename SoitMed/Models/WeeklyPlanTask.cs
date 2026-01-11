@@ -23,6 +23,9 @@ namespace SoitMed.Models
 
         public bool IsCompleted { get; set; } = false;
 
+        [MaxLength(20)]
+        public string? Status { get; set; } = "Planned"; // Planned, InProgress, Completed, Cancelled
+
         public int DisplayOrder { get; set; } = 0;
 
         // Client Information

@@ -166,9 +166,20 @@ namespace SoitMed.DTO
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
         public bool IsCompleted { get; set; }
+        public string? Status { get; set; }
         public int DisplayOrder { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        public long? ClientId { get; set; }
+        public string? ClientName { get; set; }
+        public string? ClientStatus { get; set; }
+        public string? ClientPhone { get; set; }
+        public string? ClientAddress { get; set; }
+        public string? ClientLocation { get; set; }
+        public string? ClientClassification { get; set; }
+        public DateTime? PlannedDate { get; set; }
+        public string? Notes { get; set; }
+        public int ProgressCount { get; set; }
     }
 
     /// <summary>

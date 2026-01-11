@@ -84,7 +84,13 @@ namespace SoitMed.Services
                 IsActive = plan.IsActive,
                 CreatedAt = plan.CreatedAt,
                 UpdatedAt = plan.UpdatedAt,
-                Tasks = mappedTasks
+                Tasks = mappedTasks,
+                DailyProgresses = new List<DailyProgressResponseDto>(),
+                TotalTasks = mappedTasks.Count,
+                CompletedTasks = mappedTasks.Count(t => t.IsCompleted),
+                CompletionPercentage = mappedTasks.Any() 
+                    ? (decimal)mappedTasks.Count(t => t.IsCompleted) / mappedTasks.Count * 100 
+                    : 0
             };
         }
 
@@ -148,7 +154,13 @@ namespace SoitMed.Services
                 IsViewed = p.ManagerViewedAt.HasValue,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
-                    Tasks = mappedTasks
+                Tasks = mappedTasks,
+                DailyProgresses = new List<DailyProgressResponseDto>(),
+                TotalTasks = mappedTasks.Count,
+                CompletedTasks = mappedTasks.Count(t => t.IsCompleted),
+                CompletionPercentage = mappedTasks.Any() 
+                    ? (decimal)mappedTasks.Count(t => t.IsCompleted) / mappedTasks.Count * 100 
+                    : 0
             });
             }
 
@@ -220,7 +232,13 @@ namespace SoitMed.Services
                 IsViewed = p.ManagerViewedAt.HasValue,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
-                    Tasks = mappedTasks
+                Tasks = mappedTasks,
+                DailyProgresses = new List<DailyProgressResponseDto>(),
+                TotalTasks = mappedTasks.Count,
+                CompletedTasks = mappedTasks.Count(t => t.IsCompleted),
+                CompletionPercentage = mappedTasks.Any() 
+                    ? (decimal)mappedTasks.Count(t => t.IsCompleted) / mappedTasks.Count * 100 
+                    : 0
             });
             }
 
@@ -275,7 +293,13 @@ namespace SoitMed.Services
                 IsViewed = plan.ManagerViewedAt.HasValue,
                 CreatedAt = plan.CreatedAt,
                 UpdatedAt = plan.UpdatedAt,
-                Tasks = mappedTasks
+                Tasks = mappedTasks,
+                DailyProgresses = new List<DailyProgressResponseDto>(),
+                TotalTasks = mappedTasks.Count,
+                CompletedTasks = mappedTasks.Count(t => t.IsCompleted),
+                CompletionPercentage = mappedTasks.Any() 
+                    ? (decimal)mappedTasks.Count(t => t.IsCompleted) / mappedTasks.Count * 100 
+                    : 0
             };
         }
 
@@ -373,6 +397,13 @@ namespace SoitMed.Services
             {
                 Id = task.Id,
                 Title = task.Title,
+                Description = task.Description,
+                IsCompleted = task.IsCompleted,
+                Status = task.Status,
+                DisplayOrder = task.DisplayOrder,
+                CreatedAt = task.CreatedAt,
+                UpdatedAt = task.UpdatedAt,
+                WeeklyPlanId = task.WeeklyPlanId,
                 ClientId = task.ClientId,
                 ClientName = task.ClientName,
                 ClientStatus = task.ClientStatus,
@@ -578,16 +609,29 @@ namespace SoitMed.Services
                     Id = (int)t.Id,
                     WeeklyPlanId = t.WeeklyPlanId,
                     Title = t.Title,
-                    Description = t.Notes,
-                    IsCompleted = false, // Not available in WeeklyPlanTaskResponseDTO
-                    DisplayOrder = 0, // Not available in WeeklyPlanTaskResponseDTO
-                    CreatedAt = DateTime.UtcNow, // Not available in WeeklyPlanTaskResponseDTO
-                    UpdatedAt = DateTime.UtcNow // Not available in WeeklyPlanTaskResponseDTO
+                    Description = t.Description,
+                    IsCompleted = t.IsCompleted,
+                    Status = t.Status,
+                    DisplayOrder = t.DisplayOrder,
+                    CreatedAt = t.CreatedAt,
+                    UpdatedAt = t.UpdatedAt,
+                    ClientId = t.ClientId,
+                    ClientName = t.ClientName,
+                    ClientStatus = t.ClientStatus,
+                    ClientPhone = t.ClientPhone,
+                    ClientAddress = t.ClientAddress,
+                    ClientLocation = t.ClientLocation,
+                    ClientClassification = t.ClientClassification,
+                    PlannedDate = t.PlannedDate,
+                    Notes = t.Notes,
+                    ProgressCount = t.Progresses?.Count ?? 0
                 }).ToList() ?? new List<WeeklyPlanTaskResponseDto>(),
                 DailyProgresses = new List<DailyProgressResponseDto>(),
                 TotalTasks = result.Tasks?.Count ?? 0,
-                CompletedTasks = 0,
-                CompletionPercentage = 0
+                CompletedTasks = result.Tasks?.Count(t => t.IsCompleted) ?? 0,
+                CompletionPercentage = result.Tasks != null && result.Tasks.Any() 
+                    ? (decimal)result.Tasks.Count(t => t.IsCompleted) / result.Tasks.Count * 100 
+                    : 0
             };
         }
 
@@ -659,15 +703,17 @@ namespace SoitMed.Services
                     WeeklyPlanId = t.WeeklyPlanId,
                     Title = t.Title,
                     Description = t.Notes,
-                    IsCompleted = false,
-                    DisplayOrder = 0,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    IsCompleted = t.IsCompleted,
+                    DisplayOrder = t.DisplayOrder,
+                    CreatedAt = t.CreatedAt,
+                    UpdatedAt = t.UpdatedAt
                 }).ToList() ?? new List<WeeklyPlanTaskResponseDto>(),
                 DailyProgresses = new List<DailyProgressResponseDto>(),
                 TotalTasks = plan.Tasks?.Count ?? 0,
-                CompletedTasks = 0,
-                CompletionPercentage = 0
+                CompletedTasks = plan.Tasks?.Count(t => t.IsCompleted) ?? 0,
+                CompletionPercentage = plan.Tasks != null && plan.Tasks.Any() 
+                    ? (decimal)plan.Tasks.Count(t => t.IsCompleted) / plan.Tasks.Count * 100 
+                    : 0
             };
         }
 
@@ -705,16 +751,29 @@ namespace SoitMed.Services
                         Id = (int)t.Id,
                         WeeklyPlanId = t.WeeklyPlanId,
                         Title = t.Title,
-                        Description = t.Notes,
-                        IsCompleted = false,
-                        DisplayOrder = 0,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        Description = t.Description,
+                        IsCompleted = t.IsCompleted,
+                        Status = t.Status,
+                        DisplayOrder = t.DisplayOrder,
+                        CreatedAt = t.CreatedAt,
+                        UpdatedAt = t.UpdatedAt,
+                        ClientId = t.ClientId,
+                        ClientName = t.ClientName,
+                        ClientStatus = t.ClientStatus,
+                        ClientPhone = t.ClientPhone,
+                        ClientAddress = t.ClientAddress,
+                        ClientLocation = t.ClientLocation,
+                        ClientClassification = t.ClientClassification,
+                        PlannedDate = t.PlannedDate,
+                        Notes = t.Notes,
+                        ProgressCount = t.Progresses?.Count ?? 0
                     }).ToList() ?? new List<WeeklyPlanTaskResponseDto>(),
                     DailyProgresses = new List<DailyProgressResponseDto>(),
                     TotalTasks = p.Tasks?.Count ?? 0,
-                    CompletedTasks = 0,
-                    CompletionPercentage = 0
+                    CompletedTasks = p.Tasks?.Count(t => t.IsCompleted) ?? 0,
+                    CompletionPercentage = p.Tasks != null && p.Tasks.Any() 
+                        ? (decimal)p.Tasks.Count(t => t.IsCompleted) / p.Tasks.Count * 100 
+                        : 0
                 }).ToList(),
                 TotalCount = totalCount,
                 Page = filterDto.Page,
@@ -757,16 +816,29 @@ namespace SoitMed.Services
                         Id = (int)t.Id,
                         WeeklyPlanId = t.WeeklyPlanId,
                         Title = t.Title,
-                        Description = t.Notes,
-                        IsCompleted = false,
-                        DisplayOrder = 0,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        Description = t.Description,
+                        IsCompleted = t.IsCompleted,
+                        Status = t.Status,
+                        DisplayOrder = t.DisplayOrder,
+                        CreatedAt = t.CreatedAt,
+                        UpdatedAt = t.UpdatedAt,
+                        ClientId = t.ClientId,
+                        ClientName = t.ClientName,
+                        ClientStatus = t.ClientStatus,
+                        ClientPhone = t.ClientPhone,
+                        ClientAddress = t.ClientAddress,
+                        ClientLocation = t.ClientLocation,
+                        ClientClassification = t.ClientClassification,
+                        PlannedDate = t.PlannedDate,
+                        Notes = t.Notes,
+                        ProgressCount = t.Progresses?.Count ?? 0
                     }).ToList() ?? new List<WeeklyPlanTaskResponseDto>(),
                     DailyProgresses = new List<DailyProgressResponseDto>(),
                     TotalTasks = p.Tasks?.Count ?? 0,
-                    CompletedTasks = 0,
-                    CompletionPercentage = 0
+                    CompletedTasks = p.Tasks?.Count(t => t.IsCompleted) ?? 0,
+                    CompletionPercentage = p.Tasks != null && p.Tasks.Any() 
+                        ? (decimal)p.Tasks.Count(t => t.IsCompleted) / p.Tasks.Count * 100 
+                        : 0
                 }).ToList(),
                 TotalCount = totalCount,
                 Page = filterDto.Page,
@@ -958,16 +1030,29 @@ namespace SoitMed.Services
                     Id = (int)t.Id,
                     WeeklyPlanId = t.WeeklyPlanId,
                     Title = t.Title,
-                    Description = t.Notes,
-                    IsCompleted = false,
-                    DisplayOrder = 0,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    Description = t.Description,
+                    IsCompleted = t.IsCompleted,
+                    Status = t.Status,
+                    DisplayOrder = t.DisplayOrder,
+                    CreatedAt = t.CreatedAt,
+                    UpdatedAt = t.UpdatedAt,
+                    ClientId = t.ClientId,
+                    ClientName = t.ClientName,
+                    ClientStatus = t.ClientStatus,
+                    ClientPhone = t.ClientPhone,
+                    ClientAddress = t.ClientAddress,
+                    ClientLocation = t.ClientLocation,
+                    ClientClassification = t.ClientClassification,
+                    PlannedDate = t.PlannedDate,
+                    Notes = t.Notes,
+                    ProgressCount = t.Progresses?.Count ?? 0
                 }).ToList() ?? new List<WeeklyPlanTaskResponseDto>(),
                 DailyProgresses = new List<DailyProgressResponseDto>(),
                 TotalTasks = result.Tasks?.Count ?? 0,
-                CompletedTasks = 0,
-                CompletionPercentage = 0
+                CompletedTasks = result.Tasks?.Count(t => t.IsCompleted) ?? 0,
+                CompletionPercentage = result.Tasks != null && result.Tasks.Any() 
+                    ? (decimal)result.Tasks.Count(t => t.IsCompleted) / result.Tasks.Count * 100 
+                    : 0
             };
         }
     }

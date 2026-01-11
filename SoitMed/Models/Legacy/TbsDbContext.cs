@@ -141,7 +141,7 @@ namespace SoitMed.Models.Legacy
     public class TbsCustomer
     {
         [Key]
-        [Column("CusId")]
+        [Column("Cus_ID")]
         public int CusId { get; set; }
 
         [Column("Cus_Name")]
@@ -159,6 +159,10 @@ namespace SoitMed.Models.Legacy
         [Column("Cus_address")]
         [MaxLength(300)]
         public string? CusAddress { get; set; }
+
+        [Column("Cus_Email")]
+        [MaxLength(100)]
+        public string? CusEmail { get; set; }
     }
 
     /// <summary>

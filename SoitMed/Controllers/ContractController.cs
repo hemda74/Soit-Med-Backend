@@ -5,6 +5,7 @@ using SoitMed.DTO;
 using SoitMed.Models.Contract;
 using SoitMed.Models.Enums;
 using SoitMed.Repositories;
+using SoitMed.Services;
 using System.Text.Json;
 
 namespace SoitMed.Controllers
@@ -18,13 +19,20 @@ namespace SoitMed.Controllers
         private readonly ILogger<ContractController> _logger;
         private readonly IConfiguration _configuration;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ICustomerMachinesService _customerMachinesService;
 
-        public ContractController(IUnitOfWork unitOfWork, ILogger<ContractController> logger, IConfiguration configuration, IHttpClientFactory httpClientFactory)
+        public ContractController(
+            IUnitOfWork unitOfWork, 
+            ILogger<ContractController> logger, 
+            IConfiguration configuration, 
+            IHttpClientFactory httpClientFactory,
+            ICustomerMachinesService customerMachinesService)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
             _configuration = configuration;
             _httpClientFactory = httpClientFactory;
+            _customerMachinesService = customerMachinesService;
         }
 
         /// <summary>
@@ -1035,6 +1043,34 @@ namespace SoitMed.Controllers
                 DaysUntilExpiry = daysUntilExpiry,
                 TotalAmount = contract.CashAmount ?? contract.InstallmentAmount
             };
+        }
+
+        /// <summary>
+        /// Get all machines for a customer
+        /// Replaces Media API endpoint: GET /api/Contracts/customers/{customerId}/machines
+        /// </summary>
+        [HttpGet("customers/{customerId}/machines")]
+        [ProducesResponseType(typeof(CustomerMachinesDto), 200)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> GetCustomerMachines(long customerId)
+        {
+            try
+            {
+                var result = await _customerMachinesService.GetMachinesByCustomerIdAsync(customerId);
+
+                if (result == null)
+                {
+                    return NotFound(new { message = $"Customer with ID {customerId} not found" });
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving machines for customer {CustomerId}", customerId);
+                return StatusCode(500, new { message = "An error occurred while retrieving customer machines", error = ex.Message });
+            }
         }
     }
 }

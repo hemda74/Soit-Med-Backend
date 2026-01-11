@@ -374,6 +374,33 @@ namespace SoitMed.Services
                         );
                     }
                 }
+
+                // Filter by client category (Potential vs Existing)
+                if (!string.IsNullOrWhiteSpace(searchDto.ClientCategory))
+                {
+                    if (searchDto.ClientCategory.Equals("Existing", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Existing clients: have LegacyCustomerId OR have contracts OR have deals
+                        var clientIdsWithContracts = context.Contracts.Select(c => c.ClientId).Distinct();
+                        var clientIdsWithDeals = context.SalesDeals.Select(d => d.ClientId).Distinct();
+                        
+                        baseQuery = baseQuery.Where(c => 
+                            c.LegacyCustomerId.HasValue ||
+                            clientIdsWithContracts.Contains(c.Id) ||
+                            clientIdsWithDeals.Contains(c.Id));
+                    }
+                    else if (searchDto.ClientCategory.Equals("Potential", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Potential clients: do NOT have LegacyCustomerId AND do NOT have contracts AND do NOT have deals
+                        var clientIdsWithContracts = context.Contracts.Select(c => c.ClientId).Distinct();
+                        var clientIdsWithDeals = context.SalesDeals.Select(d => d.ClientId).Distinct();
+                        
+                        baseQuery = baseQuery.Where(c => 
+                            !c.LegacyCustomerId.HasValue &&
+                            !clientIdsWithContracts.Contains(c.Id) &&
+                            !clientIdsWithDeals.Contains(c.Id));
+                    }
+                }
                 
                 var totalCount = await baseQuery.CountAsync();
                 
@@ -468,17 +495,46 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<(IEnumerable<ClientResponseDTO> Clients, int TotalCount, int PageNumber, int PageSize)> GetAllClientsAsync(int pageNumber = 1, int pageSize = 25)
+        public async Task<(IEnumerable<ClientResponseDTO> Clients, int TotalCount, int PageNumber, int PageSize)> GetAllClientsAsync(int pageNumber = 1, int pageSize = 25, string? searchTerm = null)
         {
             try
             {
-                var (clients, totalCount) = await _unitOfWork.Clients.GetAllClientsAsync(pageNumber, pageSize);
-                var clientDtos = clients.Select(MapToClientResponseDTO).ToList();
+                var (clients, totalCount) = await _unitOfWork.Clients.GetAllClientsAsync(pageNumber, pageSize, searchTerm);
+                var clientList = clients.ToList();
+                
+                // Get client IDs for batch queries
+                var clientIds = clientList.Select(c => c.Id).ToList();
+                
+                // Batch query for contract counts per client
+                var context = _unitOfWork.GetContext();
+                var contractCounts = await context.Contracts
+                    .AsNoTracking()
+                    .Where(c => clientIds.Contains(c.ClientId))
+                    .GroupBy(c => c.ClientId)
+                    .Select(g => new { ClientId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.ClientId, x => x.Count);
+                
+                // Batch query for deal counts per client
+                var dealCounts = await context.SalesDeals
+                    .AsNoTracking()
+                    .Where(d => clientIds.Contains(d.ClientId))
+                    .GroupBy(d => d.ClientId)
+                    .Select(g => new { ClientId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.ClientId, x => x.Count);
+                
+                // Map clients with counts
+                var clientDtos = clientList.Select(client => 
+                {
+                    var contractCount = contractCounts.GetValueOrDefault(client.Id, 0);
+                    var dealCount = dealCounts.GetValueOrDefault(client.Id, 0);
+                    return MapToClientResponseDTOWithCounts(client, contractCount, dealCount);
+                }).ToList();
+                
                 return (clientDtos, totalCount, pageNumber, pageSize);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting all clients. PageNumber: {PageNumber}, PageSize: {PageSize}", pageNumber, pageSize);
+                _logger.LogError(ex, "Error getting all clients. PageNumber: {PageNumber}, PageSize: {PageSize}, SearchTerm: {SearchTerm}", pageNumber, pageSize, searchTerm ?? "null");
                 throw;
             }
         }
@@ -558,8 +614,28 @@ namespace SoitMed.Services
                 TaxCardNumber = client.TaxCardNumber,
                 TaxCardImage = client.TaxCardImage,
                 LegalDocumentsSubmittedAt = client.LegalDocumentsSubmittedAt,
-                HasAccount = client.RelatedUserId != null
+                HasAccount = client.RelatedUserId != null,
+                // Default values - will be updated by MapToClientResponseDTOWithCounts
+                HasEquipment = client.LegacyCustomerId.HasValue,
+                ClientCategory = client.LegacyCustomerId.HasValue ? "Existing" : "Potential",
+                ContractCount = 0,
+                DealCount = 0,
+                LegacyCustomerId = client.LegacyCustomerId
             };
+        }
+
+        /// <summary>
+        /// Maps a client to ClientResponseDTO with contract and deal counts
+        /// </summary>
+        private static ClientResponseDTO MapToClientResponseDTOWithCounts(Client client, int contractCount, int dealCount)
+        {
+            var dto = MapToClientResponseDTO(client);
+            dto.ContractCount = contractCount;
+            dto.DealCount = dealCount;
+            // Client is "Existing" if they have LegacyCustomerId OR contracts OR deals
+            dto.HasEquipment = client.LegacyCustomerId.HasValue || contractCount > 0 || dealCount > 0;
+            dto.ClientCategory = dto.HasEquipment ? "Existing" : "Potential";
+            return dto;
         }
 
         private static TaskProgressSummaryDTO MapToTaskProgressSummaryDTO(TaskProgress taskProgress)

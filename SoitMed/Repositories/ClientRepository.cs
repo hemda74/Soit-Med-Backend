@@ -119,6 +119,33 @@ namespace SoitMed.Repositories
                 }
             }
             
+            // Filter by client category (Potential vs Existing)
+            if (!string.IsNullOrWhiteSpace(searchDto.ClientCategory))
+            {
+                if (searchDto.ClientCategory.Equals("Existing", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Existing clients: have LegacyCustomerId OR have contracts OR have deals
+                    var clientIdsWithContracts = _context.Contracts.Select(c => c.ClientId).Distinct();
+                    var clientIdsWithDeals = _context.SalesDeals.Select(d => d.ClientId).Distinct();
+                    
+                    baseQuery = baseQuery.Where(c => 
+                        c.LegacyCustomerId.HasValue ||
+                        clientIdsWithContracts.Contains(c.Id) ||
+                        clientIdsWithDeals.Contains(c.Id));
+                }
+                else if (searchDto.ClientCategory.Equals("Potential", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Potential clients: do NOT have LegacyCustomerId AND do NOT have contracts AND do NOT have deals
+                    var clientIdsWithContracts = _context.Contracts.Select(c => c.ClientId).Distinct();
+                    var clientIdsWithDeals = _context.SalesDeals.Select(d => d.ClientId).Distinct();
+                    
+                    baseQuery = baseQuery.Where(c => 
+                        !c.LegacyCustomerId.HasValue &&
+                        !clientIdsWithContracts.Contains(c.Id) &&
+                        !clientIdsWithDeals.Contains(c.Id));
+                }
+            }
+            
             // Apply pagination
             return await baseQuery
                 .OrderBy(c => c.Name)
@@ -249,7 +276,7 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<(IEnumerable<Client> Clients, int TotalCount)> GetAllClientsAsync(int pageNumber = 1, int pageSize = 25)
+        public async Task<(IEnumerable<Client> Clients, int TotalCount)> GetAllClientsAsync(int pageNumber = 1, int pageSize = 25, string? searchTerm = null)
         {
             try
             {
@@ -257,20 +284,23 @@ namespace SoitMed.Repositories
                 if (pageNumber < 1) pageNumber = 1;
                 if (pageSize < 1 || pageSize > 100) pageSize = 25;
 
-                // Verify data exists - similar to soitmed_data_backend approach
-                var hasClients = await _context.Clients
-                    .AsNoTracking()
-                    .AnyAsync(c => !string.IsNullOrEmpty(c.Name));
-
-                if (!hasClients)
-                {
-                    // Return empty result if no clients exist
-                    return (Enumerable.Empty<Client>(), 0);
-                }
-
+                // Build base query
                 var query = _context.Clients
                     .AsNoTracking()
                     .Where(c => !string.IsNullOrEmpty(c.Name));
+
+                // Apply search filter if provided
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    var search = searchTerm.Trim();
+                    var pattern = $"%{search}%";
+                    query = query.Where(c =>
+                        EF.Functions.Like(c.Name, pattern) ||
+                        (c.Email != null && EF.Functions.Like(c.Email, pattern)) ||
+                        (c.Phone != null && EF.Functions.Like(c.Phone, pattern)) ||
+                        (c.Specialization != null && EF.Functions.Like(c.Specialization, pattern)) ||
+                        (c.Location != null && EF.Functions.Like(c.Location, pattern)));
+                }
 
                 var totalCount = await query.CountAsync();
 

@@ -73,6 +73,17 @@ namespace SoitMed.Extensions
             // Contract migration service
             services.AddScoped<IContractMigrationService, ContractMigrationService>();
 
+            // Equipment-to-Client migration service (MCP-like service)
+            services.AddScoped<IMigrationService, MigrationService>();
+
+            // Legacy data sync service (syncs data from TBS to ITIWebApi44 using MediaApi logic)
+            services.AddScoped<ILegacyDataSyncService, LegacyDataSyncService>();
+
+            // Customer machines service (replaces Media API endpoint)
+            services.AddScoped<ICustomerMachinesService, CustomerMachinesService>();
+            services.AddScoped<ILegacyEmployeeService, LegacyEmployeeService>();
+            services.AddScoped<ILegacyEmployeeMigrationService, LegacyEmployeeMigrationService>();
+
             return services;
         }
     }

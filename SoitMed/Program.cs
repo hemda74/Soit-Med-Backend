@@ -148,9 +148,12 @@ namespace SoitMed
                     options.MultipartBoundaryLengthLimit = int.MaxValue;
                 });
 
-                // Configure Kestrel for better file upload handling
+                // Configure Kestrel for better file upload handling and network access
                 builder.WebHost.ConfigureKestrel(options =>
                 {
+                    // Listen on all interfaces (0.0.0.0) to allow network access
+                    options.ListenAnyIP(5117);
+                    
                     options.Limits.MaxRequestBodySize = 20L * 1024 * 1024; // 20MB
                     options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(5);
                     options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(2);
@@ -232,6 +235,9 @@ namespace SoitMed
                 builder.Services.AddScoped<IRequestWorkflowService, RequestWorkflowService>();
                 builder.Services.AddHttpContextAccessor(); // Required for ChatService
                 builder.Services.AddApplicationServices();
+                
+                // Register Enhanced Maintenance Service
+                builder.Services.AddScoped<IEnhancedMaintenanceService, EnhancedMaintenanceService>();
                 
                 // Configure ContractMaintenance options
                 builder.Services.Configure<SoitMed.Services.ContractMaintenanceOptions>(

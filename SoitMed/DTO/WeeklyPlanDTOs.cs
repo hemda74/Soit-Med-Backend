@@ -72,6 +72,10 @@ namespace SoitMed.DTO
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public List<WeeklyPlanTaskResponseDTO> Tasks { get; set; } = new();
+        public List<DailyProgressResponseDto> DailyProgresses { get; set; } = new();
+        public int TotalTasks { get; set; }
+        public int CompletedTasks { get; set; }
+        public decimal CompletionPercentage { get; set; }
     }
 
     public class EmployeeInfoDTO
@@ -89,6 +93,12 @@ namespace SoitMed.DTO
         public long Id { get; set; }
         public long WeeklyPlanId { get; set; }
         public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsCompleted { get; set; }
+        public string? Status { get; set; }
+        public int DisplayOrder { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
         public long? ClientId { get; set; }
         public string? ClientName { get; set; }
         public string? ClientStatus { get; set; }

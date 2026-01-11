@@ -7,6 +7,7 @@ SoitMed is a comprehensive medical equipment management and sales system designe
 ### Core Business Functions
 
 #### 1. Sales Module
+
 - **Client Management**: Track and manage client information including hospitals, clinics, Doctors, and Technicians
 - **Offer Management**: Create, manage, and track sales offers with detailed equipment specifications, pricing, and terms
 - **Deal Processing**: Handle deal creation, approval workflows, and deal closure
@@ -14,6 +15,7 @@ SoitMed is a comprehensive medical equipment management and sales system designe
 - **Sales Reports**: Generate comprehensive sales reports and analytics
 
 #### 2. Maintenance Module
+
 - **Maintenance Requests**: Customers can submit maintenance requests for their equipment with descriptions, symptoms, and multimedia attachments
 - **Visit Management**: Engineers can create maintenance visits, scan QR codes, and create detailed visit reports
 - **Spare Parts Management**: Handle spare part requests with warehouse approval workflow
@@ -22,18 +24,21 @@ SoitMed is a comprehensive medical equipment management and sales system designe
 - **Status Tracking**: Real-time status tracking for maintenance requests
 
 #### 3. Payment Module
+
 - **Multiple Payment Methods**: Support for Cash, Credit Card, Paymob, and other gateways
 - **Payment Strategy Pattern**: Extensible architecture for future installment payments
 - **Invoice Management**: Automatic invoice generation with cost breakdown
 - **Accounting Management**: Accounting roles can confirm or reject payments
 
 #### 4. Equipment Management
+
 - **Equipment Registration**: Register equipment with QR codes, serial numbers, and detailed specifications
 - **QR Code Management**: Generate and track QR codes for equipment
 - **Equipment Linking**: Equipment can be linked to hospitals or directly to customers
 - **Maintenance History**: Track maintenance history and repair visits for each equipment
 
 #### 5. Legacy Data Integration
+
 - **Legacy Data Import**: Import clients, equipment, and maintenance visits from legacy SOIT system
 - **Legacy Media Files**: Serve legacy media files through integrated media API
 - **Data Migration**: Comprehensive migration tools for historical data
@@ -43,6 +48,7 @@ SoitMed is a comprehensive medical equipment management and sales system designe
 ## Technical Architecture
 
 ### Technology Stack
+
 - **Framework**: ASP.NET Core 8.0
 - **Database**: SQL Server with Entity Framework Core
 - **Authentication**: ASP.NET Core Identity with JWT tokens
@@ -52,6 +58,7 @@ SoitMed is a comprehensive medical equipment management and sales system designe
 - **Payment Integration**: Paymob Egypt payment gateway
 
 ### Project Structure
+
 ```
 SoitMed/
 ├── Controllers/          # API endpoint controllers
@@ -79,6 +86,7 @@ SoitMed/
 Complete end-to-end workflow for maintenance requests from creation to payment closure.
 
 #### Workflow
+
 1. **Request Creation**: Customer or Call Center creates ticket with description and images
 2. **Assignment**: Admin/Coordinator assigns Engineer
 3. **QR Verification**: Engineer scans QR code to verify arrival
@@ -91,12 +99,14 @@ Complete end-to-end workflow for maintenance requests from creation to payment c
 10. **Closure**: Ticket marked as completed
 
 #### Database Schema
+
 - **MaintenanceRequest**: Extended with `LaborFees`, future installment fields
 - **SparePartRequest**: Added warehouse approval workflow fields
 - **Invoice**: New entity for invoice management with cost breakdown
 - **PaymentTransaction**: Enhanced with payment method and status tracking
 
 #### API Endpoints
+
 - `POST /api/MaintenanceRequest` - Create maintenance request
 - `POST /api/MaintenanceRequest/{id}/assign` - Assign engineer
 - `POST /api/SparePartRequest` - Request spare parts (Engineer)
@@ -110,11 +120,13 @@ Complete end-to-end workflow for maintenance requests from creation to payment c
 Extensible payment processing architecture using Strategy Pattern for future installment support.
 
 #### Implemented Strategies
+
 - **CashPaymentStrategy**: Handles cash payments (requires manual confirmation)
 - **VisaPaymentStrategy**: Handles credit card and gateway payments (Paymob, Stripe, etc.)
 - **InstallmentPaymentStrategy**: Reserved for future implementation
 
 #### Architecture Benefits
+
 - Easy to add new payment methods
 - Installment payment support ready (database fields and strategy class exist)
 - Clean separation of concerns
@@ -127,26 +139,29 @@ Extensible payment processing architecture using Strategy Pattern for future ins
 Comprehensive integration with legacy SOIT system for data migration and media file access.
 
 #### Legacy Data Import
+
 - **Service**: `LegacyImporterService`
 - **Models**: `LegacyCustomer`, `LegacyOrderOutItem`, `LegacyMaintenanceVisit`, `LegacyMaintenanceContract`
 - **Features**:
-  - Import clients from `Stk_Customers`
-  - Import equipment from `Stk_Order_Out_Items`
-  - Import maintenance visits from `MNT_Visiting`
-  - Automatic QR token generation for equipment
-  - Client-to-User linking support
-  - File-based error logging
+     - Import clients from `Stk_Customers`
+     - Import equipment from `Stk_Order_Out_Items`
+     - Import maintenance visits from `MNT_Visiting`
+     - Automatic QR token generation for equipment
+     - Client-to-User linking support
+     - File-based error logging
 
 #### Legacy Media Files Integration
+
 - **Service**: `LegacyMediaService`
 - **Controller**: `LegacyMediaController`
 - **Integration**: Proxies requests to legacy media API (`soitmed_data_backend`)
 - **Media Paths**:
-  - `D:\Soit-Med\legacy\SOIT\Ar\MNT\FileUploaders\Reports`
-  - `D:\Soit-Med\legacy\SOIT\UploadFiles\Images`
-  - `D:\Soit-Med\legacy\SOIT\UploadFiles\Files`
+     - `D:\Soit-Med\legacy\SOIT\Ar\MNT\FileUploaders\Reports`
+     - `D:\Soit-Med\legacy\SOIT\UploadFiles\Images`
+     - `D:\Soit-Med\legacy\SOIT\UploadFiles\Files`
 
 #### API Endpoints
+
 - `GET /api/LegacyMedia/files/{fileName}` - Serve legacy media files (proxy)
 - `GET /api/LegacyMedia/url/{fileName}` - Get media file URL
 - `GET /api/LegacyMedia/check/{fileName}` - Check if file exists
@@ -162,21 +177,23 @@ Comprehensive integration with legacy SOIT system for data migration and media f
 Flexible connection management for local development and remote server access.
 
 #### Configuration
+
 ```json
 {
-  "ConnectionSettings": {
-    "Mode": "Remote",  // "Local" or "Remote"
-    "LocalConnectionString": "...",
-    "RemoteConnectionString": "...",
-    "LocalMediaPath": "C:\\LegacyMedia",
-    "RemoteMediaPath": "\\\\10.10.9.104\\LegacyMedia",
-    "LegacyMediaApiBaseUrl": "http://10.10.9.104:5266",
-    "LegacyMediaPaths": "D:\\Soit-Med\\legacy\\SOIT\\..."
-  }
+	"ConnectionSettings": {
+		"Mode": "Remote", // "Local" or "Remote"
+		"LocalConnectionString": "...",
+		"RemoteConnectionString": "...",
+		"LocalMediaPath": "C:\\LegacyMedia",
+		"RemoteMediaPath": "\\\\192.168.1.8\\LegacyMedia",
+		"LegacyMediaApiBaseUrl": "http://192.168.1.8:5266",
+		"LegacyMediaPaths": "D:\\Soit-Med\\legacy\\SOIT\\..."
+	}
 }
 ```
 
 #### Usage
+
 - Switch between Local and Remote modes by changing `Mode` in appsettings.json
 - Automatic connection string selection based on mode
 - Media file path selection based on mode
@@ -187,17 +204,20 @@ Flexible connection management for local development and remote server access.
 ### 5. Admin & Support Capabilities
 
 #### Admin: Client-to-User Linking
+
 - `POST /api/Admin/Client/LinkAccount` - Link Client to User account
 - `POST /api/Admin/Client/UnlinkAccount` - Unlink Client from User account
 - Updates `Client.RelatedUserId` field
 - Validates Client and User existence
 
 #### Support: QR Code Management
+
 - `POST /api/Equipment/Qr/MarkPrinted` - Mark QR code as printed
 - Updates `Equipment.IsQrPrinted` and `Equipment.QrLastPrintedDate`
 - Role: Support, Admin, SuperAdmin
 
 #### DTO Updates
+
 - **ClientResponseDTO**: Added `HasAccount` (bool) - indicates if client is linked to user
 - **EquipmentResponseDTO**: Added `QrToken` (Guid) and `IsQrPrinted` (bool)
 
@@ -206,21 +226,24 @@ Flexible connection management for local development and remote server access.
 Complete Paymob Egypt payment gateway integration with DTOs and configuration.
 
 #### Configuration
+
 ```json
 {
-  "Paymob": {
-    "ApiKey": "",
-    "HmacSecret": "",
-    "IntegrationId_Card": "",
-    "IntegrationId_Wallet": "",
-    "IntegrationId_Fawry": "",
-    "IframeId": ""
-  }
+	"Paymob": {
+		"ApiKey": "",
+		"HmacSecret": "",
+		"IntegrationId_Card": "",
+		"IntegrationId_Wallet": "",
+		"IntegrationId_Fawry": "",
+		"IframeId": ""
+	}
 }
 ```
 
 #### DTOs
+
 All DTOs use `[JsonPropertyName("snake_case")]` to match Paymob API:
+
 - `PaymobAuthResponse` - Authentication response
 - `PaymobOrderRequest/Response` - Order creation
 - `PaymobKeyRequest/Response` - Payment key generation
@@ -237,27 +260,32 @@ All DTOs use `[JsonPropertyName("snake_case")]` to match Paymob API:
 ### Key Entities
 
 #### MaintenanceRequest
+
 - Core maintenance request entity
 - Fields: `LaborFees`, `TotalAmount`, `PaidAmount`, `RemainingAmount`
 - Future-proofing: `PaymentPlan?`, `InstallmentMonths?`, `CollectionDelegateId?`
 
 #### SparePartRequest
+
 - Spare part request with warehouse approval workflow
 - Fields: `WarehouseApproved`, `ApprovedByWarehouseKeeperId`, `WarehouseApprovedAt`
 - Pricing: `OriginalPrice`, `CompanyPrice`, `CustomerPrice`
 
 #### Invoice
+
 - Invoice entity for maintenance requests
 - Cost breakdown: `LaborFees`, `SparePartsTotal`, `TotalAmount`
 - Payment tracking: `PaidAmount`, `RemainingAmount`, `Status`
 - Future-proofing: `PaymentPlan?`, `InstallmentMonths?`, `CollectionDelegateId?`
 
 #### Equipment
+
 - Equipment with QR code support
 - Fields: `QrToken` (unique), `IsQrPrinted`, `QrLastPrintedDate`
 - Legacy support: `LegacySourceId`
 
 #### Client
+
 - Client entity with user linking
 - Fields: `RelatedUserId` (FK to ApplicationUser), `LegacyCustomerId`
 - DTO includes: `HasAccount` (computed property)
@@ -265,15 +293,18 @@ All DTOs use `[JsonPropertyName("snake_case")]` to match Paymob API:
 ### Enums
 
 #### PaymentMethod
+
 - `Cash = 1`, `BankTransfer = 2`, `CreditCard = 3`, `DebitCard = 4`
 - `Stripe = 5`, `PayPal = 6`, `Fawry = 7`, `Paymob = 8`
 - `MobileWallet = 9`, `Check = 10`, `CompanyCredit = 11`
 - `Delegate = 12`, `Gateway = 13`, `Installment = 14` (reserved)
 
 #### PaymentPlan
+
 - `OneTime = 1`, `Installment = 2` (reserved)
 
 #### PaymentStatus
+
 - `NotRequired = 0`, `Pending = 1`, `Processing = 2`, `Completed = 3`
 - `Failed = 4`, `Cancelled = 5`, `Refunded = 6`
 - `Unpaid = 7`, `PendingCollection = 8`, `Collected = 9`, `PaidOnline = 10`
@@ -283,6 +314,7 @@ All DTOs use `[JsonPropertyName("snake_case")]` to match Paymob API:
 ## API Endpoints
 
 ### Maintenance Module
+
 - `POST /api/MaintenanceRequest` - Create request
 - `GET /api/MaintenanceRequest/{id}` - Get request details
 - `POST /api/MaintenanceRequest/{id}/assign` - Assign engineer
@@ -292,15 +324,18 @@ All DTOs use `[JsonPropertyName("snake_case")]` to match Paymob API:
 - `POST /api/SparePartRequest/{id}/customer-decision` - Customer approval
 
 ### Admin Module
+
 - `POST /api/Admin/Client/LinkAccount` - Link client to user
 - `POST /api/Admin/Client/UnlinkAccount` - Unlink client from user
 
 ### Equipment Module
+
 - `POST /api/Equipment/Qr/MarkPrinted` - Mark QR as printed
 - `GET /api/Equipment` - Get all equipment
 - `GET /api/Equipment/{id}` - Get equipment details
 
 ### Legacy Integration
+
 - `POST /api/LegacyImport/import-all` - Import all legacy data
 - `POST /api/LegacyImport/import-clients` - Import clients
 - `POST /api/LegacyImport/import-equipment` - Import equipment
@@ -310,6 +345,7 @@ All DTOs use `[JsonPropertyName("snake_case")]` to match Paymob API:
 - `GET /api/LegacyMedia/check/{fileName}` - Check file existence
 
 ### Payment Module
+
 - `POST /api/Payment` - Create payment
 - `POST /api/Payment/{id}/stripe` - Process Stripe payment
 - `POST /api/Payment/{id}/paypal` - Process PayPal payment
@@ -325,36 +361,36 @@ All DTOs use `[JsonPropertyName("snake_case")]` to match Paymob API:
 
 ```json
 {
-  "ConnectionStrings": {
-    "DefaultConnection": "...",
-    "Redis": "localhost:6379"
-  },
-  "ConnectionSettings": {
-    "Mode": "Remote",
-    "LocalConnectionString": "...",
-    "RemoteConnectionString": "...",
-    "LocalMediaPath": "C:\\LegacyMedia",
-    "RemoteMediaPath": "\\\\10.10.9.104\\LegacyMedia",
-    "LegacyMediaApiBaseUrl": "http://10.10.9.104:5266",
-    "LegacyMediaPaths": "D:\\Soit-Med\\legacy\\SOIT\\..."
-  },
-  "Paymob": {
-    "ApiKey": "",
-    "HmacSecret": "",
-    "IntegrationId_Card": "",
-    "IntegrationId_Wallet": "",
-    "IntegrationId_Fawry": "",
-    "IframeId": ""
-  },
-  "ContractMaintenance": {
-    "ScheduleDaysAhead": 7,
-    "RunHour": 2
-  },
-  "JWT": {
-    "ValidIss": "http://localhost:58868",
-    "ValidAud": "http://localhost:4200",
-    "SecritKey": "..."
-  }
+	"ConnectionStrings": {
+		"DefaultConnection": "...",
+		"Redis": "localhost:6379"
+	},
+	"ConnectionSettings": {
+		"Mode": "Remote",
+		"LocalConnectionString": "...",
+		"RemoteConnectionString": "...",
+		"LocalMediaPath": "C:\\LegacyMedia",
+		"RemoteMediaPath": "\\\\192.168.1.8\\LegacyMedia",
+		"LegacyMediaApiBaseUrl": "http://192.168.1.13:5266",
+		"LegacyMediaPaths": "D:\\Soit-Med\\legacy\\SOIT\\..."
+	},
+	"Paymob": {
+		"ApiKey": "",
+		"HmacSecret": "",
+		"IntegrationId_Card": "",
+		"IntegrationId_Wallet": "",
+		"IntegrationId_Fawry": "",
+		"IframeId": ""
+	},
+	"ContractMaintenance": {
+		"ScheduleDaysAhead": 7,
+		"RunHour": 2
+	},
+	"JWT": {
+		"ValidIss": "http://localhost:58868",
+		"ValidAud": "http://localhost:4200",
+		"SecritKey": "..."
+	}
 }
 ```
 
@@ -363,11 +399,13 @@ All DTOs use `[JsonPropertyName("snake_case")]` to match Paymob API:
 ## Database Migrations
 
 ### Key Migrations
+
 - `AddLegacyAndQrSupport` - Adds QR token, legacy fields to Equipment and Client
 - `MaintenanceLifecycleModule_Migration` - Complete maintenance lifecycle schema
 - Manual SQL scripts available in `Scripts/` directory
 
 ### Migration Commands
+
 ```bash
 # Create migration
 dotnet ef migrations add MigrationName --project SoitMed
@@ -384,12 +422,14 @@ dotnet ef migrations script --project SoitMed
 ## Development Setup
 
 ### Prerequisites
+
 - .NET 8.0 SDK
 - SQL Server (Local or Remote)
 - Visual Studio 2022 or VS Code
 - Redis (optional, for distributed caching)
 
 ### Setup Steps
+
 1. Clone repository
 2. Update `appsettings.json` with connection strings
 3. Restore NuGet packages: `dotnet restore`
@@ -397,6 +437,7 @@ dotnet ef migrations script --project SoitMed
 5. Run application: `dotnet run`
 
 ### Swagger Documentation
+
 Access Swagger UI at: `http://localhost:58868/swagger`
 
 ---
@@ -404,20 +445,22 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 ## Important Notes for Future Development
 
 ### 1. Installment Payment Support (Reserved)
+
 - **Database Fields**: Already added to `MaintenanceRequest` and `Invoice` entities
-  - `PaymentPlan?` (enum)
-  - `InstallmentMonths?` (int)
-  - `CollectionDelegateId?` (FK to ApplicationUser)
+     - `PaymentPlan?` (enum)
+     - `InstallmentMonths?` (int)
+     - `CollectionDelegateId?` (FK to ApplicationUser)
 - **Code Structure**: `InstallmentPaymentStrategy` class exists but returns error
 - **Enum**: `PaymentMethod.Installment` exists but not used in UI
-- **To Implement**: 
-  - Implement `InstallmentPaymentStrategy.ProcessPaymentAsync()`
-  - Create `InstallmentSchedule` entity
-  - Add monthly payment tracking
-  - Add collection delegate assignment
-  - Update UI to show installment option
+- **To Implement**:
+     - Implement `InstallmentPaymentStrategy.ProcessPaymentAsync()`
+     - Create `InstallmentSchedule` entity
+     - Add monthly payment tracking
+     - Add collection delegate assignment
+     - Update UI to show installment option
 
 ### 2. Legacy Media Files
+
 - **Legacy Media API**: Separate API project (`soitmed_data_backend`) serves legacy files
 - **Integration**: Main backend proxies requests to legacy API
 - **File Paths**: Configured in `ConnectionSettings.LegacyMediaPaths`
@@ -425,22 +468,26 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 - **Important**: Ensure legacy media API is running and accessible
 
 ### 3. Connection Settings
+
 - **Mode Switching**: Change `ConnectionSettings.Mode` to switch between Local/Remote
 - **Media Paths**: Different paths for local vs remote access
 - **Legacy API**: URL must be accessible from main backend server
 
 ### 4. Payment Gateway Integration
+
 - **Paymob**: DTOs ready, configuration needed in appsettings.json
 - **Strategy Pattern**: Easy to add new payment gateways
 - **Current Support**: Cash and Gateway (Credit Card) payments only
 - **Future**: Installment payments reserved but not implemented
 
 ### 5. Warehouse Approval Workflow
+
 - **Required Step**: Warehouse Keeper must approve spare parts before engineer can proceed
 - **Status Flow**: `Checking` → `ReadyForEngineer` (if approved) or `Cancelled` (if rejected)
 - **Notification**: Engineer notified of approval/rejection decision
 
 ### 6. Cost Calculation
+
 - **Formula**: `TotalAmount = LaborFees + Sum(Approved Spare Parts CustomerPrice)`
 - **Approved Parts Only**: Only spare parts with `WarehouseApproved = true` and `CustomerApproved = true` are included
 - **Invoice**: Automatically created when job is finalized
@@ -452,6 +499,7 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 ### Implemented Features (This Session)
 
 #### 1. Maintenance Request & Lifecycle Module
+
 - Complete workflow from request creation to payment closure
 - Warehouse approval workflow for spare parts
 - Cost calculation (Labor Fees + Approved Spare Parts)
@@ -459,6 +507,7 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 - Invoice generation and tracking
 
 #### 2. Payment Strategy Pattern
+
 - `IPaymentStrategy` interface for extensible payment processing
 - `CashPaymentStrategy` for cash payments
 - `VisaPaymentStrategy` for gateway payments
@@ -466,6 +515,7 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 - `PaymentStrategyFactory` for automatic strategy selection
 
 #### 3. Legacy Data Integration
+
 - `LegacyImporterService` for importing clients, equipment, and visits
 - Support for Local/Remote connection modes
 - File-based error logging
@@ -473,6 +523,7 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 - Client-to-User linking support
 
 #### 4. Legacy Media Files Integration
+
 - `LegacyMediaService` for accessing legacy media files
 - Proxy endpoints to legacy media API
 - File existence checking
@@ -480,16 +531,19 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 - Integration with `soitmed_data_backend` API
 
 #### 5. Admin & Support Capabilities
+
 - Client-to-User account linking
 - QR code print status tracking
 - Enhanced DTOs with new fields
 
 #### 6. Paymob Payment Gateway
+
 - Complete DTO structure with snake_case JSON properties
 - Configuration support in appsettings.json
 - Ready for API integration
 
 #### 7. Database Schema Updates
+
 - `Invoice` entity for invoice management
 - Extended `MaintenanceRequest` with labor fees and installment fields
 - Extended `SparePartRequest` with warehouse approval fields
@@ -508,6 +562,7 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 ### Files Created/Modified
 
 #### New Files
+
 - `Services/Payment/IPaymentStrategy.cs`
 - `Services/Payment/CashPaymentStrategy.cs`
 - `Services/Payment/VisaPaymentStrategy.cs`
@@ -523,6 +578,7 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 - `Documentation/LEGACY_MEDIA_INTEGRATION.md`
 
 #### Modified Files
+
 - `Models/Equipment/MaintenanceRequest.cs` - Added labor fees and installment fields
 - `Models/Equipment/SparePartRequest.cs` - Added warehouse approval fields
 - `Models/Equipment/Equipment.cs` - Added QR code fields
@@ -540,6 +596,7 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 - `DTO/EquipmentDTO.cs` - Added QrToken and IsQrPrinted to EquipmentResponseDTO
 
 ### Testing Checklist
+
 - [ ] Create maintenance request
 - [ ] Assign engineer
 - [ ] Request spare parts
@@ -560,12 +617,14 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 ## Performance & Caching
 
 ### Caching Layer
+
 - **Redis Support**: Distributed caching with Redis
 - **Memory Fallback**: Automatic fallback to in-memory cache
 - **Cache Keys**: Centralized in `CacheKeys.cs`
 - **Cache Duration**: Configurable per data type (2-24 hours)
 
 ### Database Optimization
+
 - **Connection Pooling**: Max 300, Min 20 connections
 - **Performance Indexes**: Comprehensive indexes on frequently queried fields
 - **AsNoTracking**: Used for read-only legacy data queries
@@ -575,16 +634,19 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 ## Security
 
 ### Authentication & Authorization
+
 - JWT token-based authentication
 - Role-based authorization with `[Authorize(Roles = "...")]`
 - Custom authorization helpers for complex scenarios
 
 ### Input Validation
+
 - Data annotations on DTOs
 - FluentValidation for complex validations
 - Custom validation extensions
 
 ### File Security
+
 - Path traversal protection for file access
 - File type and size validation
 - Secure file upload handling
@@ -594,12 +656,14 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 ## Documentation
 
 ### Technical Documentation
+
 - `Documentation/MAINTENANCE_LIFECYCLE_IMPLEMENTATION.md` - Complete maintenance lifecycle guide
 - `Documentation/LEGACY_MEDIA_INTEGRATION.md` - Legacy media files integration guide
 - `Documentation/API_DOCUMENTATION_REACT_TEAMS.md` - API reference for React teams
 - Additional documentation files in `Documentation/` directory
 
 ### Code Documentation
+
 - XML comments on all public APIs
 - Inline comments for complex business logic
 - README files for major modules
@@ -609,6 +673,7 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 ## Deployment
 
 ### Pre-Deployment Checklist
+
 1. Update `appsettings.json` with production connection strings
 2. Configure `ConnectionSettings.Mode` (Remote for production)
 3. Set `LegacyMediaApiBaseUrl` to production legacy API URL
@@ -619,7 +684,9 @@ Access Swagger UI at: `http://localhost:58868/swagger`
 8. Configure Redis for distributed caching (if using)
 
 ### Environment Variables
+
 Consider using environment variables for sensitive configuration:
+
 - Database connection strings
 - JWT secret key
 - Payment gateway credentials
@@ -632,18 +699,21 @@ Consider using environment variables for sensitive configuration:
 ### Common Issues
 
 #### Legacy Media Files Not Found
+
 1. Verify legacy media API is running
 2. Check `LegacyMediaApiBaseUrl` in appsettings.json
 3. Verify network connectivity to legacy API server
 4. Check file paths in legacy file system
 
 #### Payment Processing Errors
+
 1. Verify payment gateway credentials
 2. Check payment strategy registration in DI container
 3. Review payment transaction logs
 4. Verify invoice creation succeeded
 
 #### Database Connection Issues
+
 1. Check connection string format
 2. Verify SQL Server is accessible
 3. Check firewall rules
@@ -654,6 +724,7 @@ Consider using environment variables for sensitive configuration:
 ## Future Enhancements
 
 ### Planned Features
+
 1. **Installment Payments**: Complete implementation of installment payment strategy
 2. **Collection Delegates**: Assignment and tracking of collection delegates
 3. **File Migration**: Option to migrate legacy files to new storage
@@ -662,6 +733,7 @@ Consider using environment variables for sensitive configuration:
 6. **Advanced Analytics**: Enhanced reporting and analytics dashboard
 
 ### Reserved for Future
+
 - Installment payment processing logic
 - Collection delegate assignment workflow
 - Monthly payment tracking and reminders
@@ -678,6 +750,7 @@ Proprietary - SoitMed Medical Equipment Management System
 ## Support
 
 For technical support or questions, refer to:
+
 - Technical documentation in `Documentation/` directory
 - API documentation via Swagger UI
 - Code comments and XML documentation

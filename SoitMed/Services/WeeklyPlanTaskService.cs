@@ -339,6 +339,30 @@ namespace SoitMed.Services
                 if (updateDto.Notes != null)
                     task.Notes = updateDto.Notes;
 
+                // Update task completion status
+                if (updateDto.IsCompleted.HasValue)
+                {
+                    task.IsCompleted = updateDto.IsCompleted.Value;
+                    // If marking as completed, also set status to "Completed"
+                    if (updateDto.IsCompleted.Value)
+                    {
+                        task.Status = "Completed";
+                    }
+                    else if (task.Status == "Completed")
+                    {
+                        // If unmarking completion, reset status to "Planned"
+                        task.Status = "Planned";
+                    }
+                }
+
+                // Update status directly if provided
+                if (!string.IsNullOrEmpty(updateDto.Status))
+                {
+                    task.Status = updateDto.Status;
+                    // Sync IsCompleted with Status
+                    task.IsCompleted = updateDto.Status == "Completed";
+                }
+
                 await UnitOfWork.WeeklyPlanTasks.UpdateAsync(task);
                 await UnitOfWork.SaveChangesAsync();
 
@@ -551,6 +575,10 @@ namespace SoitMed.Services
                 Id = task.Id,
                 WeeklyPlanId = task.WeeklyPlanId,
                 Title = task.Title,
+                Description = task.Description,
+                IsCompleted = task.IsCompleted,
+                Status = task.Status,
+                DisplayOrder = task.DisplayOrder,
                 ClientId = task.ClientId,
                 ClientName = task.ClientName,
                 ClientStatus = task.ClientStatus,

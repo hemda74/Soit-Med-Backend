@@ -111,6 +111,7 @@ namespace SoitMed.Models
         public DbSet<Legacy.LegacyOrderOutItem> LegacyOrderOutItems { get; set; }
         public DbSet<Legacy.LegacyMaintenanceVisit> LegacyMaintenanceVisits { get; set; }
         public DbSet<Legacy.LegacyMaintenanceContract> LegacyMaintenanceContracts { get; set; }
+        public DbSet<Legacy.LegacyEmployee> LegacyEmployees { get; set; }
         
         public Context(DbContextOptions<Context> options) : base(options)
         {
@@ -1038,6 +1039,15 @@ namespace SoitMed.Models
 
             modelBuilder.Entity<Contract.InstallmentSchedule>()
                 .HasIndex(ins => new { ins.Status, ins.DueDate });
+
+            // LegacyEmployees configuration
+            modelBuilder.Entity<Legacy.LegacyEmployee>()
+                .HasIndex(le => le.LegacyEmployeeId)
+                .IsUnique();
+
+            modelBuilder.Entity<Legacy.LegacyEmployee>()
+                .HasIndex(le => new { le.LegacyEmployeeId, le.IsActive })
+                .HasFilter("[IsActive] = 1");
         }
     }
 }

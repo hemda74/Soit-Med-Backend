@@ -19,6 +19,9 @@ namespace SoitMed.Models.Legacy
 
         [Column("OO_Date", TypeName = "datetime")]
         public DateTime? OoDate { get; set; }
+
+        [Column("Cus_ID")]
+        public int? CusId { get; set; }
     }
 }
 

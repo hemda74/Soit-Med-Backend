@@ -38,8 +38,10 @@ namespace SoitMed.Models.Legacy
         [StringLength(500)]
         public string? Files { get; set; }
 
+        [Column("RepVisit_Status_ID")]
         public int? RepVisitStatusId { get; set; }
 
+        [Column("Recpt_RepVisit_Type_ID")]
         public int? RecptRepVisitTypeId { get; set; }
     }
 }
