@@ -185,8 +185,8 @@ Flexible connection management for local development and remote server access.
 		"LocalConnectionString": "...",
 		"RemoteConnectionString": "...",
 		"LocalMediaPath": "C:\\LegacyMedia",
-		"RemoteMediaPath": "\\\\192.168.1.8\\LegacyMedia",
-		"LegacyMediaApiBaseUrl": "http://192.168.1.8:5266",
+		"RemoteMediaPath": "\\\\10.10.9.100\\LegacyMedia",
+		"LegacyMediaApiBaseUrl": "http://10.10.9.100:5266",
 		"LegacyMediaPaths": "D:\\Soit-Med\\legacy\\SOIT\\..."
 	}
 }
@@ -370,7 +370,7 @@ All DTOs use `[JsonPropertyName("snake_case")]` to match Paymob API:
 		"LocalConnectionString": "...",
 		"RemoteConnectionString": "...",
 		"LocalMediaPath": "C:\\LegacyMedia",
-		"RemoteMediaPath": "\\\\192.168.1.8\\LegacyMedia",
+		"RemoteMediaPath": "\\\\10.10.9.100\\LegacyMedia",
 		"LegacyMediaApiBaseUrl": "http://192.168.1.13:5266",
 		"LegacyMediaPaths": "D:\\Soit-Med\\legacy\\SOIT\\..."
 	},

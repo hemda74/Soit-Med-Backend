@@ -14,7 +14,7 @@ namespace SoitMed.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<LegacyMediaService> _logger;
         private readonly string[] _legacyMediaPaths;
-        private readonly string _remoteServerIp = "192.168.1.8";
+        private readonly string _remoteServerIp = "10.10.9.100";
 
         public LegacyMediaService(
             IOptions<ConnectionSettings> connectionSettings,
@@ -264,8 +264,8 @@ namespace SoitMed.Services
                 
                 // Try UNC path for remote access
                 // Format depends on OS:
-                // Windows: \\192.168.1.8\D$\...
-                // macOS/Linux: smb://192.168.1.8/D$/... or //192.168.1.8/D$/...
+                // Windows: \\10.10.9.100\D$\...
+                // macOS/Linux: smb://10.10.9.100/D$/... or //10.10.9.100/D$/...
                 if (basePath.StartsWith(@"D:\"))
                 {
                     // Windows UNC format

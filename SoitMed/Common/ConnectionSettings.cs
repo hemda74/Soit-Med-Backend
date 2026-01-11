@@ -30,13 +30,13 @@ namespace SoitMed.Common
 
         /// <summary>
         /// Remote media files path (network share or UNC path)
-        /// Format: \\192.168.1.8\LegacyMedia or mapped drive
+        /// Format: \\10.10.9.100\LegacyMedia or mapped drive
         /// </summary>
         public string RemoteMediaPath { get; set; } = string.Empty;
 
         /// <summary>
         /// Legacy Media API Base URL (for serving legacy media files)
-        /// Example: http://localhost:5266 or http://192.168.1.8:5266
+        /// Example: http://localhost:5266 or http://10.10.9.100:5266
         /// </summary>
         public string LegacyMediaApiBaseUrl { get; set; } = string.Empty;
 

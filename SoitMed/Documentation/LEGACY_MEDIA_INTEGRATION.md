@@ -9,7 +9,7 @@ This document describes the integration between the main SoitMed backend and the
 ### Legacy Media API (`soitmed_data_backend`)
 
 - **Port**: 5266 (configurable)
-- **Base URL**: `http://192.168.1.8:5266` (or `http://localhost:5266` for local)
+- **Base URL**: `http://10.10.9.100:5266` (or `http://localhost:5266` for local)
 - **Purpose**: Serves legacy media files from the old SOIT system
 - **Media Paths**:
      - `D:\Soit-Med\legacy\SOIT\Ar\MNT\FileUploaders\Reports`
@@ -30,7 +30,7 @@ This document describes the integration between the main SoitMed backend and the
 {
 	"ConnectionSettings": {
 		"Mode": "Remote",
-		"LegacyMediaApiBaseUrl": "http://192.168.1.8:5266",
+		"LegacyMediaApiBaseUrl": "http://10.10.9.100:5266",
 		"LegacyMediaPaths": "D:\\Soit-Med\\legacy\\SOIT\\Ar\\MNT\\FileUploaders\\Reports,D:\\Soit-Med\\legacy\\SOIT\\UploadFiles\\Images,D:\\Soit-Med\\legacy\\SOIT\\UploadFiles\\Files"
 	}
 }
@@ -67,7 +67,7 @@ GET /api/LegacyMedia/url/{fileName}
 ```json
 {
 	"fileName": "81d25aa6f0f946988e394f05fa351abf.jpg",
-	"url": "http://192.168.1.8:5266/api/Media/files/81d25aa6f0f946988e394f05fa351abf.jpg"
+	"url": "http://10.10.9.100:5266/api/Media/files/81d25aa6f0f946988e394f05fa351abf.jpg"
 }
 ```
 
@@ -95,7 +95,7 @@ GET /api/LegacyMedia/check/{fileName}
 ```csharp
 var legacyMediaService = serviceProvider.GetService<ILegacyMediaService>();
 var fileUrl = legacyMediaService.GetMediaFileUrl("filename.jpg");
-// Returns: "http://192.168.1.8:5266/api/Media/files/filename.jpg"
+// Returns: "http://10.10.9.100:5266/api/Media/files/filename.jpg"
 ```
 
 ### Checking File Existence
@@ -169,7 +169,7 @@ const getLegacyMediaUrl = (fileName: string) => {
 ```typescript
 // Get media file URL
 const getLegacyMediaUrl = (fileName: string) => {
-	const baseUrl = 'http://192.168.1.8:58868'; // Main API base URL
+	const baseUrl = 'http://10.10.9.100:58868'; // Main API base URL
 	return `${baseUrl}/api/LegacyMedia/files/${encodeURIComponent(
 		fileName
 	)}`;
