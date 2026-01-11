@@ -239,6 +239,9 @@ namespace SoitMed
                 // Register Enhanced Maintenance Service
                 builder.Services.AddScoped<IEnhancedMaintenanceService, EnhancedMaintenanceService>();
                 
+                // Register Comprehensive Maintenance Service
+                builder.Services.AddScoped<IComprehensiveMaintenanceService, ComprehensiveMaintenanceService>();
+                
                 // Configure ContractMaintenance options
                 builder.Services.Configure<SoitMed.Services.ContractMaintenanceOptions>(
                     builder.Configuration.GetSection(SoitMed.Services.ContractMaintenanceOptions.SectionName));

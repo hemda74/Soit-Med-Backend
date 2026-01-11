@@ -197,7 +197,7 @@ namespace SoitMed.Services
                 // Map to DTOs
                 var equipmentDTOs = equipmentList.Select(e => new EquipmentResponseDTO
                 {
-                    Id = e.Id,
+                    Id = e.Id.ToString(),
                     Name = e.Name,
                     QRCode = e.QRCode,
                     QRCodeImageData = e.QRCodeImageData,
@@ -210,7 +210,7 @@ namespace SoitMed.Services
                     HospitalId = e.HospitalId,
                     HospitalName = e.Hospital?.Name ?? string.Empty,
                     RepairVisitCount = e.RepairVisitCount,
-                    Status = e.Status,
+                    Status = e.Status.ToString(),
                     CreatedAt = e.CreatedAt,
                     LastMaintenanceDate = e.LastMaintenanceDate,
                     IsActive = e.IsActive,
@@ -313,7 +313,7 @@ namespace SoitMed.Services
                 // Map to DTOs
                 var equipmentDTOs = equipmentList.Select(e => new EquipmentResponseDTO
                 {
-                    Id = e.Id,
+                    Id = e.Id.ToString(),
                     Name = e.Name,
                     QRCode = e.QRCode,
                     QRCodeImageData = e.QRCodeImageData,
@@ -326,7 +326,7 @@ namespace SoitMed.Services
                     HospitalId = e.HospitalId,
                     HospitalName = e.Hospital?.Name ?? string.Empty,
                     RepairVisitCount = e.RepairVisitCount,
-                    Status = e.Status,
+                    Status = e.Status.ToString(),
                     CreatedAt = e.CreatedAt,
                     LastMaintenanceDate = e.LastMaintenanceDate,
                     IsActive = e.IsActive,

@@ -510,13 +510,13 @@ namespace SoitMed.Services
             var payments = request.Payments?.Select(p => new PaymentResponseDTO
             {
                 Id = p.Id,
-                MaintenanceRequestId = p.MaintenanceRequestId,
-                CustomerId = p.CustomerId,
+                MaintenanceRequestId = p.MaintenanceRequestId.ToString(),
+                CustomerId = p.CustomerId.ToString(),
                 CustomerName = customer?.UserName ?? "",
                 Amount = p.Amount,
-                PaymentMethod = p.PaymentMethod,
+                PaymentMethod = p.PaymentMethod.ToString(),
                 PaymentMethodName = p.PaymentMethod.ToString(),
-                Status = p.Status,
+                Status = p.Status.ToString(),
                 StatusName = p.Status.ToString(),
                 TransactionId = p.TransactionId,
                 PaymentReference = p.PaymentReference,

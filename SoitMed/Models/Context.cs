@@ -39,10 +39,7 @@ namespace SoitMed.Models
         public DbSet<SparePartRequest> SparePartRequests { get; set; }
         public DbSet<MaintenanceRequestRating> MaintenanceRequestRatings { get; set; }
         
-        // Payment entities
-        public DbSet<Payment.Invoice> Invoices { get; set; }
         public DbSet<VisitAssignees> VisitAssignees { get; set; }
-        public DbSet<VisitReport> VisitReports { get; set; }
         
         // Audit entities
         public DbSet<Core.EntityChangeLog> EntityChangeLogs { get; set; }
@@ -112,6 +109,10 @@ namespace SoitMed.Models
         public DbSet<Legacy.LegacyMaintenanceVisit> LegacyMaintenanceVisits { get; set; }
         public DbSet<Legacy.LegacyMaintenanceContract> LegacyMaintenanceContracts { get; set; }
         public DbSet<Legacy.LegacyEmployee> LegacyEmployees { get; set; }
+
+        // Comprehensive Maintenance Module entities
+        public DbSet<VisitReport> VisitReports { get; set; }
+        public DbSet<Invoice> Invoices { get; set; }
         
         public Context(DbContextOptions<Context> options) : base(options)
         {
@@ -176,177 +177,6 @@ namespace SoitMed.Models
                 .HasForeignKey(eg => eg.GovernorateId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Ensure unique combination of Engineer-Governorate
-            modelBuilder.Entity<EngineerGovernorate>()
-                .HasIndex(eg => new { eg.EngineerId, eg.GovernorateId })
-                .IsUnique();
-
-            // Configure unique indexes
-            modelBuilder.Entity<Governorate>()
-                .HasIndex(g => g.Name)
-                .IsUnique();
-
-            modelBuilder.Entity<Role>()
-                .HasIndex(r => r.RoleName)
-                .IsUnique();
-
-            // Configure optional User relationships
-            modelBuilder.Entity<Doctor>()
-                .HasOne(d => d.User)
-                .WithMany()
-                .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<Technician>()
-                .HasOne(t => t.User)
-                .WithMany()
-                .HasForeignKey(t => t.UserId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<Engineer>()
-                .HasOne(e => e.User)
-                .WithMany()
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            // Configure Equipment relationships
-            modelBuilder.Entity<Equipment.Equipment>()
-                .HasOne(e => e.Hospital)
-                .WithMany(h => h.Equipment)
-                .HasForeignKey(e => e.HospitalId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<Equipment.Equipment>()
-                .HasOne(e => e.Customer)
-                .WithMany()
-                .HasForeignKey(e => e.CustomerId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            // Ensure Equipment has either HospitalId OR CustomerId, not both
-            modelBuilder.Entity<Equipment.Equipment>()
-                .ToTable(t => t.HasCheckConstraint("CK_Equipment_Owner",
-                    "(HospitalId IS NOT NULL AND CustomerId IS NULL) OR (HospitalId IS NULL AND CustomerId IS NOT NULL)"));
-
-            // Ensure unique QR codes
-            modelBuilder.Entity<Equipment.Equipment>()
-                .HasIndex(e => e.QRCode)
-                .IsUnique();
-
-            // Ensure unique QrToken
-            modelBuilder.Entity<Equipment.Equipment>()
-                .HasIndex(e => e.QrToken)
-                .IsUnique();
-
-            // Configure Client relationships
-            modelBuilder.Entity<Client>()
-                .HasOne(c => c.RelatedUser)
-                .WithMany()
-                .HasForeignKey(c => c.RelatedUserId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            // Configure RepairRequest relationships
-            modelBuilder.Entity<RepairRequest>()
-                .HasOne(rr => rr.Equipment)
-                .WithMany(e => e.RepairRequests)
-                .HasForeignKey(rr => rr.EquipmentId)
-                .OnDelete(DeleteBehavior.NoAction);
-
-            modelBuilder.Entity<RepairRequest>()
-                .HasOne(rr => rr.RequestingDoctor)
-                .WithMany(d => d.RepairRequests)
-                .HasForeignKey(rr => rr.DoctorId)
-                .OnDelete(DeleteBehavior.NoAction);
-
-            modelBuilder.Entity<RepairRequest>()
-                .HasOne(rr => rr.RequestingTechnician)
-                .WithMany(t => t.RepairRequests)
-                .HasForeignKey(rr => rr.TechnicianId)
-                .OnDelete(DeleteBehavior.NoAction);
-
-            modelBuilder.Entity<RepairRequest>()
-                .HasOne(rr => rr.AssignedEngineer)
-                .WithMany(e => e.AssignedRepairRequests)
-                .HasForeignKey(rr => rr.AssignedEngineerId)
-                .OnDelete(DeleteBehavior.NoAction);
-
-            // Configure decimal precision for RepairCost
-            modelBuilder.Entity<RepairRequest>()
-                .Property(rr => rr.RepairCost)
-                .HasPrecision(18, 2);
-
-            // Ensure either Doctor or Technician is specified (not both)
-            modelBuilder.Entity<RepairRequest>()
-                .ToTable(t => t.HasCheckConstraint("CK_RepairRequest_Requestor", 
-                    "(DoctorId IS NOT NULL AND TechnicianId IS NULL) OR (DoctorId IS NULL AND TechnicianId IS NOT NULL)"));
-
-            // Configure UserImage relationships
-            modelBuilder.Entity<UserImage>()
-                .HasOne(ui => ui.User)
-                .WithMany(u => u.UserImages)
-                .HasForeignKey(ui => ui.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Configure unique constraint for profile image per user
-            modelBuilder.Entity<UserImage>()
-                .HasIndex(ui => new { ui.UserId, ui.IsProfileImage })
-                .HasFilter("[IsProfileImage] = 1")
-                .IsUnique();
-
-            // Configure Sales Funnel entities
-            // Note: ActivityLog relationships with Deal and Offer are handled in their respective models
-
-            // Configure RequestWorkflow relationships
-            modelBuilder.Entity<RequestWorkflow>()
-                .HasOne(rw => rw.ActivityLog)
-                .WithMany()
-                .HasForeignKey(rw => rw.ActivityLogId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<RequestWorkflow>()
-                .HasOne(rw => rw.Offer)
-                .WithMany()
-                .HasForeignKey(rw => rw.OfferId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<RequestWorkflow>()
-                .HasOne(rw => rw.Deal)
-                .WithMany()
-                .HasForeignKey(rw => rw.DealId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<RequestWorkflow>()
-                .HasOne(rw => rw.DeliveryTerms)
-                .WithMany()
-                .HasForeignKey(rw => rw.DeliveryTermsId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<RequestWorkflow>()
-                .HasOne(rw => rw.PaymentTerms)
-                .WithMany()
-                .HasForeignKey(rw => rw.PaymentTermsId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            // Configure Notification relationships
-            modelBuilder.Entity<Notification>()
-                .HasOne(n => n.RequestWorkflow)
-                .WithMany()
-                .HasForeignKey(n => n.RequestWorkflowId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<Notification>()
-                .HasOne(n => n.ActivityLog)
-                .WithMany()
-                .HasForeignKey(n => n.ActivityLogId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            // Configure DeviceToken relationships
-            modelBuilder.Entity<DeviceToken>()
-                .HasOne(dt => dt.User)
-                .WithMany()
-                .HasForeignKey(dt => dt.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Index for efficient queries
             modelBuilder.Entity<DeviceToken>()
                 .HasIndex(dt => new { dt.UserId, dt.IsActive });
 
@@ -1048,6 +878,153 @@ namespace SoitMed.Models
             modelBuilder.Entity<Legacy.LegacyEmployee>()
                 .HasIndex(le => new { le.LegacyEmployeeId, le.IsActive })
                 .HasFilter("[IsActive] = 1");
+
+            // ========== COMPREHENSIVE MAINTENANCE MODULE CONFIGURATIONS ==========
+            
+            // MaintenanceContract relationships
+            modelBuilder.Entity<MaintenanceContract>()
+                .HasOne(mc => mc.Client)
+                .WithMany(c => c.MaintenanceContracts)
+                .HasForeignKey(mc => mc.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MaintenanceContract>()
+                .HasIndex(mc => mc.ContractNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<MaintenanceContract>()
+                .HasIndex(mc => new { mc.ClientId, mc.Status });
+
+            // ContractItem relationships
+            modelBuilder.Entity<ContractItem>()
+                .HasOne(ci => ci.Contract)
+                .WithMany(mc => mc.ContractItems)
+                .HasForeignKey(ci => ci.ContractId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ContractItem>()
+                .HasOne(ci => ci.Equipment)
+                .WithMany(e => e.ContractItems)
+                .HasForeignKey(ci => ci.EquipmentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ContractItem>()
+                .HasIndex(ci => new { ci.ContractId, ci.EquipmentId })
+                .IsUnique();
+
+            // VisitReport relationships
+            modelBuilder.Entity<VisitReport>()
+                .HasOne(vr => vr.Visit)
+                .WithOne(v => v.VisitReport)
+                .HasForeignKey<VisitReport>(vr => vr.VisitId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // MediaFile relationships
+            modelBuilder.Entity<MediaFile>()
+                .HasOne(mf => mf.Visit)
+                .WithMany(v => v.MediaFiles)
+                .HasForeignKey(mf => mf.VisitId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<MediaFile>()
+                .HasIndex(mf => new { mf.VisitId, mf.FileType });
+
+            // SparePart relationships
+            modelBuilder.Entity<SparePart>()
+                .HasIndex(sp => sp.PartNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<SparePart>()
+                .HasIndex(sp => new { sp.Category, sp.IsActive });
+
+            // UsedSparePart relationships
+            modelBuilder.Entity<UsedSparePart>()
+                .HasOne(usp => usp.Visit)
+                .WithMany(v => v.UsedSpareParts)
+                .HasForeignKey(usp => usp.VisitId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<UsedSparePart>()
+                .HasOne(usp => usp.SparePart)
+                .WithMany(sp => sp.UsedSpareParts)
+                .HasForeignKey(usp => usp.SparePartId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Invoice relationships
+            modelBuilder.Entity<Invoice>()
+                .HasOne(i => i.Client)
+                .WithMany(c => c.Invoices)
+                .HasForeignKey(i => i.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Invoice>()
+                .HasIndex(i => i.InvoiceNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<Invoice>()
+                .HasIndex(i => new { i.ClientId, i.Status });
+
+            // InvoiceItem relationships
+            modelBuilder.Entity<InvoiceItem>()
+                .HasOne(ii => ii.Invoice)
+                .WithMany(i => i.InvoiceItems)
+                .HasForeignKey(ii => ii.InvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Payment relationships
+            modelBuilder.Entity<Payment>()
+                .HasOne(p => p.Invoice)
+                .WithMany(i => i.Payments)
+                .HasForeignKey(p => p.InvoiceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Payment>()
+                .HasIndex(p => new { p.InvoiceId, p.PaymentDate });
+
+            // Configure decimal precision for financial fields
+            modelBuilder.Entity<MaintenanceContract>()
+                .Property(mc => mc.ContractValue)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<ContractItem>()
+                .Property(ci => ci.Price)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<SparePart>()
+                .Property(sp => sp.UnitPrice)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<UsedSparePart>()
+                .Property(usp => usp.UnitPrice)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<UsedSparePart>()
+                .Property(usp => usp.TotalPrice)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Invoice>()
+                .Property(i => i.TotalAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Invoice>()
+                .Property(i => i.TaxAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Invoice>()
+                .Property(i => i.DiscountAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<InvoiceItem>()
+                .Property(ii => ii.UnitPrice)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<InvoiceItem>()
+                .Property(ii => ii.TotalPrice)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Payment>()
+                .Property(p => p.Amount)
+                .HasPrecision(18, 2);
         }
     }
 }

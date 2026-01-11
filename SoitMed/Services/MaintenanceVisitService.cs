@@ -310,7 +310,7 @@ namespace SoitMed.Services
                 PurchaseDate = equipment.PurchaseDate,
                 WarrantyExpiry = equipment.WarrantyExpiry,
                 HospitalId = equipment.HospitalId ?? "",
-                Status = equipment.Status
+                Status = equipment.Status.ToString()
             };
         }
 
@@ -334,7 +334,7 @@ namespace SoitMed.Services
                 PurchaseDate = equipment.PurchaseDate,
                 WarrantyExpiry = equipment.WarrantyExpiry,
                 HospitalId = equipment.HospitalId ?? "",
-                Status = equipment.Status
+                Status = equipment.Status.ToString()
             };
         }
 

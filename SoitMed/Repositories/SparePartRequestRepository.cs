@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SoitMed.Models;
 using SoitMed.Models.Equipment;
 using SoitMed.Models.Enums;
+using SoitMed.Models.Core;
 
 namespace SoitMed.Repositories
 {
