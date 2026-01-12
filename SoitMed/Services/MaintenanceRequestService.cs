@@ -509,14 +509,14 @@ namespace SoitMed.Services
 
             var payments = request.Payments?.Select(p => new PaymentResponseDTO
             {
-                Id = p.Id,
-                MaintenanceRequestId = p.MaintenanceRequestId,
-                CustomerId = p.CustomerId,
+                Id = p.Id.ToString(),
+                MaintenanceRequestId = p.MaintenanceRequestId.ToString(),
+                CustomerId = p.CustomerId.ToString(),
                 CustomerName = customer?.UserName ?? "",
                 Amount = p.Amount,
-                PaymentMethod = p.PaymentMethod,
+                PaymentMethod = p.PaymentMethod.ToString(),
                 PaymentMethodName = p.PaymentMethod.ToString(),
-                Status = p.Status,
+                Status = p.Status.ToString(),
                 StatusName = p.Status.ToString(),
                 TransactionId = p.TransactionId,
                 PaymentReference = p.PaymentReference,
@@ -595,7 +595,7 @@ namespace SoitMed.Services
 
                 foreach (var Engineer in allEngineers)
                 {
-                    var EngineerWithGovs = await _unitOfWork.Engineers.GetEngineerWithGovernoratesAsync(Engineer.EngineerId);
+                    var EngineerWithGovs = await _unitOfWork.Engineers.GetEngineerWithGovernoratesAsync(int.Parse(Engineer.EngineerId));
                     if (EngineerWithGovs?.EngineerGovernorates != null)
                     {
                         var matches = EngineerWithGovs.EngineerGovernorates

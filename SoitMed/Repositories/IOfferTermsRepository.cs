@@ -4,7 +4,7 @@ namespace SoitMed.Repositories
 {
     public interface IOfferTermsRepository : IBaseRepository<OfferTerms>
     {
-        Task<OfferTerms?> GetByOfferIdAsync(long offerId, CancellationToken cancellationToken = default);
+        Task<OfferTerms?> GetByOfferIdAsync(string offerId, CancellationToken cancellationToken = default);
     }
 }
 

@@ -153,7 +153,7 @@ namespace SoitMed.Services
             return result;
         }
 
-        public async Task<IEnumerable<MaintenanceVisitResponseDTO>> GetVisitsByEquipmentIdAsync(int equipmentId)
+        public async Task<IEnumerable<MaintenanceVisitResponseDTO>> GetVisitsByEquipmentIdAsync(string equipmentId)
         {
             // First check if equipment exists in current database
             var equipment = await _unitOfWork.Equipment.GetByIdAsync(equipmentId);
@@ -180,7 +180,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Get visits from legacy TBS database for a machine (OOI_ID)
         /// </summary>
-        private async Task<List<MaintenanceVisitResponseDTO>> GetLegacyVisitsByMachineIdAsync(int machineId)
+        private async Task<List<MaintenanceVisitResponseDTO>> GetLegacyVisitsByMachineIdAsync(string machineId)
         {
             var result = new List<MaintenanceVisitResponseDTO>();
 
@@ -201,7 +201,7 @@ namespace SoitMed.Services
                 // Verify machine exists in legacy database
                 var machine = await tbsContext.StkOrderOutItems
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(ooi => ooi.OoiId == machineId);
+                    .FirstOrDefaultAsync(ooi => ooi.OoiId == int.Parse(machineId));
 
                 if (machine == null)
                 {
@@ -211,7 +211,7 @@ namespace SoitMed.Services
 
                 // Get visit history with employee names (ordered by date DESC)
                 var visitsHistory = await (from vr in tbsContext.MntVisitingReports.AsNoTracking()
-                                          where vr.OoiId == machineId
+                                          where vr.OoiId == int.Parse(machineId)
                                           join v in tbsContext.MntVisitings.AsNoTracking() on vr.VisitingId equals v.VisitingId
                                           orderby v.VisitingDate descending
                                           select new
@@ -310,7 +310,7 @@ namespace SoitMed.Services
                 PurchaseDate = equipment.PurchaseDate,
                 WarrantyExpiry = equipment.WarrantyExpiry,
                 HospitalId = equipment.HospitalId ?? "",
-                Status = equipment.Status
+                Status = equipment.Status.ToString()
             };
         }
 
@@ -334,7 +334,7 @@ namespace SoitMed.Services
                 PurchaseDate = equipment.PurchaseDate,
                 WarrantyExpiry = equipment.WarrantyExpiry,
                 HospitalId = equipment.HospitalId ?? "",
-                Status = equipment.Status
+                Status = equipment.Status.ToString()
             };
         }
 

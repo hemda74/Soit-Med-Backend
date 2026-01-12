@@ -8,7 +8,7 @@ namespace SoitMed.DTO
     public class LinkClientAccountDTO
     {
         [Required(ErrorMessage = "ClientId is required")]
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
 
         [Required(ErrorMessage = "UserId is required")]
         [MaxLength(450)]

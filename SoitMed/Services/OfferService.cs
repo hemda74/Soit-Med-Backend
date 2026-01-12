@@ -84,7 +84,7 @@ namespace SoitMed.Services
 
                 var offer = new SalesOffer
                 {
-                    OfferRequestId = createOfferDto.OfferRequestId,
+                    OfferRequestId = createOfferDto.OfferRequestId?.ToString(),
                     ClientId = createOfferDto.ClientId,
                     CreatedBy = userId, // SalesSupport/SalesManager who creates the offer
                     AssignedTo = assignedTo, // SalesMan or Customer who requested it
@@ -217,7 +217,7 @@ namespace SoitMed.Services
 
                 var offer = new SalesOffer
                 {
-                    OfferRequestId = createOfferDto.OfferRequestId, // REQUIRED - link to offer request
+                    OfferRequestId = createOfferDto.OfferRequestId?.ToString(), // REQUIRED - link to offer request
                     ClientId = createOfferDto.ClientId,
                     CreatedBy = userId, // SalesSupport/SalesManager who creates the offer
                     AssignedTo = assignedTo, // SalesMan or Customer who requested it
@@ -292,7 +292,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferResponseDTO?> GetOfferAsync(long offerId)
+        public async Task<OfferResponseDTO?> GetOfferAsync(string offerId)
         {
             try
             {
@@ -315,7 +315,7 @@ namespace SoitMed.Services
             {
                 // OPTIMIZED: Single method call loads offers + related data in O(1) queries (3 queries total)
                 var (offers, clientsDict, usersDict) = await _unitOfWork.SalesOffers
-                    .GetOffersByClientIdWithRelatedDataAsync(clientId);
+                    .GetOffersByClientIdWithRelatedDataAsync(clientId.ToString());
 
                 // Map synchronously using pre-loaded data - O(n) in-memory operation
                 return offers.Select(o => MapToOfferResponseDTO(o, clientsDict, usersDict)).ToList();
@@ -356,7 +356,7 @@ namespace SoitMed.Services
 
                 // OPTIMIZED: Single method call loads offers + related data in O(1) queries (3 queries total)
                 var (offers, clientsDict, usersDict) = await _unitOfWork.SalesOffers
-                    .GetOffersByClientIdWithRelatedDataAsync(clientId);
+                    .GetOffersByClientIdWithRelatedDataAsync(clientId.ToString());
 
                 // Map synchronously using pre-loaded data - O(n) in-memory operation
                 return offers.Select(o => MapToOfferResponseDTO(o, clientsDict, usersDict)).ToList();
@@ -463,7 +463,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferResponseDTO> UpdateOfferAsync(long offerId, CreateOfferDTO updateOfferDto, string userId)
+        public async Task<OfferResponseDTO> UpdateOfferAsync(string offerId, CreateOfferDTO updateOfferDto, string userId)
         {
             try
             {
@@ -529,7 +529,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Update offer by SalesManager - allows modification regardless of status
         /// </summary>
-        public async Task<OfferResponseDTO> UpdateOfferBySalesManagerAsync(long offerId, UpdateOfferDTO updateDto, string userId)
+        public async Task<OfferResponseDTO> UpdateOfferBySalesManagerAsync(string offerId, UpdateOfferDTO updateDto, string userId)
         {
             try
             {
@@ -553,7 +553,7 @@ namespace SoitMed.Services
 
                 // Update only provided fields (PATCH semantics)
                 if (updateDto.ClientId.HasValue)
-                    offer.ClientId = updateDto.ClientId.Value;
+                    offer.ClientId = updateDto.ClientId.Value.ToString();
 
                 if (!string.IsNullOrEmpty(updateDto.AssignedTo))
                     offer.AssignedTo = updateDto.AssignedTo;
@@ -625,7 +625,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferResponseDTO> SendToSalesManAsync(long offerId, string userId)
+        public async Task<OfferResponseDTO> SendToSalesManAsync(string offerId, string userId)
         {
             try
             {
@@ -664,9 +664,9 @@ namespace SoitMed.Services
                     await _unitOfWork.SalesOffers.UpdateAsync(offer);
                 
                 // Update OfferRequest status to Sent (if linked to a request)
-                if (offer.OfferRequestId.HasValue)
+                if (!string.IsNullOrEmpty(offer.OfferRequestId))
                 {
-                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId.Value);
+                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(long.Parse(offer.OfferRequestId));
                     if (offerRequest != null && offerRequest.Status != "Sent")
                     {
                         offerRequest.MarkAsSent();
@@ -751,7 +751,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferResponseDTO> SalesManagerApprovalAsync(long offerId, ApproveOfferDTO approvalDto, string salesManagerId)
+        public async Task<OfferResponseDTO> SalesManagerApprovalAsync(string offerId, ApproveOfferDTO approvalDto, string salesManagerId)
         {
             try
             {
@@ -905,7 +905,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferResponseDTO> RecordClientResponseAsync(long offerId, string response, bool accepted, string userId)
+        public async Task<OfferResponseDTO> RecordClientResponseAsync(string offerId, string response, bool accepted, string userId)
         {
             try
             {
@@ -950,7 +950,7 @@ namespace SoitMed.Services
                     {
                         // Check if deal already exists for this offer
                         var dealsQuery = _unitOfWork.SalesDeals.GetQueryable()
-                            .Where(d => d.OfferId == offerId);
+                            .Where(d => d.OfferId == offerId.ToString());
                         var existingDeals = dealsQuery.ToList();
                         var existingDeal = existingDeals.FirstOrDefault();
 
@@ -1055,9 +1055,9 @@ namespace SoitMed.Services
                     }
                     
                     // Notify original requester if different from customer
-                    if (offer.OfferRequestId.HasValue)
+                    if (!string.IsNullOrEmpty(offer.OfferRequestId))
                     {
-                        var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId.Value);
+                        var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(long.Parse(offer.OfferRequestId));
                         if (offerRequest != null && offerRequest.RequestedBy != userId)
                         {
                             await _notificationService.CreateNotificationAsync(
@@ -1093,7 +1093,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferResponseDTO> CompleteOfferAsync(long offerId, string? completionNotes, string userId)
+        public async Task<OfferResponseDTO> CompleteOfferAsync(string offerId, string? completionNotes, string userId)
         {
             try
             {
@@ -1132,7 +1132,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferResponseDTO> MarkAsNeedsModificationAsync(long offerId, string? reason, string userId)
+        public async Task<OfferResponseDTO> MarkAsNeedsModificationAsync(string offerId, string? reason, string userId)
         {
             try
             {
@@ -1235,7 +1235,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferResponseDTO> MarkAsUnderReviewAsync(long offerId, string userId)
+        public async Task<OfferResponseDTO> MarkAsUnderReviewAsync(string offerId, string userId)
         {
             try
             {
@@ -1269,7 +1269,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Resume offer from UnderReview back to Sent status
         /// </summary>
-        public async Task<OfferResponseDTO> ResumeFromUnderReviewAsync(long offerId, string userId)
+        public async Task<OfferResponseDTO> ResumeFromUnderReviewAsync(string offerId, string userId)
         {
             try
             {
@@ -1396,7 +1396,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Generates activity description based on offer status
         /// </summary>
-        private string GenerateActivityDescription(string status, long offerId, string clientName, string? salesmanName, string? creatorName, string? oldStatus)
+        private string GenerateActivityDescription(string status, string offerId, string clientName, string? salesmanName, string? creatorName, string? oldStatus)
         {
             return status switch
             {
@@ -1468,7 +1468,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Get full history of all actions performed on a specific offer
         /// </summary>
-        public async Task<List<OfferActivityDTO>> GetOfferHistoryAsync(long offerId)
+        public async Task<List<OfferActivityDTO>> GetOfferHistoryAsync(string offerId)
         {
             try
             {
@@ -1493,7 +1493,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferResponseDTO> AssignOfferToSalesManAsync(long offerId, string salesmanId, string userId)
+        public async Task<OfferResponseDTO> AssignOfferToSalesManAsync(string offerId, string salesmanId, string userId)
         {
             try
             {
@@ -1527,7 +1527,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<bool> DeleteOfferAsync(long offerId, string userId)
+        public async Task<bool> DeleteOfferAsync(string offerId, string userId)
         {
             try
             {
@@ -1642,7 +1642,7 @@ namespace SoitMed.Services
 
         #region Enhanced Offer Features - Equipment Management
 
-        public async Task<OfferEquipmentDTO> AddEquipmentAsync(long offerId, CreateOfferEquipmentDTO dto)
+        public async Task<OfferEquipmentDTO> AddEquipmentAsync(string offerId, CreateOfferEquipmentDTO dto)
         {
             try
             {
@@ -1670,7 +1670,7 @@ namespace SoitMed.Services
 
                 return new OfferEquipmentDTO
                 {
-                    Id = equipment.Id,
+                    Id = long.Parse(equipment.Id),
                     OfferId = equipment.OfferId,
                     Name = equipment.Name,
                     Model = equipment.Model,
@@ -1690,7 +1690,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<List<OfferEquipmentDTO>> GetEquipmentListAsync(long offerId)
+        public async Task<List<OfferEquipmentDTO>> GetEquipmentListAsync(string offerId)
         {
             try
             {
@@ -1768,7 +1768,7 @@ namespace SoitMed.Services
 
                     return new OfferEquipmentDTO
                     {
-                        Id = e.Id,
+                        Id = long.Parse(e.Id),
                         OfferId = e.OfferId,
                         Name = e.Name,
                         // Use equipment data if available, otherwise fall back to matched product data
@@ -1794,7 +1794,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<bool> DeleteEquipmentAsync(long offerId, long equipmentId)
+        public async Task<bool> DeleteEquipmentAsync(string offerId, long equipmentId)
         {
             try
             {
@@ -1815,7 +1815,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferEquipmentDTO> UpdateEquipmentAsync(long offerId, long equipmentId, UpdateOfferEquipmentDTO dto)
+        public async Task<OfferEquipmentDTO> UpdateEquipmentAsync(string offerId, long equipmentId, UpdateOfferEquipmentDTO dto)
         {
             try
             {
@@ -1848,7 +1848,7 @@ namespace SoitMed.Services
 
                 return new OfferEquipmentDTO
                 {
-                    Id = equipment.Id,
+                    Id = long.Parse(equipment.Id),
                     OfferId = equipment.OfferId,
                     Name = equipment.Name,
                     Model = equipment.Model,
@@ -1869,7 +1869,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferEquipmentDTO> UpdateEquipmentImagePathAsync(long offerId, long equipmentId, string imagePath)
+        public async Task<OfferEquipmentDTO> UpdateEquipmentImagePathAsync(string offerId, long equipmentId, string imagePath)
         {
             try
             {
@@ -1885,7 +1885,7 @@ namespace SoitMed.Services
 
                 return new OfferEquipmentDTO
                 {
-                    Id = equipment.Id,
+                    Id = long.Parse(equipment.Id),
                     OfferId = equipment.OfferId,
                     Name = equipment.Name,
                     Model = equipment.Model,
@@ -1905,7 +1905,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<string?> GetEquipmentImagePathAsync(long offerId, long equipmentId)
+        public async Task<string?> GetEquipmentImagePathAsync(string offerId, long equipmentId)
         {
             try
             {
@@ -2090,7 +2090,7 @@ namespace SoitMed.Services
 
         #region Enhanced Offer Features - Terms Management
 
-        public async Task<OfferTermsDTO> AddOrUpdateTermsAsync(long offerId, CreateOfferTermsDTO dto)
+        public async Task<OfferTermsDTO> AddOrUpdateTermsAsync(string offerId, CreateOfferTermsDTO dto)
         {
             try
             {
@@ -2112,7 +2112,7 @@ namespace SoitMed.Services
 
                     return new OfferTermsDTO
                     {
-                        Id = existingTerms.Id,
+                        Id = long.Parse(existingTerms.Id),
                         OfferId = existingTerms.OfferId,
                         WarrantyPeriod = existingTerms.WarrantyPeriod,
                         DeliveryTime = existingTerms.DeliveryTime,
@@ -2136,7 +2136,7 @@ namespace SoitMed.Services
 
                     return new OfferTermsDTO
                     {
-                        Id = terms.Id,
+                        Id = long.Parse(terms.Id),
                         OfferId = terms.OfferId,
                         WarrantyPeriod = terms.WarrantyPeriod,
                         DeliveryTime = terms.DeliveryTime,
@@ -2156,7 +2156,7 @@ namespace SoitMed.Services
 
         #region Enhanced Offer Features - Installment Plans
 
-        public async Task<List<InstallmentPlanDTO>> CreateInstallmentPlanAsync(long offerId, CreateInstallmentPlanDTO dto)
+        public async Task<List<InstallmentPlanDTO>> CreateInstallmentPlanAsync(string offerId, CreateInstallmentPlanDTO dto)
         {
             try
             {
@@ -2209,7 +2209,7 @@ namespace SoitMed.Services
 
                 return installments.Select(i => new InstallmentPlanDTO
                 {
-                    Id = i.Id,
+                    Id = long.Parse(i.Id),
                     OfferId = i.OfferId,
                     InstallmentNumber = i.InstallmentNumber,
                     Amount = i.Amount,
@@ -2229,7 +2229,7 @@ namespace SoitMed.Services
 
         #region Enhanced Offer - Complete Details
 
-        public async Task<EnhancedOfferResponseDTO> GetEnhancedOfferAsync(long offerId)
+        public async Task<EnhancedOfferResponseDTO> GetEnhancedOfferAsync(string offerId)
         {
             try
             {
@@ -2248,7 +2248,7 @@ namespace SoitMed.Services
                 return new EnhancedOfferResponseDTO
                 {
                     Id = offer.Id,
-                    OfferRequestId = offer.OfferRequestId,
+                    OfferRequestId = !string.IsNullOrEmpty(offer.OfferRequestId) ? offer.OfferRequestId : null,
                     ClientId = offer.ClientId,
                     ClientName = client?.Name ?? "Unknown Client",
                     CreatedBy = offer.CreatedBy,
@@ -2271,7 +2271,7 @@ namespace SoitMed.Services
                     Equipment = equipment,
                     Terms = terms != null ? new OfferTermsDTO
                     {
-                        Id = terms.Id,
+                        Id = long.Parse(terms.Id),
                         OfferId = terms.OfferId,
                         WarrantyPeriod = terms.WarrantyPeriod,
                         DeliveryTime = terms.DeliveryTime,
@@ -2280,7 +2280,7 @@ namespace SoitMed.Services
                     } : null,
                     Installments = installments.Select(i => new InstallmentPlanDTO
                     {
-                        Id = i.Id,
+                        Id = long.Parse(i.Id),
                         OfferId = i.OfferId,
                         InstallmentNumber = i.InstallmentNumber,
                         Amount = i.Amount,
@@ -2318,7 +2318,7 @@ namespace SoitMed.Services
             }
 
             // Pre-load all related data in batches to avoid DbContext concurrency issues
-            var clientIds = offersList.Where(o => o.ClientId > 0).Select(o => o.ClientId).Distinct().ToList();
+            var clientIds = offersList.Where(o => !string.IsNullOrEmpty(o.ClientId) && long.TryParse(o.ClientId, out var clientId) && clientId > 0).Select(o => o.ClientId).Distinct().ToList();
             var userIds = offersList
                 .SelectMany(o => new[] { o.CreatedBy, o.AssignedTo })
                 .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -2329,7 +2329,7 @@ namespace SoitMed.Services
             var clientsList = clientIds.Any() ? await _unitOfWork.Clients.GetByIdsAsync(clientIds) : new List<Client>();
             var usersList = userIds.Any() ? await _unitOfWork.Users.GetByIdsAsync(userIds) : new List<ApplicationUser>();
 
-            var clientsDict = clientsList.ToDictionary(c => c.Id);
+            var clientsDict = clientsList.ToDictionary(c => long.Parse(c.Id));
             var usersDict = usersList.ToDictionary(u => u.Id);
 
             // Map synchronously using pre-loaded data
@@ -2345,9 +2345,9 @@ namespace SoitMed.Services
             // Get OfferRequest information if linked
             string? requesterId = null;
             string? requesterName = null;
-            if (offer.OfferRequestId.HasValue)
+            if (!string.IsNullOrEmpty(offer.OfferRequestId))
             {
-                var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId.Value);
+                var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(long.Parse(offer.OfferRequestId));
                 if (offerRequest != null)
                 {
                     requesterId = offerRequest.RequestedBy;
@@ -2369,7 +2369,7 @@ namespace SoitMed.Services
             return new OfferResponseDTO
             {
                 Id = offer.Id,
-                OfferRequestId = offer.OfferRequestId,
+                OfferRequestId = !string.IsNullOrEmpty(offer.OfferRequestId) ? offer.OfferRequestId : null,
                 OfferRequestRequesterId = requesterId,
                 OfferRequestRequesterName = requesterName,
                 ClientId = offer.ClientId,
@@ -2408,7 +2408,7 @@ namespace SoitMed.Services
         // Synchronous overload that uses pre-loaded data to avoid DbContext concurrency issues
         private OfferResponseDTO MapToOfferResponseDTO(SalesOffer offer, Dictionary<long, Client> clientsDict, Dictionary<string, ApplicationUser> usersDict)
         {
-            clientsDict.TryGetValue(offer.ClientId, out var client);
+            clientsDict.TryGetValue(long.Parse(offer.ClientId), out var client);
             usersDict.TryGetValue(offer.CreatedBy ?? string.Empty, out var creator);
             usersDict.TryGetValue(offer.AssignedTo ?? string.Empty, out var salesman);
 
@@ -2426,7 +2426,7 @@ namespace SoitMed.Services
             return new OfferResponseDTO
             {
                 Id = offer.Id,
-                OfferRequestId = offer.OfferRequestId,
+                OfferRequestId = !string.IsNullOrEmpty(offer.OfferRequestId) ? offer.OfferRequestId : null,
                 OfferRequestRequesterId = null, // Will be populated in individual retrieval
                 OfferRequestRequesterName = null, // Will be populated in individual retrieval
                 ClientId = offer.ClientId,
@@ -2470,7 +2470,7 @@ namespace SoitMed.Services
         /// Automatically adds equipment items to offer based on products description
         /// Creates equipment with default image paths
         /// </summary>
-        private async Task AutoAddEquipmentFromProductsAsync(long offerId, string productsDescription)
+        private async Task AutoAddEquipmentFromProductsAsync(string offerId, string productsDescription)
         {
             try
             {

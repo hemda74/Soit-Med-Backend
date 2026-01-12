@@ -5,10 +5,10 @@ namespace SoitMed.Repositories
 {
     public interface IRepairRequestRepository : IBaseRepository<RepairRequest>
     {
-        Task<IEnumerable<RepairRequest>> GetByEquipmentIdAsync(int equipmentId, CancellationToken cancellationToken = default);
+        Task<IEnumerable<RepairRequest>> GetByEquipmentIdAsync(string equipmentId, CancellationToken cancellationToken = default);
         Task<IEnumerable<RepairRequest>> GetByDoctorIdAsync(int DoctorId, CancellationToken cancellationToken = default);
         Task<IEnumerable<RepairRequest>> GetByTechnicianIdAsync(int TechnicianId, CancellationToken cancellationToken = default);
-        Task<IEnumerable<RepairRequest>> GetByAssignedEngineerIdAsync(int EngineerId, CancellationToken cancellationToken = default);
+        Task<IEnumerable<RepairRequest>> GetByAssignedEngineerIdAsync(string EngineerId, CancellationToken cancellationToken = default);
         Task<IEnumerable<RepairRequest>> GetByStatusAsync(RepairStatus status, CancellationToken cancellationToken = default);
         Task<IEnumerable<RepairRequest>> GetByPriorityAsync(RepairPriority priority, CancellationToken cancellationToken = default);
         Task<RepairRequest?> GetRepairRequestWithEquipmentAsync(int id, CancellationToken cancellationToken = default);

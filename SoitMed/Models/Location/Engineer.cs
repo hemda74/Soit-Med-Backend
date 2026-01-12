@@ -7,7 +7,7 @@ namespace SoitMed.Models.Location
     public class Engineer
     {
         [Key]
-        public int EngineerId { get; set; }
+        public string EngineerId { get; set; }
 
         [Required]
         [MaxLength(200)]

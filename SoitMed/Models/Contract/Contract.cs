@@ -12,9 +12,9 @@ namespace SoitMed.Models.Contract
     public class Contract
     {
         [Key]
-        public long Id { get; set; }
+        public string Id { get; set; }
 
-        public long? DealId { get; set; }
+        public string? DealId { get; set; }
 
         [ForeignKey("DealId")]
         public virtual SalesDeal? Deal { get; set; }
@@ -57,7 +57,7 @@ namespace SoitMed.Models.Contract
         public DateTime? LastReviewedAt { get; set; }
 
         [Required]
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
 
         [ForeignKey("ClientId")]
         public virtual Client Client { get; set; } = null!;

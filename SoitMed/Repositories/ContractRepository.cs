@@ -22,7 +22,7 @@ namespace SoitMed.Repositories
                 .Include(c => c.CustomerSigner)
                 .Include(c => c.InstallmentSchedules)
                 .Include(c => c.Negotiations)
-                .FirstOrDefaultAsync(c => c.Id == id);
+                .FirstOrDefaultAsync(c => c.Id == id.ToString());
         }
 
         public async Task<IEnumerable<Contract>> GetAllAsync()

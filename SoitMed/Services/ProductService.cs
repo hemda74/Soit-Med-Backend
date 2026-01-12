@@ -23,24 +23,24 @@ namespace SoitMed.Services
             _cacheService = cacheService;
         }
 
-        public async Task<List<ProductResponseDTO>> GetAllProductsAsync(string? category = null, long? categoryId = null, bool? inStock = null)
+        public async Task<List<ProductResponseDTO>> GetAllProductsAsync(string? category = null, string? categoryId = null, bool? inStock = null)
         {
             try
             {
                 // Build cache key based on parameters
                 string cacheKey;
-                if (categoryId.HasValue && inStock.HasValue)
+                if (!string.IsNullOrEmpty(categoryId) && inStock.HasValue)
                     cacheKey = $"Products:CategoryId:{categoryId}:InStock:{inStock}";
-                else if (categoryId.HasValue)
-                    cacheKey = CacheKeys.Products.ByCategory(categoryId.Value);
+                else if (!string.IsNullOrEmpty(categoryId))
+                    cacheKey = CacheKeys.Products.ByCategory(categoryId);
                 else if (!string.IsNullOrWhiteSpace(category) && inStock.HasValue)
                     cacheKey = $"Products:Category:{category}:InStock:{inStock}";
                 else if (!string.IsNullOrWhiteSpace(category))
                     cacheKey = $"Products:Category:{category}";
-                else if (inStock.HasValue && inStock.Value)
-                    cacheKey = CacheKeys.Products.InStock;
+                else if (inStock.HasValue)
+                    cacheKey = $"Products:InStock:{inStock}";
                 else
-                    cacheKey = CacheKeys.Products.All;
+                    cacheKey = "Products:All";
 
                 return await _cacheService.GetOrCreateAsync(
                     cacheKey,
@@ -49,12 +49,12 @@ namespace SoitMed.Services
                         IEnumerable<Product> products;
 
                         // Priority: categoryId > category > inStock > all
-                        if (categoryId.HasValue && inStock.HasValue)
+                        if (!string.IsNullOrEmpty(categoryId) && inStock.HasValue)
                         {
                             products = await _unitOfWork.Products.GetByCategoryIdAsync(categoryId);
                             products = products.Where(p => p.InStock == inStock.Value);
                         }
-                        else if (categoryId.HasValue)
+                        else if (!string.IsNullOrEmpty(categoryId))
                         {
                             products = await _unitOfWork.Products.GetByCategoryIdAsync(categoryId);
                         }
@@ -94,14 +94,14 @@ namespace SoitMed.Services
 
                         // Pre-load all category IDs
                         var categoryIds = productsList
-                            .Where(p => p.CategoryId.HasValue)
-                            .Select(p => p.CategoryId!.Value)
+                            .Where(p => !string.IsNullOrEmpty(p.CategoryId))
+                            .Select(p => p.CategoryId!)
                             .Distinct()
                             .ToList();
 
                         var categoriesDict = categoryIds.Any()
                             ? (await _unitOfWork.ProductCategories.GetByIdsAsync(categoryIds)).ToDictionary(c => c.Id)
-                            : new Dictionary<long, ProductCategory>();
+                            : new Dictionary<string, ProductCategory>();
 
                         // Map synchronously using pre-loaded data
                         return productsList.Select(p => MapToProductResponseDTO(p, usersDict, categoriesDict)).ToList();
@@ -116,7 +116,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<ProductResponseDTO?> GetProductByIdAsync(long id)
+        public async Task<ProductResponseDTO?> GetProductByIdAsync(string id)
         {
             try
             {
@@ -164,14 +164,14 @@ namespace SoitMed.Services
 
                 // Pre-load all category IDs
                 var categoryIds = productsList
-                    .Where(p => p.CategoryId.HasValue)
-                    .Select(p => p.CategoryId!.Value)
+                    .Where(p => !string.IsNullOrEmpty(p.CategoryId))
+                    .Select(p => p.CategoryId!)
                     .Distinct()
                     .ToList();
 
                 var categoriesDict = categoryIds.Any()
                     ? (await _unitOfWork.ProductCategories.GetByIdsAsync(categoryIds)).ToDictionary(c => c.Id)
-                    : new Dictionary<long, ProductCategory>();
+                    : new Dictionary<string, ProductCategory>();
 
                 // Map synchronously using pre-loaded data
                 return productsList.Select(p => MapToProductResponseDTO(p, usersDict, categoriesDict)).ToList();
@@ -207,14 +207,14 @@ namespace SoitMed.Services
 
                 // Pre-load all category IDs
                 var categoryIds = productsList
-                    .Where(p => p.CategoryId.HasValue)
-                    .Select(p => p.CategoryId!.Value)
+                    .Where(p => !string.IsNullOrEmpty(p.CategoryId))
+                    .Select(p => p.CategoryId!)
                     .Distinct()
                     .ToList();
 
                 var categoriesDict = categoryIds.Any()
                     ? (await _unitOfWork.ProductCategories.GetByIdsAsync(categoryIds)).ToDictionary(c => c.Id)
-                    : new Dictionary<long, ProductCategory>();
+                    : new Dictionary<string, ProductCategory>();
 
                 // Map synchronously using pre-loaded data
                 return productsList.Select(p => MapToProductResponseDTO(p, usersDict, categoriesDict)).ToList();
@@ -267,7 +267,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<ProductResponseDTO> UpdateProductAsync(long id, UpdateProductDTO updateDto, string userId)
+        public async Task<ProductResponseDTO> UpdateProductAsync(string id, UpdateProductDTO updateDto, string userId)
         {
             try
             {
@@ -292,16 +292,16 @@ namespace SoitMed.Services
                     product.Country = updateDto.Country;
 
                 // Handle CategoryId (new way) - validate it exists
-                if (updateDto.CategoryId.HasValue)
+                if (!string.IsNullOrEmpty(updateDto.CategoryId))
                 {
-                    var categoryExists = await _unitOfWork.ProductCategories.GetByIdAsync(updateDto.CategoryId.Value);
+                    var categoryExists = await _unitOfWork.ProductCategories.GetByIdAsync(updateDto.CategoryId);
                     if (categoryExists == null)
-                        throw new ArgumentException($"Category with ID {updateDto.CategoryId.Value} not found", nameof(updateDto.CategoryId));
+                        throw new ArgumentException($"Category with ID {updateDto.CategoryId} not found", nameof(updateDto.CategoryId));
                     
                     if (!categoryExists.IsActive)
-                        throw new ArgumentException($"Category with ID {updateDto.CategoryId.Value} is not active", nameof(updateDto.CategoryId));
+                        throw new ArgumentException($"Category with ID {updateDto.CategoryId} is not active", nameof(updateDto.CategoryId));
                     
-                    product.CategoryId = updateDto.CategoryId.Value;
+                    product.CategoryId = updateDto.CategoryId;
                     
                     // Also update legacy Category field for backward compatibility
                     if (string.IsNullOrWhiteSpace(updateDto.Category))
@@ -311,7 +311,7 @@ namespace SoitMed.Services
                 }
                 
                 // Handle legacy Category field (for backward compatibility)
-                if (updateDto.Category != null && !updateDto.CategoryId.HasValue)
+                if (updateDto.Category != null && string.IsNullOrEmpty(updateDto.CategoryId))
                 {
                     product.Category = updateDto.Category;
                     // Try to find matching CategoryId from Category name
@@ -359,7 +359,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<bool> DeleteProductAsync(long id)
+        public async Task<bool> DeleteProductAsync(string id)
         {
             try
             {
@@ -391,7 +391,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<ProductResponseDTO> UpdateProductImageAsync(long id, string imagePath)
+        public async Task<ProductResponseDTO> UpdateProductImageAsync(string id, string imagePath)
         {
             try
             {
@@ -419,7 +419,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<ProductResponseDTO> UpdateProviderImageAsync(long id, string imagePath)
+        public async Task<ProductResponseDTO> UpdateProviderImageAsync(string id, string imagePath)
         {
             try
             {
@@ -444,7 +444,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<ProductResponseDTO> UpdateDataSheetAsync(long id, string pdfPath)
+        public async Task<ProductResponseDTO> UpdateDataSheetAsync(string id, string pdfPath)
         {
             try
             {
@@ -469,7 +469,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<ProductResponseDTO> UpdateCatalogAsync(long id, string pdfPath)
+        public async Task<ProductResponseDTO> UpdateCatalogAsync(string id, string pdfPath)
         {
             try
             {
@@ -494,7 +494,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<ProductResponseDTO> UpdateInventoryQuantityAsync(long id, int inventoryQuantity)
+        public async Task<ProductResponseDTO> UpdateInventoryQuantityAsync(string id, int inventoryQuantity)
         {
             try
             {
@@ -525,9 +525,9 @@ namespace SoitMed.Services
         {
             // Load category if CategoryId exists
             string? categoryName = null;
-            if (product.CategoryId.HasValue)
+            if (!string.IsNullOrEmpty(product.CategoryId))
             {
-                var category = await _unitOfWork.ProductCategories.GetByIdAsync(product.CategoryId.Value);
+                var category = await _unitOfWork.ProductCategories.GetByIdAsync(product.CategoryId);
                 categoryName = category?.Name;
             }
 
@@ -567,11 +567,11 @@ namespace SoitMed.Services
         }
 
         // Synchronous overload that uses pre-loaded data to avoid DbContext concurrency issues
-        private ProductResponseDTO MapToProductResponseDTO(Product product, Dictionary<string, ApplicationUser> usersDict, Dictionary<long, ProductCategory> categoriesDict)
+        private ProductResponseDTO MapToProductResponseDTO(Product product, Dictionary<string, ApplicationUser> usersDict, Dictionary<string, ProductCategory> categoriesDict)
         {
             // Get category name from pre-loaded dictionary
             string? categoryName = null;
-            if (product.CategoryId.HasValue && categoriesDict.TryGetValue(product.CategoryId.Value, out var category))
+            if (!string.IsNullOrEmpty(product.CategoryId) && categoriesDict.TryGetValue(product.CategoryId, out var category))
             {
                 categoryName = category.Name;
             }

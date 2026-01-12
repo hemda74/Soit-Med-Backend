@@ -10,7 +10,7 @@ namespace SoitMed.Repositories
         {
         }
 
-        public async Task<IEnumerable<RepairRequest>> GetByEquipmentIdAsync(int equipmentId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<RepairRequest>> GetByEquipmentIdAsync(string equipmentId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Where(rr => rr.EquipmentId == equipmentId)
@@ -31,7 +31,7 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<RepairRequest>> GetByAssignedEngineerIdAsync(int EngineerId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<RepairRequest>> GetByAssignedEngineerIdAsync(string EngineerId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Where(rr => rr.AssignedEngineerId == EngineerId)
@@ -56,28 +56,28 @@ namespace SoitMed.Repositories
         {
             return await _dbSet
                 .Include(rr => rr.Equipment)
-                .FirstOrDefaultAsync(rr => rr.Id == id, cancellationToken);
+                .FirstOrDefaultAsync(rr => rr.Id == id.ToString(), cancellationToken);
         }
 
         public async Task<RepairRequest?> GetRepairRequestWithDoctorAsync(int id, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(rr => rr.RequestingDoctor)
-                .FirstOrDefaultAsync(rr => rr.Id == id, cancellationToken);
+                .FirstOrDefaultAsync(rr => rr.Id == id.ToString(), cancellationToken);
         }
 
         public async Task<RepairRequest?> GetRepairRequestWithTechnicianAsync(int id, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(rr => rr.RequestingTechnician)
-                .FirstOrDefaultAsync(rr => rr.Id == id, cancellationToken);
+                .FirstOrDefaultAsync(rr => rr.Id == id.ToString(), cancellationToken);
         }
 
         public async Task<RepairRequest?> GetRepairRequestWithEngineerAsync(int id, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(rr => rr.AssignedEngineer)
-                .FirstOrDefaultAsync(rr => rr.Id == id, cancellationToken);
+                .FirstOrDefaultAsync(rr => rr.Id == id.ToString(), cancellationToken);
         }
 
         public async Task<RepairRequest?> GetRepairRequestWithAllDetailsAsync(int id, CancellationToken cancellationToken = default)
@@ -87,7 +87,7 @@ namespace SoitMed.Repositories
                 .Include(rr => rr.RequestingDoctor)
                 .Include(rr => rr.RequestingTechnician)
                 .Include(rr => rr.AssignedEngineer)
-                .FirstOrDefaultAsync(rr => rr.Id == id, cancellationToken);
+                .FirstOrDefaultAsync(rr => rr.Id == id.ToString(), cancellationToken);
         }
 
         public async Task<IEnumerable<RepairRequest>> GetActiveRepairRequestsAsync(CancellationToken cancellationToken = default)

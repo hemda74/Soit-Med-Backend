@@ -24,7 +24,7 @@ namespace SoitMed.Repositories
         {
             return await _context.SalesDeals
                 .AsNoTracking()
-                .Where(d => d.ClientId == clientId)
+                .Where(d => d.ClientId == clientId.ToString())
                 .OrderByDescending(d => d.CreatedAt)
                 .ToListAsync();
         }
@@ -94,7 +94,7 @@ namespace SoitMed.Repositories
                 .Include(d => d.Offer)
                 .Include(d => d.ManagerApprover)
                 .Include(d => d.SuperAdminApprover)
-                .FirstOrDefaultAsync(d => d.Id == dealId);
+                .FirstOrDefaultAsync(d => d.Id == dealId.ToString());
         }
 
         public async Task<List<SalesDeal>> GetDealsByManagerAsync(string managerId)
@@ -182,7 +182,7 @@ namespace SoitMed.Repositories
 
             return await _context.SalesDeals
                 .AsNoTracking()
-                .Where(d => idList.Contains(d.Id))
+                .Where(d => idList.Contains(long.Parse(d.Id)))
                 .ToListAsync();
         }
     }

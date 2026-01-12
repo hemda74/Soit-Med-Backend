@@ -7,13 +7,13 @@ namespace SoitMed.DTO
     /// </summary>
     public class ProductCategoryDTO
     {
-        public long Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string? NameAr { get; set; }
         public string? Description { get; set; }
         public string? DescriptionAr { get; set; }
         public string? IconPath { get; set; }
-        public long? ParentCategoryId { get; set; }
+        public string? ParentCategoryId { get; set; }
         public string? ParentCategoryName { get; set; }
         public int DisplayOrder { get; set; }
         public bool IsActive { get; set; }
@@ -39,7 +39,7 @@ namespace SoitMed.DTO
         [MaxLength(500)]
         public string? DescriptionAr { get; set; }
 
-        public long? ParentCategoryId { get; set; }
+        public string? ParentCategoryId { get; set; }
 
         public int DisplayOrder { get; set; } = 0;
 
@@ -63,7 +63,7 @@ namespace SoitMed.DTO
         [MaxLength(500)]
         public string? DescriptionAr { get; set; }
 
-        public long? ParentCategoryId { get; set; }
+        public string? ParentCategoryId { get; set; }
 
         public int? DisplayOrder { get; set; }
 
@@ -75,7 +75,7 @@ namespace SoitMed.DTO
     /// </summary>
     public class CategoryHierarchyDTO
     {
-        public long Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string? NameAr { get; set; }
         public string? IconPath { get; set; }

@@ -5,7 +5,7 @@ namespace SoitMed.Models.Location
     public class Governorate
     {
         [Key]
-        public int GovernorateId { get; set; }
+        public string GovernorateId { get; set; }
 
         [Required]
         [MaxLength(100)]

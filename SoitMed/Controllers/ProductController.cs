@@ -47,7 +47,7 @@ namespace SoitMed.Controllers
         [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin,Doctor")]
         public async Task<IActionResult> GetAllProducts(
             [FromQuery] string? category = null,
-            [FromQuery] long? categoryId = null,
+            [FromQuery] string? categoryId = null,
             [FromQuery] bool? inStock = null)
         {
             try
@@ -67,7 +67,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{id}")]
         [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin,Doctor")]
-        public async Task<IActionResult> GetProduct(long id)
+        public async Task<IActionResult> GetProduct(string id)
         {
             try
             {
@@ -167,7 +167,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPut("{id}")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> UpdateProduct(long id, [FromBody] UpdateProductDTO updateDto)
+        public async Task<IActionResult> UpdateProduct(string id, [FromBody] UpdateProductDTO updateDto)
         {
             try
             {
@@ -200,7 +200,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpDelete("{id}")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> DeleteProduct(long id)
+        public async Task<IActionResult> DeleteProduct(string id)
         {
             try
             {
@@ -223,7 +223,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{id}/upload-image")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> UploadProductImage(long id, IFormFile file)
+        public async Task<IActionResult> UploadProductImage(string id, IFormFile file)
         {
             try
             {
@@ -275,7 +275,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{id}/upload-provider-image")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> UploadProviderImage(long id, IFormFile file)
+        public async Task<IActionResult> UploadProviderImage(string id, IFormFile file)
         {
             try
             {
@@ -336,7 +336,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{id}/provider-image-file")]
         [Microsoft.AspNetCore.Authorization.AllowAnonymous]
-        public async Task<IActionResult> GetProviderImageFile(long id)
+        public async Task<IActionResult> GetProviderImageFile(string id)
         {
             try
             {
@@ -396,7 +396,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPut("{id}/inventory")]
         [Authorize(Roles = "InventoryManager,SuperAdmin")]
-        public async Task<IActionResult> UpdateInventoryQuantity(long id, [FromBody] UpdateInventoryDTO updateDto)
+        public async Task<IActionResult> UpdateInventoryQuantity(string id, [FromBody] UpdateInventoryDTO updateDto)
         {
             try
             {
@@ -425,7 +425,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{id}/upload-data-sheet")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> UploadDataSheet(long id, IFormFile file)
+        public async Task<IActionResult> UploadDataSheet(string id, IFormFile file)
         {
             try
             {
@@ -465,7 +465,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{id}/upload-catalog")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> UploadCatalog(long id, IFormFile file)
+        public async Task<IActionResult> UploadCatalog(string id, IFormFile file)
         {
             try
             {
@@ -505,7 +505,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{id}/data-sheet-file")]
         [Microsoft.AspNetCore.Authorization.AllowAnonymous]
-        public async Task<IActionResult> GetDataSheetFile(long id)
+        public async Task<IActionResult> GetDataSheetFile(string id)
         {
             try
             {
@@ -550,7 +550,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{id}/catalog-file")]
         [Microsoft.AspNetCore.Authorization.AllowAnonymous]
-        public async Task<IActionResult> GetCatalogFile(long id)
+        public async Task<IActionResult> GetCatalogFile(string id)
         {
             try
             {

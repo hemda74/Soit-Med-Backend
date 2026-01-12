@@ -1,3 +1,4 @@
+using SoitMed.DTO;
 using SoitMed.Models.Equipment;
 
 namespace SoitMed.Services

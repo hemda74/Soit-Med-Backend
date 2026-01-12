@@ -39,11 +39,11 @@ namespace SoitMed.Controllers
                     HospitalName = rr.Equipment.Hospital.Name,
                     Description = rr.Description,
                     Symptoms = rr.Symptoms,
-                    Priority = rr.Priority,
-                    Status = rr.Status,
+                    Priority = rr.Priority.ToString(),
+                    Status = rr.Status.ToString(),
                     RequestorName = rr.RequestingDoctor != null ? rr.RequestingDoctor.Name : rr.RequestingTechnician!.Name,
                     RequestorType = rr.RequestingDoctor != null ? "Doctor" : "Technician",
-                    AssignedEngineerId = rr.AssignedEngineerId,
+                    AssignedEngineerId = rr.AssignedEngineerId != null ? rr.AssignedEngineerId.ToString() : null,
                     AssignedEngineerName = rr.AssignedEngineer != null ? rr.AssignedEngineer.Name : null,
                     RequestedAt = rr.RequestedAt,
                     AssignedAt = rr.AssignedAt,
@@ -51,9 +51,9 @@ namespace SoitMed.Controllers
                     CompletedAt = rr.CompletedAt,
                     RepairNotes = rr.RepairNotes,
                     PartsUsed = rr.PartsUsed,
-                    RepairCost = rr.RepairCost,
-                    EstimatedHours = rr.EstimatedHours,
-                    ActualHours = rr.ActualHours
+                    RepairCost = rr.RepairCost ?? 0m,
+                    EstimatedHours = rr.EstimatedHours ?? 0m,
+                    ActualHours = rr.ActualHours ?? 0m
                 })
                 .ToListAsync();
 
@@ -62,7 +62,7 @@ namespace SoitMed.Controllers
 
         [HttpGet("{id}")]
         [Authorize(Roles = "SuperAdmin,Admin,Doctor,Technician,Engineer")]
-        public async Task<IActionResult> GetRepairRequest(int id)
+        public async Task<IActionResult> GetRepairRequest(string id)
         {
             var repairRequest = await context.RepairRequests
                 .Include(rr => rr.Equipment)
@@ -86,11 +86,11 @@ namespace SoitMed.Controllers
                 HospitalName = repairRequest.Equipment.Hospital.Name,
                 Description = repairRequest.Description,
                 Symptoms = repairRequest.Symptoms,
-                Priority = repairRequest.Priority,
-                Status = repairRequest.Status,
+                Priority = repairRequest.Priority.ToString(),
+                Status = repairRequest.Status.ToString(),
                 RequestorName = repairRequest.RequestingDoctor?.Name ?? repairRequest.RequestingTechnician?.Name,
                 RequestorType = repairRequest.RequestingDoctor != null ? "Doctor" : "Technician",
-                AssignedEngineerId = repairRequest.AssignedEngineerId,
+                AssignedEngineerId = repairRequest.AssignedEngineerId?.ToString(),
                 AssignedEngineerName = repairRequest.AssignedEngineer?.Name,
                 RequestedAt = repairRequest.RequestedAt,
                 AssignedAt = repairRequest.AssignedAt,
@@ -98,9 +98,9 @@ namespace SoitMed.Controllers
                 CompletedAt = repairRequest.CompletedAt,
                 RepairNotes = repairRequest.RepairNotes,
                 PartsUsed = repairRequest.PartsUsed,
-                RepairCost = repairRequest.RepairCost,
-                EstimatedHours = repairRequest.EstimatedHours,
-                ActualHours = repairRequest.ActualHours
+                RepairCost = repairRequest.RepairCost ?? 0m,
+                EstimatedHours = repairRequest.EstimatedHours ?? 0m,
+                ActualHours = repairRequest.ActualHours ?? 0m
             };
 
             return Ok(response);
@@ -156,10 +156,10 @@ namespace SoitMed.Controllers
                 EquipmentId = repairRequestDTO.EquipmentId,
                 Description = repairRequestDTO.Description,
                 Symptoms = repairRequestDTO.Symptoms,
-                Priority = repairRequestDTO.Priority,
+                Priority = Enum.Parse<RepairPriority>(repairRequestDTO.Priority),
                 DoctorId = repairRequestDTO.DoctorId,
                 TechnicianId = repairRequestDTO.TechnicianId,
-                EstimatedHours = repairRequestDTO.EstimatedHours,
+                EstimatedHours = repairRequestDTO.EstimatedHours.HasValue ? (int)repairRequestDTO.EstimatedHours.Value : null,
                 Status = RepairStatus.Pending,
                 RequestedAt = DateTime.UtcNow,
                 IsActive = true
@@ -173,7 +173,7 @@ namespace SoitMed.Controllers
             await context.SaveChangesAsync();
 
             // Auto-assign to Engineers in the hospital's governorate
-            await AutoAssignToEngineer(repairRequest.Id, equipment.Hospital.Location);
+            await AutoAssignToEngineer(int.Parse(repairRequest.Id), equipment.Hospital.Location);
 
             return Ok($"Repair request for equipment '{equipment.Name}' created successfully");
         }
@@ -194,12 +194,12 @@ namespace SoitMed.Controllers
             }
 
             // Update fields if provided
-            if (updateDTO.Status.HasValue)
+            if (!string.IsNullOrEmpty(updateDTO.Status))
             {
-                repairRequest.Status = updateDTO.Status.Value;
+                repairRequest.Status = Enum.Parse<RepairStatus>(updateDTO.Status);
 
                 // Update timestamps based on status
-                switch (updateDTO.Status.Value)
+                switch (repairRequest.Status)
                 {
                     case RepairStatus.Assigned:
                         if (!repairRequest.AssignedAt.HasValue)
@@ -216,29 +216,28 @@ namespace SoitMed.Controllers
                 }
             }
 
-            if (updateDTO.AssignedEngineerId.HasValue)
+            if (!string.IsNullOrEmpty(updateDTO.AssignedEngineerId))
             {
-                var Engineer = await context.Engineers.FindAsync(updateDTO.AssignedEngineerId.Value);
-                if (Engineer == null)
+                var engineer = await context.Engineers.FindAsync(updateDTO.AssignedEngineerId);
+                if (engineer == null)
                 {
                     return NotFound($"Engineer with ID {updateDTO.AssignedEngineerId} not found");
                 }
-                repairRequest.AssignedEngineerId = updateDTO.AssignedEngineerId.Value;
+                repairRequest.AssignedEngineerId = updateDTO.AssignedEngineerId;
                 repairRequest.AssignedAt = DateTime.UtcNow;
                 repairRequest.Status = RepairStatus.Assigned;
             }
 
-            if (!string.IsNullOrEmpty(updateDTO.RepairNotes))
-                repairRequest.RepairNotes = updateDTO.RepairNotes;
+            if (!string.IsNullOrEmpty(updateDTO.Notes))
+                repairRequest.RepairNotes = updateDTO.Notes;
 
-            if (!string.IsNullOrEmpty(updateDTO.PartsUsed))
-                repairRequest.PartsUsed = updateDTO.PartsUsed;
+            if (!string.IsNullOrEmpty(updateDTO.Notes))
+                repairRequest.PartsUsed = updateDTO.Notes;
 
-            if (updateDTO.RepairCost.HasValue)
-                repairRequest.RepairCost = updateDTO.RepairCost.Value;
+            if (updateDTO.EstimatedCost.HasValue)
+                repairRequest.RepairCost = updateDTO.EstimatedCost.Value;
 
-            if (updateDTO.ActualHours.HasValue)
-                repairRequest.ActualHours = updateDTO.ActualHours.Value;
+                        // ActualHours not available in DTO
 
             await context.SaveChangesAsync();
 
@@ -264,12 +263,12 @@ namespace SoitMed.Controllers
                     HospitalName = rr.Equipment.Hospital.Name,
                     Description = rr.Description,
                     Symptoms = rr.Symptoms,
-                    Priority = rr.Priority,
-                    Status = rr.Status,
+                    Priority = rr.Priority.ToString(),
+                    Status = rr.Status.ToString(),
                     RequestorName = rr.RequestingDoctor != null ? rr.RequestingDoctor.Name : rr.RequestingTechnician!.Name,
                     RequestorType = rr.RequestingDoctor != null ? "Doctor" : "Technician",
                     RequestedAt = rr.RequestedAt,
-                    EstimatedHours = rr.EstimatedHours
+                    EstimatedHours = rr.EstimatedHours.HasValue ? (decimal)rr.EstimatedHours.Value : 0m
                 })
                 .OrderByDescending(rr => rr.Priority)
                 .ThenBy(rr => rr.RequestedAt)
@@ -289,7 +288,7 @@ namespace SoitMed.Controllers
             }
 
             var repairRequests = await context.RepairRequests
-                .Where(rr => rr.AssignedEngineerId == EngineerId && rr.IsActive)
+                .Where(rr => rr.AssignedEngineerId == EngineerId.ToString() && rr.IsActive)
                 .Include(rr => rr.Equipment)
                 .ThenInclude(e => e.Hospital)
                 .Include(rr => rr.RequestingDoctor)
@@ -303,8 +302,8 @@ namespace SoitMed.Controllers
                     HospitalName = rr.Equipment.Hospital.Name,
                     Description = rr.Description,
                     Symptoms = rr.Symptoms,
-                    Priority = rr.Priority,
-                    Status = rr.Status,
+                    Priority = rr.Priority.ToString(),
+                    Status = rr.Status.ToString(),
                     RequestorName = rr.RequestingDoctor != null ? rr.RequestingDoctor.Name : rr.RequestingTechnician!.Name,
                     RequestorType = rr.RequestingDoctor != null ? "Doctor" : "Technician",
                     RequestedAt = rr.RequestedAt,
@@ -313,9 +312,9 @@ namespace SoitMed.Controllers
                     CompletedAt = rr.CompletedAt,
                     RepairNotes = rr.RepairNotes,
                     PartsUsed = rr.PartsUsed,
-                    RepairCost = rr.RepairCost,
-                    EstimatedHours = rr.EstimatedHours,
-                    ActualHours = rr.ActualHours
+                    RepairCost = rr.RepairCost ?? 0m,
+                    EstimatedHours = rr.EstimatedHours.HasValue ? (decimal)rr.EstimatedHours.Value : 0m,
+                    ActualHours = rr.ActualHours.HasValue ? (decimal)rr.ActualHours.Value : 0m
                 })
                 .OrderByDescending(rr => rr.Priority)
                 .ThenBy(rr => rr.RequestedAt)
@@ -345,7 +344,7 @@ namespace SoitMed.Controllers
             {
                 // Simple round-robin assignment - assign to Engineer with least active requests
                 var EngineerWorkloads = await context.RepairRequests
-                    .Where(rr => rr.AssignedEngineerId.HasValue && 
+                    .Where(rr => rr.AssignedEngineerId != null && 
                                 rr.Status != RepairStatus.Completed && 
                                 rr.Status != RepairStatus.Cancelled)
                     .GroupBy(rr => rr.AssignedEngineerId)
@@ -353,7 +352,7 @@ namespace SoitMed.Controllers
                     .ToListAsync();
 
                 var selectedEngineer = availableEngineers
-                    .OrderBy(e => EngineerWorkloads.FirstOrDefault(w => w.EngineerId == e.EngineerId)?.Count ?? 0)
+                    .OrderBy(e => EngineerWorkloads.FirstOrDefault(w => w.EngineerId.ToString() == e.EngineerId)?.Count ?? 0)
                     .First();
 
                 var repairRequest = await context.RepairRequests.FindAsync(repairRequestId);

@@ -83,7 +83,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{id}/subcategories")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetSubCategories(long id)
+        public async Task<IActionResult> GetSubCategories(string id)
         {
             try
             {
@@ -102,7 +102,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{id}")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetCategoryById(long id)
+        public async Task<IActionResult> GetCategoryById(string id)
         {
             try
             {
@@ -147,7 +147,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPut("{id}")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> UpdateCategory(long id, [FromBody] UpdateProductCategoryDTO updateDto)
+        public async Task<IActionResult> UpdateCategory(string id, [FromBody] UpdateProductCategoryDTO updateDto)
         {
             try
             {
@@ -170,7 +170,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpDelete("{id}")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> DeleteCategory(long id)
+        public async Task<IActionResult> DeleteCategory(string id)
         {
             try
             {

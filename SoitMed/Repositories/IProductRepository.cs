@@ -6,7 +6,7 @@ namespace SoitMed.Repositories
     {
         Task<IEnumerable<Product>> GetAllActiveAsync();
         Task<IEnumerable<Product>> GetByCategoryAsync(string category);
-        Task<IEnumerable<Product>> GetByCategoryIdAsync(long? categoryId);
+        Task<IEnumerable<Product>> GetByCategoryIdAsync(string? categoryId);
         Task<IEnumerable<Product>> SearchAsync(string searchTerm);
         Task<IEnumerable<Product>> GetInStockAsync();
         /// <summary>

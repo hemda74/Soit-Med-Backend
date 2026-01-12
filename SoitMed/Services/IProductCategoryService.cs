@@ -7,11 +7,11 @@ namespace SoitMed.Services
         Task<List<ProductCategoryDTO>> GetAllCategoriesAsync();
         Task<List<CategoryHierarchyDTO>> GetCategoryHierarchyAsync();
         Task<List<ProductCategoryDTO>> GetMainCategoriesAsync();
-        Task<List<ProductCategoryDTO>> GetSubCategoriesAsync(long parentCategoryId);
-        Task<ProductCategoryDTO?> GetCategoryByIdAsync(long id);
+        Task<List<ProductCategoryDTO>> GetSubCategoriesAsync(string parentCategoryId);
+        Task<ProductCategoryDTO?> GetCategoryByIdAsync(string id);
         Task<ProductCategoryDTO> CreateCategoryAsync(CreateProductCategoryDTO createDto);
-        Task<ProductCategoryDTO> UpdateCategoryAsync(long id, UpdateProductCategoryDTO updateDto);
-        Task<bool> DeleteCategoryAsync(long id);
+        Task<ProductCategoryDTO> UpdateCategoryAsync(string id, UpdateProductCategoryDTO updateDto);
+        Task<bool> DeleteCategoryAsync(string id);
     }
 }
 

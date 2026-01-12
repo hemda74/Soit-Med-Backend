@@ -239,6 +239,14 @@ namespace SoitMed
                 // Register Enhanced Maintenance Service
                 builder.Services.AddScoped<IEnhancedMaintenanceService, EnhancedMaintenanceService>();
                 
+                // Register Comprehensive Maintenance Service
+                builder.Services.AddScoped<IComprehensiveMaintenanceService, ComprehensiveMaintenanceService>();
+                
+                // Register Security Services
+                builder.Services.AddScoped<ISecurityConfigurationService, SecurityConfigurationService>();
+                builder.Services.AddScoped<IRateLimitingService, RateLimitingService>();
+                builder.Services.AddMemoryCache(); // Required for rate limiting and security caching
+                
                 // Configure ContractMaintenance options
                 builder.Services.Configure<SoitMed.Services.ContractMaintenanceOptions>(
                     builder.Configuration.GetSection(SoitMed.Services.ContractMaintenanceOptions.SectionName));
@@ -565,6 +573,12 @@ END";
                         }
                     });
                 });
+
+                // Add Security Middleware (before other middleware)
+                app.UseMiddleware<SoitMed.Middleware.SecurityMiddleware>();
+                
+                // Add Rate Limiting Middleware
+                app.UseMiddleware<SoitMed.Services.RateLimitingMiddleware>();
 
                 app.Use(async (context, next) =>
                 {

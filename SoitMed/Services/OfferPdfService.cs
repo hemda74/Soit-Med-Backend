@@ -39,7 +39,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Generates PDF on-demand without saving to disk (returns bytes directly)
         /// </summary>
-        public async Task<byte[]> GenerateOfferPdfAsync(long offerId, string language = "en")
+        public async Task<byte[]> GenerateOfferPdfAsync(string offerId, string language = "en")
         {
             IBrowser? browser = null;
             try

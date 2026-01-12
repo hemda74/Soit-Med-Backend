@@ -23,7 +23,7 @@ namespace SoitMed.Models
         [MaxLength(500)]
         public string? IconPath { get; set; } // Path to category icon/image
 
-        public long? ParentCategoryId { get; set; } // For hierarchical categories
+        public string? ParentCategoryId { get; set; } // For hierarchical categories
 
         public int DisplayOrder { get; set; } = 0;
 

@@ -228,7 +228,7 @@ namespace SoitMed.Controllers
 
                 if (client != null)
                 {
-                    clientId = client.Id;
+                    clientId = long.Parse(client.Id);
                     _logger.LogInformation("Found client record for customer user {UserId} by email {Email}. ClientId: {ClientId}, ClientName: {ClientName}", 
                         userId, currentUser.Email, clientId, client.Name);
                 }
@@ -247,7 +247,7 @@ namespace SoitMed.Controllers
 
                         if (client != null)
                         {
-                            clientId = client.Id;
+                            clientId = long.Parse(client.Id);
                             _logger.LogInformation("Found client record for customer user {UserId} by name {Name}. ClientId: {ClientId}, ClientName: {ClientName}", 
                                 userId, userFullName, clientId, client.Name);
                         }
@@ -312,7 +312,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{id}/salesmanager-approval")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> SalesManagerApproval(long id, [FromBody] ApproveOfferDTO approvalDto)
+        public async Task<IActionResult> SalesManagerApproval(string id, [FromBody] ApproveOfferDTO approvalDto)
         {
             try
             {
@@ -350,7 +350,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{id}")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,SalesMan,Customer,Doctor,Technician")]
-        public async Task<IActionResult> GetOffer(long id)
+        public async Task<IActionResult> GetOffer(string id)
         {
             try
             {
@@ -405,7 +405,7 @@ namespace SoitMed.Controllers
 
                     if (client != null)
                     {
-                        clientId = client.Id;
+                        clientId = long.Parse(client.Id);
                         _logger.LogInformation("Found client record for customer user {UserId} by email {Email}. ClientId: {ClientId}, ClientName: {ClientName}", 
                             userId, currentUser.Email, clientId, client.Name);
                     }
@@ -424,7 +424,7 @@ namespace SoitMed.Controllers
 
                             if (client != null)
                             {
-                                clientId = client.Id;
+                                clientId = long.Parse(client.Id);
                                 _logger.LogInformation("Found client record for customer user {UserId} by name {Name}. ClientId: {ClientId}, ClientName: {ClientName}", 
                                     userId, userFullName, clientId, client.Name);
                             }
@@ -445,7 +445,7 @@ namespace SoitMed.Controllers
                         return NotFound(ResponseHelper.CreateErrorResponse("Offer not found"));
 
                     // Verify the offer belongs to this client
-                    if (result.ClientId != clientId)
+                    if (result.ClientId != clientId.ToString())
                     {
                         _logger.LogWarning("Customer {UserId} (ClientId: {ClientId}) attempted to access offer {OfferId} belonging to ClientId {OfferClientId}", 
                             userId, clientId, id, result.ClientId);
@@ -519,7 +519,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPatch("{id}")]
         [Authorize(Roles = "SalesManager,SuperAdmin")]
-        public async Task<IActionResult> UpdateOffer(long id, [FromBody] UpdateOfferDTO updateDto)
+        public async Task<IActionResult> UpdateOffer(string id, [FromBody] UpdateOfferDTO updateDto)
         {
             try
             {
@@ -582,7 +582,7 @@ namespace SoitMed.Controllers
         // Equipment Management Endpoints
         [HttpPost("{offerId}/equipment")]
         [Authorize(Roles = "SalesSupport,SalesManager")]
-        public async Task<IActionResult> AddEquipment(long offerId, [FromBody] CreateOfferEquipmentDTO dto)
+        public async Task<IActionResult> AddEquipment(string offerId, [FromBody] CreateOfferEquipmentDTO dto)
         {
             try
             {
@@ -598,7 +598,7 @@ namespace SoitMed.Controllers
 
         [HttpGet("{offerId}/equipment")]
         [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin")]
-        public async Task<IActionResult> GetEquipment(long offerId)
+        public async Task<IActionResult> GetEquipment(string offerId)
         {
             try
             {
@@ -633,7 +633,7 @@ namespace SoitMed.Controllers
 
         [HttpDelete("{offerId}/equipment/{equipmentId}")]
         [Authorize(Roles = "SalesSupport,SalesManager")]
-        public async Task<IActionResult> DeleteEquipment(long offerId, long equipmentId)
+        public async Task<IActionResult> DeleteEquipment(string offerId, long equipmentId)
         {
             var result = await _offerService.DeleteEquipmentAsync(offerId, equipmentId);
             return result ? Ok(ResponseHelper.CreateSuccessResponse(null, "Deleted")) : NotFound();
@@ -641,7 +641,7 @@ namespace SoitMed.Controllers
 
         [HttpPost("{offerId}/equipment/{equipmentId}/upload-image")]
         [Authorize(Roles = "SalesSupport,SalesManager")]
-        public async Task<IActionResult> UploadEquipmentImage(long offerId, long equipmentId, IFormFile file)
+        public async Task<IActionResult> UploadEquipmentImage(string offerId, long equipmentId, IFormFile file)
         {
             try
             {
@@ -668,7 +668,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{offerId}/equipment/{equipmentId}/image")]
         [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin")]
-        public async Task<IActionResult> GetEquipmentImage(long offerId, long equipmentId)
+        public async Task<IActionResult> GetEquipmentImage(string offerId, long equipmentId)
         {
             try
             {
@@ -706,7 +706,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{offerId}/equipment/{equipmentId}/image-file")]
         [Authorize(Roles = "SalesSupport,SalesManager,SalesMan,SuperAdmin")]
-        public async Task<IActionResult> GetEquipmentImageFile(long offerId, long equipmentId)
+        public async Task<IActionResult> GetEquipmentImageFile(string offerId, long equipmentId)
         {
             try
             {
@@ -749,7 +749,7 @@ namespace SoitMed.Controllers
         // Terms Management
         [HttpPost("{offerId}/terms")]
         [Authorize(Roles = "SalesSupport,SalesManager")]
-        public async Task<IActionResult> AddOrUpdateTerms(long offerId, [FromBody] CreateOfferTermsDTO dto)
+        public async Task<IActionResult> AddOrUpdateTerms(string offerId, [FromBody] CreateOfferTermsDTO dto)
         {
             var result = await _offerService.AddOrUpdateTermsAsync(offerId, dto);
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Terms saved"));
@@ -758,7 +758,7 @@ namespace SoitMed.Controllers
         // Installment Plans
         [HttpPost("{offerId}/installments")]
         [Authorize(Roles = "SalesSupport,SalesManager")]
-        public async Task<IActionResult> CreateInstallmentPlan(long offerId, [FromBody] CreateInstallmentPlanDTO dto)
+        public async Task<IActionResult> CreateInstallmentPlan(string offerId, [FromBody] CreateInstallmentPlanDTO dto)
         {
             var result = await _offerService.CreateInstallmentPlanAsync(offerId, dto);
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Installment plan created"));
@@ -770,7 +770,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{offerId}/pdf")]
         [Authorize(Roles = "SalesMan,SalesSupport,SalesManager,SuperAdmin,Customer,Doctor,Technician")]
-        public async Task<IActionResult> GetOfferPdf(long offerId, [FromQuery] string language = "en")
+        public async Task<IActionResult> GetOfferPdf(string offerId, [FromQuery] string language = "en")
         {
             try
             {
@@ -884,7 +884,7 @@ namespace SoitMed.Controllers
         // Send to SalesMan
         [HttpPost("{offerId}/send-to-salesman")]
         [Authorize(Roles = "SalesSupport,SalesManager")]
-        public async Task<IActionResult> SendToSalesMan(long offerId)
+        public async Task<IActionResult> SendToSalesMan(string offerId)
         {
             var result = await _offerService.SendToSalesManAsync(offerId, GetCurrentUserId());
             return Ok(ResponseHelper.CreateSuccessResponse(result, "Sent"));
@@ -895,7 +895,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPut("{offerId}/assign-to-salesman")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> AssignOfferToSalesMan(long offerId, [FromBody] AssignOfferToSalesManDTO assignDto)
+        public async Task<IActionResult> AssignOfferToSalesMan(string offerId, [FromBody] AssignOfferToSalesManDTO assignDto)
         {
             try
             {
@@ -1047,7 +1047,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{offerId}/client-response")]
         [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin,SalesSupport,Customer,Doctor,Technician")]
-        public async Task<IActionResult> RecordClientResponse(long offerId, [FromBody] RecordClientResponseDTO dto)
+        public async Task<IActionResult> RecordClientResponse(string offerId, [FromBody] RecordClientResponseDTO dto)
         {
             try
             {
@@ -1112,7 +1112,7 @@ namespace SoitMed.Controllers
 
                     if (client != null)
                     {
-                        clientId = client.Id;
+                        clientId = long.Parse(client.Id);
                     }
                     else
                     {
@@ -1128,7 +1128,7 @@ namespace SoitMed.Controllers
 
                             if (client != null)
                             {
-                                clientId = client.Id;
+                                clientId = long.Parse(client.Id);
                             }
                         }
                     }
@@ -1148,7 +1148,7 @@ namespace SoitMed.Controllers
                     }
 
                     // Verify the offer belongs to this client
-                    if (offer.ClientId != clientId)
+                    if (offer.ClientId != clientId.ToString())
                     {
                         _logger.LogWarning("Customer {UserId} (ClientId: {ClientId}) attempted to respond to offer {OfferId} belonging to ClientId {OfferClientId}", 
                             userId, clientId, offerId, offer.ClientId);
@@ -1191,7 +1191,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{offerId}/complete")]
         [Authorize(Roles = "SalesMan,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> CompleteOffer(long offerId, [FromBody] CompleteOfferDTO dto)
+        public async Task<IActionResult> CompleteOffer(string offerId, [FromBody] CompleteOfferDTO dto)
         {
             try
             {
@@ -1218,7 +1218,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{offerId}/needs-modification")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin,SalesMan")]
-        public async Task<IActionResult> MarkAsNeedsModification(long offerId, [FromBody] NeedsModificationDTO dto)
+        public async Task<IActionResult> MarkAsNeedsModification(string offerId, [FromBody] NeedsModificationDTO dto)
         {
             try
             {
@@ -1249,7 +1249,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{offerId}/under-review")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> MarkAsUnderReview(long offerId)
+        public async Task<IActionResult> MarkAsUnderReview(string offerId)
         {
             try
             {
@@ -1275,7 +1275,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPost("{offerId}/resume-from-review")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> ResumeFromUnderReview(long offerId)
+        public async Task<IActionResult> ResumeFromUnderReview(string offerId)
         {
             try
             {

@@ -103,7 +103,7 @@ namespace SoitMed.DTO
     // ==================== OfferRequest DTOs ====================
     public class CreateOfferRequestDTO
     {
-        public long? ClientId { get; set; } // Optional - will be auto-resolved for customer roles
+        public string? ClientId { get; set; } // Optional - will be auto-resolved for customer roles
 
         public long? TaskProgressId { get; set; }
 
@@ -120,7 +120,7 @@ namespace SoitMed.DTO
         public long Id { get; set; }
         public string RequestedBy { get; set; } = string.Empty;
         public string RequestedByName { get; set; } = string.Empty;
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
         public string ClientName { get; set; } = string.Empty;
         public string RequestedProducts { get; set; } = string.Empty;
         public string? SpecialNotes { get; set; }
@@ -137,7 +137,7 @@ namespace SoitMed.DTO
         public long? OfferRequestId { get; set; } // Optional - can create offer without request
 
         [Required]
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
 
         [Required]
         public string AssignedTo { get; set; } = string.Empty;
@@ -272,7 +272,7 @@ namespace SoitMed.DTO
         public long? OfferRequestId { get; set; }
 
         [Required]
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
 
         [Required]
         public string AssignedTo { get; set; } = string.Empty;
@@ -316,9 +316,9 @@ namespace SoitMed.DTO
     public class OfferResponseDTO
     {
         public List<OfferEquipmentDTO> Equipment { get; set; } = new();
-        public long Id { get; set; }
-        public long? OfferRequestId { get; set; }
-        public long ClientId { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string? OfferRequestId { get; set; }
+        public string ClientId { get; set; }
         public string ClientName { get; set; } = string.Empty;
         public string CreatedBy { get; set; } = string.Empty;
         public string CreatedByName { get; set; } = string.Empty;
@@ -515,7 +515,7 @@ namespace SoitMed.DTO
         public long OfferId { get; set; }
 
         [Required]
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
 
         [Required]
         [Range(0.01, double.MaxValue)]
@@ -537,7 +537,7 @@ namespace SoitMed.DTO
     {
         public long Id { get; set; }
         public long? OfferId { get; set; }
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
         public string ClientName { get; set; } = string.Empty;
         public string SalesManId { get; set; } = string.Empty;
         public string SalesManName { get; set; } = string.Empty;
@@ -629,7 +629,7 @@ namespace SoitMed.DTO
     public class CreateTaskProgressWithOfferRequestDTO : CreateTaskProgressDTO
     {
         [Required]
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
         
         [Required]
         [MaxLength(2000)]

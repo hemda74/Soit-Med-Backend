@@ -41,7 +41,7 @@ namespace SoitMed.Services
                     SparePartRequestId = dto.SparePartRequestId,
                     CustomerId = customerId,
                     Amount = dto.Amount,
-                    PaymentMethod = dto.PaymentMethod,
+                    PaymentMethod = Enum.Parse<PaymentMethod>(dto.PaymentMethod),
                     Status = PaymentStatus.Pending
                 };
 
@@ -227,7 +227,7 @@ namespace SoitMed.Services
             if (payment.Status != PaymentStatus.Completed)
                 throw new InvalidOperationException("Only completed payments can be refunded");
 
-            var refundAmount = dto.Amount ?? payment.Amount;
+            var refundAmount = dto.Amount > 0 ? dto.Amount : payment.Amount;
 
             // Create refund transaction
             var transaction = new PaymentTransaction
@@ -293,21 +293,21 @@ namespace SoitMed.Services
 
             return new PaymentResponseDTO
             {
-                Id = payment.Id,
-                MaintenanceRequestId = payment.MaintenanceRequestId,
-                SparePartRequestId = payment.SparePartRequestId,
+                Id = payment.Id.ToString(),
+                MaintenanceRequestId = payment.MaintenanceRequestId?.ToString(),
+                SparePartRequestId = payment.SparePartRequestId?.ToString(),
                 CustomerId = payment.CustomerId,
                 CustomerName = customer?.UserName ?? "",
                 Amount = payment.Amount,
-                PaymentMethod = payment.PaymentMethod,
+                PaymentMethod = payment.PaymentMethod.ToString(),
                 PaymentMethodName = payment.PaymentMethod.ToString(),
-                Status = payment.Status,
+                Status = payment.Status.ToString(),
                 StatusName = payment.Status.ToString(),
                 TransactionId = payment.TransactionId,
                 PaymentReference = payment.PaymentReference,
                 ProcessedByAccountantId = payment.ProcessedByAccountantId,
                 ProcessedByAccountantName = accountant?.UserName ?? "",
-                ProcessedAt = payment.ProcessedAt,
+                ProcessedAt = payment.ProcessedAt ?? DateTime.UtcNow,
                 AccountingNotes = payment.AccountingNotes,
                 CreatedAt = payment.CreatedAt,
                 PaidAt = payment.PaidAt,

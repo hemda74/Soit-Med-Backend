@@ -20,7 +20,7 @@ namespace SoitMed.Repositories
             return _context.SalesOffers.AsNoTracking();
         }
 
-        public async Task<List<SalesOffer>> GetOffersByClientIdAsync(long clientId)
+        public async Task<List<SalesOffer>> GetOffersByClientIdAsync(string clientId)
         {
             return await _context.SalesOffers
                 .AsNoTracking()
@@ -108,7 +108,7 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<SalesOffer>> GetOffersByOfferRequestAsync(long offerRequestId)
+        public async Task<List<SalesOffer>> GetOffersByOfferRequestAsync(string offerRequestId)
         {
             return await _context.SalesOffers
                 .AsNoTracking()
@@ -117,7 +117,7 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<SalesOffer?> GetOfferWithDetailsAsync(long offerId)
+        public async Task<SalesOffer?> GetOfferWithDetailsAsync(string offerId)
         {
             return await _context.SalesOffers
                 .Include(o => o.Client)
@@ -156,7 +156,7 @@ namespace SoitMed.Repositories
                 .SumAsync(o => o.TotalAmount);
         }
 
-        public async Task<List<SalesOffer>> GetByIdsAsync(IEnumerable<long> ids)
+        public async Task<List<SalesOffer>> GetByIdsAsync(IEnumerable<string> ids)
         {
             var idList = ids.ToList();
             if (!idList.Any())
@@ -169,7 +169,7 @@ namespace SoitMed.Repositories
         }
 
         // OPTIMIZED: Single query to load offers with all related data (O(1) database queries instead of O(3))
-        public async Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
+        public async Task<(List<SalesOffer> Offers, Dictionary<string, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
             GetOffersBySalesManWithRelatedDataAsync(string salesmanId)
         {
             // Single query with joins to load everything at once
@@ -180,7 +180,7 @@ namespace SoitMed.Repositories
                 .ToListAsync();
 
             // Extract unique IDs
-            var clientIds = offers.Where(o => o.ClientId > 0).Select(o => o.ClientId).Distinct().ToList();
+            var clientIds = offers.Where(o => !string.IsNullOrEmpty(o.ClientId)).Select(o => o.ClientId).Distinct().ToList();
             var userIds = offers
                 .SelectMany(o => new[] { o.CreatedBy, o.AssignedTo })
                 .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -209,8 +209,8 @@ namespace SoitMed.Repositories
             return (offers, clientsDict, usersDict);
         }
 
-        public async Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
-            GetOffersByClientIdWithRelatedDataAsync(long clientId)
+        public async Task<(List<SalesOffer> Offers, Dictionary<string, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
+            GetOffersByClientIdWithRelatedDataAsync(string clientId)
         {
             var offers = await _context.SalesOffers
                 .AsNoTracking()
@@ -242,7 +242,7 @@ namespace SoitMed.Repositories
             return (offers, clientsDict, usersDict);
         }
 
-        public async Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
+        public async Task<(List<SalesOffer> Offers, Dictionary<string, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
             GetOffersByStatusWithRelatedDataAsync(string? status)
         {
             var query = _context.SalesOffers.AsNoTracking();
@@ -256,7 +256,7 @@ namespace SoitMed.Repositories
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
 
-            var clientIds = offers.Where(o => o.ClientId > 0).Select(o => o.ClientId).Distinct().ToList();
+            var clientIds = offers.Where(o => !string.IsNullOrEmpty(o.ClientId)).Select(o => o.ClientId).Distinct().ToList();
             var userIds = offers
                 .SelectMany(o => new[] { o.CreatedBy, o.AssignedTo })
                 .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -285,7 +285,7 @@ namespace SoitMed.Repositories
             return (offers, clientsDict, usersDict);
         }
 
-        public async Task<(List<SalesOffer> Offers, Dictionary<long, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
+        public async Task<(List<SalesOffer> Offers, Dictionary<string, Client> Clients, Dictionary<string, ApplicationUser> Users)> 
             GetExpiredOffersWithRelatedDataAsync()
         {
             var today = DateTime.UtcNow.Date;
@@ -319,7 +319,7 @@ namespace SoitMed.Repositories
             .OrderByDescending(o => o.ValidUntil)
             .ToList();
 
-            var clientIds = offers.Where(o => o.ClientId > 0).Select(o => o.ClientId).Distinct().ToList();
+            var clientIds = offers.Where(o => !string.IsNullOrEmpty(o.ClientId)).Select(o => o.ClientId).Distinct().ToList();
             var userIds = offers
                 .SelectMany(o => new[] { o.CreatedBy, o.AssignedTo })
                 .Where(id => !string.IsNullOrWhiteSpace(id))

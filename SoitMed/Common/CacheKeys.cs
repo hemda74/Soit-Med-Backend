@@ -34,10 +34,10 @@ namespace SoitMed.Common
         public static class Products
         {
             public static string All => $"{Prefix}Product:All";
-            public static string ById(long id) => $"{Prefix}Product:Id:{id}";
-            public static string ByCategory(long categoryId) => $"{Prefix}Product:Category:{categoryId}";
+            public static string ById(string id) => $"{Prefix}Product:Id:{id}";
+            public static string ByCategory(string categoryId) => $"{Prefix}Product:Category:{categoryId}";
             public static string Categories => $"{Prefix}Product:Categories";
-            public static string CategoryById(long id) => $"{Prefix}Product:Category:Id:{id}";
+            public static string CategoryById(string id) => $"{Prefix}Product:Category:Id:{id}";
             public static string InStock => $"{Prefix}Product:InStock";
         }
 

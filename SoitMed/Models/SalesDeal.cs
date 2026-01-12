@@ -11,10 +11,10 @@ namespace SoitMed.Models
     public class SalesDeal : BaseEntity
     {
         #region Basic Information
-        public long? OfferId { get; set; }
+        public string? OfferId { get; set; }
         
         [Required]
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
         
         [Required]
         public string SalesManId { get; set; } = string.Empty;

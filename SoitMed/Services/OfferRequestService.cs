@@ -50,7 +50,7 @@ namespace SoitMed.Services
                 long clientId = 0; // Initialize to avoid compiler error
 
                 // For customer roles, find their client record by email if ClientId is not provided
-                if (isCustomerRole && !createDto.ClientId.HasValue)
+                if (isCustomerRole && string.IsNullOrEmpty(createDto.ClientId))
                 {
                     // Try to find client by customer's email (case-insensitive)
                     var context = _unitOfWork.GetContext();
@@ -79,7 +79,7 @@ namespace SoitMed.Services
 
                     if (client != null)
                     {
-                        clientId = client.Id;
+                        clientId = long.Parse(client.Id);
                         _logger.LogInformation("Found client record for customer user {UserId} by email {Email}. ClientId: {ClientId}, ClientName: {ClientName}", 
                             userId, currentUser.Email, clientId, client.Name);
                     }
@@ -98,7 +98,7 @@ namespace SoitMed.Services
 
                             if (client != null)
                             {
-                                clientId = client.Id;
+                                clientId = long.Parse(client.Id);
                                 _logger.LogInformation("Found client record for customer user {UserId} by name {Name}. ClientId: {ClientId}, ClientName: {ClientName}", 
                                     userId, userFullName, clientId, client.Name);
                             }
@@ -137,7 +137,7 @@ namespace SoitMed.Services
                         await _unitOfWork.SaveChangesAsync();
 
                         client = newClient;
-                        clientId = newClient.Id;
+                        clientId = long.Parse(newClient.Id);
 
                         _logger.LogInformation("Auto-created client record for customer user {UserId}. ClientId: {ClientId}, ClientName: {ClientName}", 
                             userId, clientId, newClient.Name);
@@ -146,10 +146,10 @@ namespace SoitMed.Services
                 else
                 {
                     // For non-customer roles, ClientId is required
-                    if (!createDto.ClientId.HasValue)
+                    if (string.IsNullOrEmpty(createDto.ClientId))
                         throw new ArgumentException("ClientId is required for this user role", nameof(createDto.ClientId));
 
-                    clientId = createDto.ClientId.Value;
+                    clientId = long.Parse(createDto.ClientId);
                     // Validate client exists
                     client = await _unitOfWork.Clients.GetByIdAsync(clientId);
                     if (client == null)
@@ -179,7 +179,7 @@ namespace SoitMed.Services
                 var offerRequest = new OfferRequest
                 {
                     RequestedBy = userId,
-                    ClientId = clientId,
+                    ClientId = clientId.ToString(),
                     TaskProgressId = createDto.TaskProgressId,
                     RequestedProducts = createDto.RequestedProducts,
                     SpecialNotes = createDto.SpecialNotes,
@@ -512,9 +512,9 @@ namespace SoitMed.Services
             {
                 // For customer roles, ClientId can be null (will be auto-resolved)
                 // For other roles, ClientId must be provided
-                if (requestDto.ClientId.HasValue)
+                if (!string.IsNullOrEmpty(requestDto.ClientId))
                 {
-                    var client = await _unitOfWork.Clients.GetByIdAsync(requestDto.ClientId.Value);
+                    var client = await _unitOfWork.Clients.GetByIdAsync(requestDto.ClientId);
                     if (client == null)
                         return false;
                 }
@@ -607,7 +607,7 @@ namespace SoitMed.Services
 
             return new OfferRequestResponseDTO
             {
-                Id = offerRequest.Id,
+                Id = long.Parse(offerRequest.Id),
                 RequestedBy = offerRequest.RequestedBy,
                 RequestedByName = requester != null ? $"{requester.FirstName} {requester.LastName}" : "Unknown",
                 ClientId = offerRequest.ClientId,

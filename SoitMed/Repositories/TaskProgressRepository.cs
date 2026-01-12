@@ -25,7 +25,7 @@ namespace SoitMed.Repositories
         {
             return await _context.TaskProgresses
                 .AsNoTracking()
-                .Where(tp => tp.ClientId == clientId)
+                .Where(tp => tp.ClientId == clientId.ToString())
                 .OrderByDescending(tp => tp.ProgressDate)
                 .ToListAsync();
         }
@@ -137,7 +137,7 @@ namespace SoitMed.Repositories
                 .Include(tp => tp.Client)
                 .Include(tp => tp.Employee)
                 .Include(tp => tp.OfferRequest)
-                .FirstOrDefaultAsync(tp => tp.Id == progressId);
+                .FirstOrDefaultAsync(tp => tp.Id == progressId.ToString());
         }
 
        
@@ -161,7 +161,7 @@ namespace SoitMed.Repositories
         {
             return await _context.TaskProgresses
                 .AsNoTracking()
-                .CountAsync(tp => tp.ClientId == clientId);
+                .CountAsync(tp => tp.ClientId == clientId.ToString());
         }
 
       

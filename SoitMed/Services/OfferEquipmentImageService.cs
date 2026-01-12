@@ -6,7 +6,7 @@ namespace SoitMed.Services
 {
     public interface IOfferEquipmentImageService
     {
-        Task<ImageUploadResult> UploadEquipmentImageAsync(IFormFile imageFile, long offerId, long equipmentId, string? altText = null);
+        Task<ImageUploadResult> UploadEquipmentImageAsync(IFormFile imageFile, string offerId, long equipmentId, string? altText = null);
         Task<bool> DeleteEquipmentImageAsync(string filePath);
         bool IsValidImageFile(IFormFile file);
     }
@@ -28,7 +28,7 @@ namespace SoitMed.Services
             _uploadsRootPhysicalPath = defaultUploadsRoot;
         }
 
-        public async Task<ImageUploadResult> UploadEquipmentImageAsync(IFormFile imageFile, long offerId, long equipmentId, string? altText = null)
+        public async Task<ImageUploadResult> UploadEquipmentImageAsync(IFormFile imageFile, string offerId, long equipmentId, string? altText = null)
         {
             _logger.LogInformation("UploadEquipmentImageAsync called for offer {OfferId}, equipment {EquipmentId}", offerId, equipmentId);
             

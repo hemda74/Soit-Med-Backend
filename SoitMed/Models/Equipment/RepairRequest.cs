@@ -8,11 +8,11 @@ namespace SoitMed.Models.Equipment
     public class RepairRequest
     {
         [Key]
-        public int Id { get; set; }
+        public string Id { get; set; }
 
         // Foreign Key to Equipment
         [Required]
-        public int EquipmentId { get; set; }
+        public string EquipmentId { get; set; }
 
         [ForeignKey("EquipmentId")]
         public virtual Equipment Equipment { get; set; } = null!;
@@ -39,7 +39,7 @@ namespace SoitMed.Models.Equipment
         public virtual Technician? RequestingTechnician { get; set; }
 
         // Assigned Engineer (from the hospital's governorate)
-        public int? AssignedEngineerId { get; set; }
+        public string? AssignedEngineerId { get; set; }
 
         [ForeignKey("AssignedEngineerId")]
         public virtual Engineer? AssignedEngineer { get; set; }

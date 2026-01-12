@@ -29,7 +29,7 @@ namespace SoitMed.Models
         public int DisplayOrder { get; set; } = 0;
 
         // Client Information
-        public long? ClientId { get; set; }
+        public string? ClientId { get; set; }
 
         [MaxLength(20)]
         public string? ClientStatus { get; set; } // "Old", "New"

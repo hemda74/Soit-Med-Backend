@@ -11,7 +11,7 @@ namespace SoitMed.Common.DomainEvents
         public string TicketNumber { get; }
         public string CustomerId { get; }
         public string CustomerName { get; }
-        public int DeviceId { get; }
+        public string DeviceId { get; }
         public string DeviceName { get; }
         public DateTime ScheduledDate { get; }
         public VisitOrigin Origin { get; }
@@ -23,7 +23,7 @@ namespace SoitMed.Common.DomainEvents
             string ticketNumber,
             string customerId,
             string customerName,
-            int deviceId,
+            string deviceId,
             string deviceName,
             DateTime scheduledDate,
             VisitOrigin origin,

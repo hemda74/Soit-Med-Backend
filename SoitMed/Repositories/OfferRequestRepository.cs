@@ -43,7 +43,7 @@ namespace SoitMed.Repositories
         {
             return await _context.OfferRequests
                 .AsNoTracking()
-                .Where(or => or.ClientId == clientId)
+                .Where(or => or.ClientId == clientId.ToString())
                 .OrderByDescending(or => or.RequestDate)
                 .ToListAsync();
         }
@@ -92,7 +92,7 @@ namespace SoitMed.Repositories
                 .Include(or => or.AssignedSupportUser)
                 .Include(or => or.TaskProgress)
                 .Include(or => or.CreatedOffer)
-                .FirstOrDefaultAsync(or => or.Id == requestId);
+                .FirstOrDefaultAsync(or => or.Id == requestId.ToString());
         }
 
         public async Task<List<OfferRequest>> GetRequestsByTaskProgressIdAsync(long taskProgressId)
@@ -199,7 +199,7 @@ namespace SoitMed.Repositories
 
             return await _context.OfferRequests
                 .AsNoTracking()
-                .Where(or => idList.Contains(or.Id))
+                .Where(or => idList.Contains(long.Parse(or.Id)))
                 .ToListAsync();
         }
     }

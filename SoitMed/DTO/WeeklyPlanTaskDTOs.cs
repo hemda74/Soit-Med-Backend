@@ -17,7 +17,7 @@ namespace SoitMed.DTO
         public string Title { get; set; } = string.Empty;
 
         // Client Information - For existing clients
-        public long? ClientId { get; set; } // Will be resolved from ClientName if provided
+        public string? ClientId { get; set; } // Will be resolved from ClientName if provided
 
         [MaxLength(20, ErrorMessage = "Client status cannot exceed 20 characters")]
         public string? ClientStatus { get; set; } // "Old", "New"
@@ -57,7 +57,7 @@ namespace SoitMed.DTO
         public string? Title { get; set; }
 
         // Client Information updates
-        public long? ClientId { get; set; }
+        public string? ClientId { get; set; }
 
         [MaxLength(20, ErrorMessage = "Client status cannot exceed 20 characters")]
         public string? ClientStatus { get; set; }
@@ -102,7 +102,7 @@ namespace SoitMed.DTO
         public bool IsCompleted { get; set; }
         public string? Status { get; set; }
         public int DisplayOrder { get; set; }
-        public long? ClientId { get; set; }
+        public string? ClientId { get; set; }
         public string? ClientName { get; set; }
         public string? ClientStatus { get; set; }
         public string? ClientPhone { get; set; }

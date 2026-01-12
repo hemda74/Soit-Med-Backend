@@ -56,7 +56,7 @@ namespace SoitMed.DTO
         public string? CancellationReason { get; set; }
         
         // Client information
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
         public string ClientName { get; set; } = string.Empty;
         public string? ClientPhone { get; set; }
         public string? ClientEmail { get; set; }

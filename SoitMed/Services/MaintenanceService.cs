@@ -3,11 +3,13 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SoitMed.Common.DomainEvents;
 using SoitMed.Common.Exceptions;
+using SoitMed.DTO;
 using SoitMed.Models.Equipment;
 using SoitMed.Models.Enums;
 using SoitMed.Models.Identity;
 using SoitMed.Repositories;
 using SoitMed.Models.Core;
+using System.ComponentModel.DataAnnotations;
 
 namespace SoitMed.Services
 {
@@ -403,20 +405,4 @@ namespace SoitMed.Services
             }
         }
     }
-
-    /// <summary>
-    /// DTO for creating a visit
-    /// </summary>
-    public class CreateVisitDTO
-    {
-        public int MaintenanceRequestId { get; set; }
-        public int DeviceId { get; set; }
-        public DateTime ScheduledDate { get; set; }
-        public VisitOrigin Origin { get; set; }
-        public string? EngineerId { get; set; }
-        public List<string>? EngineerIds { get; set; }
-        public bool IsPaidVisit { get; set; }
-        public decimal? Cost { get; set; }
-    }
 }
-

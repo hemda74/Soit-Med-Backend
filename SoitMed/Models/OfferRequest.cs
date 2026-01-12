@@ -13,7 +13,7 @@ namespace SoitMed.Models
         public string RequestedBy { get; set; } // SalesMan ID
 
         [Required]
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
 
         public long? TaskProgressId { get; set; } // Link to the progress that triggered this request
 
@@ -31,7 +31,7 @@ namespace SoitMed.Models
 
         public string? AssignedTo { get; set; } // Sales Support ID
 
-        public long? CreatedOfferId { get; set; }
+        public string? CreatedOfferId { get; set; }
 
         public DateTime? CompletedAt { get; set; }
 
@@ -58,12 +58,12 @@ namespace SoitMed.Models
         /// <summary>
         /// Marks the request as completed
         /// </summary>
-        public void MarkAsCompleted(string? notes = null, long? offerId = null)
+        public void MarkAsCompleted(string? notes = null, string? offerId = null)
         {
             Status = "Ready";
             CompletedAt = DateTime.UtcNow;
-            if (offerId.HasValue)
-                CreatedOfferId = offerId.Value;
+            if (!string.IsNullOrEmpty(offerId))
+                CreatedOfferId = offerId;
             if (!string.IsNullOrEmpty(notes))
                 CompletionNotes = notes;
         }

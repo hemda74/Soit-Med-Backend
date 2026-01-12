@@ -31,7 +31,8 @@ namespace SoitMed.Models.Equipment
 
         // Device/Equipment information
         [Required]
-        public int DeviceId { get; set; } // FK to Equipment
+        [MaxLength(50)]
+        public string DeviceId { get; set; } = string.Empty; // FK to Equipment
 
         [ForeignKey("DeviceId")]
         public virtual Equipment Device { get; set; } = null!;

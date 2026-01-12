@@ -47,6 +47,9 @@ namespace SoitMed.Extensions
             // Domain events
             services.AddScoped<SoitMed.Common.DomainEvents.IDomainEventDispatcher, SoitMed.Common.DomainEvents.DomainEventDispatcher>();
             services.AddScoped<SoitMed.Common.DomainEvents.IDomainEventHandler<SoitMed.Common.DomainEvents.VisitScheduledEvent>, SoitMed.Common.DomainEvents.VisitScheduledEventHandler>();
+            
+            // Admin management services
+            services.AddScoped<IAdminManagementService, AdminManagementService>();
 
             // Payment services
             services.AddScoped<IPaymentService, PaymentService>();
@@ -61,9 +64,7 @@ namespace SoitMed.Extensions
             // Chat services
             services.AddScoped<IChatService, ChatService>();
 
-            // Legacy import service
-            services.AddScoped<ILegacyImporterService, LegacyImporterService>();
-
+            
             // Legacy media service
             services.AddScoped<ILegacyMediaService, LegacyMediaService>();
 

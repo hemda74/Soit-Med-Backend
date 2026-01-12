@@ -99,7 +99,7 @@ namespace SoitMed.DTO
         public int DisplayOrder { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-        public long? ClientId { get; set; }
+        public string? ClientId { get; set; }
         public string? ClientName { get; set; }
         public string? ClientStatus { get; set; }
         public string? ClientPhone { get; set; }
@@ -129,11 +129,11 @@ namespace SoitMed.DTO
 
     public class OfferRequestSimpleDTO
     {
-        public long Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public string RequestedProducts { get; set; } = string.Empty;
         public DateTime RequestDate { get; set; }
         public string Status { get; set; } = string.Empty;
-        public long? CreatedOfferId { get; set; }
+        public string? CreatedOfferId { get; set; }
     }
 
     public class SalesOfferSimpleDTO

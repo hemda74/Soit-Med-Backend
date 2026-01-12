@@ -48,8 +48,8 @@ namespace SoitMed.Controllers
             try
             {
                 var result = await _accountingService.GetPaymentsByDateRangeAsync(
-                    filters.FromDate ?? DateTime.UtcNow.AddDays(-30),
-                    filters.ToDate ?? DateTime.UtcNow);
+                    filters.StartDate ?? DateTime.UtcNow.AddDays(-30),
+                    filters.EndDate ?? DateTime.UtcNow);
                 return SuccessResponse(result);
             }
             catch (Exception ex)

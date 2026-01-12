@@ -55,7 +55,7 @@ namespace SoitMed.Repositories
                 // Look up the governorate name from the Governorates table first
                 var governorate = await _context.Governorates
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(g => g.GovernorateId == searchDto.GovernorateId.Value);
+                    .FirstOrDefaultAsync(g => g.GovernorateId == searchDto.GovernorateId.Value.ToString());
                 
                 if (governorate != null && !string.IsNullOrWhiteSpace(governorate.Name))
                 {
@@ -141,8 +141,8 @@ namespace SoitMed.Repositories
                     
                     baseQuery = baseQuery.Where(c => 
                         !c.LegacyCustomerId.HasValue &&
-                        !clientIdsWithContracts.Contains(c.Id) &&
-                        !clientIdsWithDeals.Contains(c.Id));
+                        !clientIdsWithContracts.Contains(c.Id.ToString()) &&
+                        !clientIdsWithDeals.Contains(c.Id.ToString()));
                 }
             }
             
@@ -257,7 +257,7 @@ namespace SoitMed.Repositories
             };
         }
 
-        public async Task<List<Client>> GetByIdsAsync(IEnumerable<long> ids)
+        public async Task<List<Client>> GetByIdsAsync(IEnumerable<string> ids)
         {
             var idList = ids.ToList();
             if (!idList.Any())

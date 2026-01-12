@@ -170,7 +170,7 @@ namespace SoitMed.DTO
         public int DisplayOrder { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-        public long? ClientId { get; set; }
+        public string? ClientId { get; set; }
         public string? ClientName { get; set; }
         public string? ClientStatus { get; set; }
         public string? ClientPhone { get; set; }

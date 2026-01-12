@@ -107,7 +107,7 @@ namespace SoitMed.Repositories
                 .FirstOrDefaultAsync(mv => mv.TicketNumber == ticketNumber, cancellationToken);
         }
 
-        public async Task<IEnumerable<MaintenanceVisit>> GetVisitsByEquipmentIdAsync(int equipmentId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<MaintenanceVisit>> GetVisitsByEquipmentIdAsync(string equipmentId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Where(mv => mv.IsActive && (
