@@ -115,7 +115,7 @@ namespace SoitMed.Repositories
         {
             return await _context.TaskProgresses
                 .AsNoTracking()
-                .Where(tp => tp.OfferRequestId.HasValue)
+                .Where(tp => !string.IsNullOrEmpty(tp.OfferRequestId))
                 .OrderByDescending(tp => tp.ProgressDate)
                 .ToListAsync();
         }

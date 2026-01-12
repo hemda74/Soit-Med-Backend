@@ -157,9 +157,9 @@ namespace SoitMed.Services
                 }
 
                 // Validate task progress if provided
-                if (createDto.TaskProgressId.HasValue)
+                if (!string.IsNullOrWhiteSpace(createDto.TaskProgressId))
                 {
-                    var taskProgress = await _unitOfWork.TaskProgresses.GetByIdAsync(createDto.TaskProgressId.Value);
+                    var taskProgress = await _unitOfWork.TaskProgresses.GetByIdAsync(createDto.TaskProgressId);
                     if (taskProgress == null)
                         throw new ArgumentException("Task progress not found", nameof(createDto.TaskProgressId));
                 }
@@ -278,7 +278,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferRequestResponseDTO?> GetOfferRequestAsync(long requestId, string userId, string userRole)
+        public async Task<OfferRequestResponseDTO?> GetOfferRequestAsync(string requestId, string userId, string userRole)
         {
             try
             {
@@ -392,7 +392,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferRequestResponseDTO> AssignToSupportAsync(long requestId, string supportId, string userId)
+        public async Task<OfferRequestResponseDTO> AssignToSupportAsync(string requestId, string supportId, string userId)
         {
             try
             {
@@ -429,7 +429,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<OfferRequestResponseDTO> UpdateStatusAsync(long requestId, string status, string? notes, string userId)
+        public async Task<OfferRequestResponseDTO> UpdateStatusAsync(string requestId, string status, string? notes, string userId)
         {
             try
             {
@@ -478,7 +478,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<bool> DeleteOfferRequestAsync(long requestId, string userId)
+        public async Task<bool> DeleteOfferRequestAsync(string requestId, string userId)
         {
             try
             {
@@ -520,9 +520,9 @@ namespace SoitMed.Services
                 }
 
                 // Check if task progress exists if provided
-                if (requestDto.TaskProgressId.HasValue)
+                if (!string.IsNullOrWhiteSpace(requestDto.TaskProgressId))
                 {
-                    var taskProgress = await _unitOfWork.TaskProgresses.GetByIdAsync(requestDto.TaskProgressId.Value);
+                    var taskProgress = await _unitOfWork.TaskProgresses.GetByIdAsync(requestDto.TaskProgressId);
                     if (taskProgress == null)
                         return false;
                 }
@@ -540,7 +540,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<bool> CanModifyOfferRequestAsync(long requestId, string userId)
+        public async Task<bool> CanModifyOfferRequestAsync(string requestId, string userId)
         {
             try
             {
@@ -607,7 +607,7 @@ namespace SoitMed.Services
 
             return new OfferRequestResponseDTO
             {
-                Id = long.Parse(offerRequest.Id),
+                Id = offerRequest.Id,
                 RequestedBy = offerRequest.RequestedBy,
                 RequestedByName = requester != null ? $"{requester.FirstName} {requester.LastName}" : "Unknown",
                 ClientId = offerRequest.ClientId,

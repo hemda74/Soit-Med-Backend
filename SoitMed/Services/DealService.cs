@@ -45,7 +45,7 @@ namespace SoitMed.Services
 
                 var deal = new SalesDeal
                 {
-                    OfferId = createDealDto.OfferId.ToString(),
+                    OfferId = createDealDto.OfferId,
                     ClientId = createDealDto.ClientId,
                     SalesManId = salesmanId,
                     // Set second salesman from offer if different
@@ -151,7 +151,7 @@ namespace SoitMed.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error mapping deal {DealId} to DTO. Skipping this deal.", string.IsNullOrEmpty(deal?.Id) ? 0 : long.Parse(deal.Id));
+                        _logger.LogError(ex, "Error mapping deal {DealId} to DTO. Skipping this deal.", deal?.Id);
                         // Continue processing other deals instead of failing the entire request
                     }
                 }
@@ -396,7 +396,7 @@ namespace SoitMed.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error mapping deal {DealId} to DTO. Skipping this deal.", string.IsNullOrEmpty(deal?.Id) ? 0 : long.Parse(deal.Id));
+                        _logger.LogError(ex, "Error mapping deal {DealId} to DTO. Skipping this deal.", deal?.Id);
                         // Continue processing other deals instead of failing the entire request
                     }
                 }
@@ -645,8 +645,8 @@ namespace SoitMed.Services
 
             var dealDto = new DealResponseDTO
             {
-                Id = long.Parse(deal.Id),
-                OfferId = long.Parse(deal.OfferId),
+                Id = deal.Id,
+                OfferId = deal.OfferId,
                 ClientId = deal.ClientId,
                 ClientName = client?.Name ?? "Unknown Client",
                 SalesManId = deal.SalesManId,
@@ -691,7 +691,7 @@ namespace SoitMed.Services
             {
                 try
                 {
-                    dealDto.Offer = await MapOfferToEnhancedDTOAsync(long.Parse(deal.OfferId));
+                    dealDto.Offer = await MapOfferToEnhancedDTOAsync(deal.OfferId);
                 }
                 catch (Exception ex)
                 {
@@ -704,7 +704,7 @@ namespace SoitMed.Services
             return dealDto;
         }
 
-        private async Task<EnhancedOfferResponseDTO?> MapOfferToEnhancedDTOAsync(long offerId)
+        private async Task<EnhancedOfferResponseDTO?> MapOfferToEnhancedDTOAsync(string offerId)
         {
             try
             {
@@ -721,7 +721,7 @@ namespace SoitMed.Services
                 string? requesterName = null;
                 if (!string.IsNullOrEmpty(offer.OfferRequestId))
                 {
-                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(long.Parse(offer.OfferRequestId));
+                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId);
                     if (offerRequest != null)
                     {
                         requesterId = offerRequest.RequestedBy;
@@ -737,7 +737,7 @@ namespace SoitMed.Services
                 var equipment = await _unitOfWork.OfferEquipment.GetByOfferIdAsync(offerId);
                 var equipmentDtos = equipment.Select(e => new OfferEquipmentDTO
                 {
-                    Id = long.Parse(e.Id),
+                    Id = e.Id,
                     OfferId = e.OfferId,
                     Name = e.Name,
                     Model = e.Model,
@@ -758,7 +758,7 @@ namespace SoitMed.Services
                 {
                     termsDto = new OfferTermsDTO
                     {
-                        Id = long.Parse(terms.Id),
+                        Id = terms.Id,
                         OfferId = terms.OfferId,
                         WarrantyPeriod = terms.WarrantyPeriod,
                         DeliveryTime = terms.DeliveryTime,
@@ -771,7 +771,7 @@ namespace SoitMed.Services
                 var installments = await _unitOfWork.InstallmentPlans.GetByOfferIdAsync(offerId);
                 var installmentDtos = installments.Select(i => new InstallmentPlanDTO
                 {
-                    Id = long.Parse(i.Id),
+                    Id = i.Id,
                     OfferId = i.OfferId,
                     InstallmentNumber = i.InstallmentNumber,
                     Amount = i.Amount,
@@ -887,7 +887,7 @@ namespace SoitMed.Services
 
                 var metadata = new Dictionary<string, object>
                 {
-                    ["dealId"] = long.Parse(deal.Id),
+                    ["dealId"] = deal.Id,
                     ["clientName"] = clientName,
                     ["salesmanName"] = salesmanName,
                     ["dealValue"] = deal.DealValue,
@@ -991,7 +991,7 @@ namespace SoitMed.Services
 
                 var metadata = new Dictionary<string, object>
                 {
-                    ["dealId"] = long.Parse(deal.Id),
+                    ["dealId"] = deal.Id,
                     ["clientName"] = clientName,
                     ["salesmanName"] = salesmanName,
                     ["managerName"] = managerName,
@@ -1429,7 +1429,7 @@ namespace SoitMed.Services
 
                 var metadata = new Dictionary<string, object>
                 {
-                    ["dealId"] = long.Parse(deal.Id),
+                    ["dealId"] = deal.Id,
                     ["clientId"] = deal.ClientId,
                     ["clientName"] = clientName,
                     ["dealValue"] = deal.DealValue,
@@ -1500,7 +1500,7 @@ namespace SoitMed.Services
 
                 var metadata = new Dictionary<string, object>
                 {
-                    ["dealId"] = long.Parse(deal.Id),
+                    ["dealId"] = deal.Id,
                     ["clientName"] = clientName,
                     ["dealValue"] = deal.DealValue,
                     ["status"] = deal.Status
@@ -1546,7 +1546,7 @@ namespace SoitMed.Services
 
                 var metadata = new Dictionary<string, object>
                 {
-                    ["dealId"] = long.Parse(deal.Id),
+                    ["dealId"] = deal.Id,
                     ["clientName"] = clientName,
                     ["dealValue"] = deal.DealValue,
                     ["status"] = deal.Status
@@ -1613,7 +1613,7 @@ namespace SoitMed.Services
 
                     var metadata = new Dictionary<string, object>
                     {
-                        ["dealId"] = long.Parse(deal.Id),
+                        ["dealId"] = deal.Id,
                         ["clientName"] = clientName,
                         ["dealValue"] = deal.DealValue,
                         ["status"] = deal.Status
@@ -1644,7 +1644,7 @@ namespace SoitMed.Services
 
                         var metadata = new Dictionary<string, object>
                         {
-                            ["dealId"] = long.Parse(deal.Id),
+                            ["dealId"] = deal.Id,
                             ["clientName"] = clientName,
                             ["dealValue"] = deal.DealValue,
                             ["status"] = deal.Status
@@ -1692,7 +1692,7 @@ namespace SoitMed.Services
 
                 var metadata = new Dictionary<string, object>
                 {
-                    ["dealId"] = long.Parse(deal.Id),
+                    ["dealId"] = deal.Id,
                     ["clientId"] = deal.ClientId,
                     ["clientName"] = clientName,
                     ["dealValue"] = deal.DealValue,

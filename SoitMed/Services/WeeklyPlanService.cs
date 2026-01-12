@@ -307,8 +307,8 @@ namespace SoitMed.Services
         {
             // Get offer requests from task progresses
             var offerRequestIds = task.Progresses
-                .Where(p => p.OfferRequestId.HasValue)
-                .Select(p => p.OfferRequestId ?? 0)
+                .Where(p => !string.IsNullOrEmpty(p.OfferRequestId))
+                .Select(p => p.OfferRequestId!)
                 .Distinct()
                 .ToList();
 
@@ -416,7 +416,7 @@ namespace SoitMed.Services
                 ProgressCount = task.Progresses.Count,
                 Progresses = task.Progresses.Select(p => new TaskProgressSimpleDTO
                 {
-                    Id = long.Parse(p.Id),
+                    Id = p.Id,
                     ProgressDate = p.ProgressDate,
                     ProgressType = p.ProgressType,
                     Description = p.Description,

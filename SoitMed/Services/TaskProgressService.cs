@@ -102,7 +102,7 @@ namespace SoitMed.Services
                         var offerRequestDto = new CreateOfferRequestDTO
                         {
                             ClientId = task.ClientId,
-                            TaskProgressId = long.Parse(progress.Id),
+                            TaskProgressId = progress.Id,
                             RequestedProducts = requestDetails.ToString(),
                             SpecialNotes = string.IsNullOrWhiteSpace(specialNotes) ? null : specialNotes
                         };
@@ -509,9 +509,9 @@ namespace SoitMed.Services
 
             return new TaskProgressResponseDTO
             {
-                Id = long.Parse(progress.Id),
+                Id = progress.Id,
                 TaskId = progress.TaskId,
-                ClientId = !string.IsNullOrEmpty(progress.ClientId) ? long.Parse(progress.ClientId) : null,
+                ClientId = progress.ClientId,
                 ClientName = client?.Name ?? "Unknown",
                 EmployeeId = progress.EmployeeId,
                 EmployeeName = employee != null ? $"{employee.FirstName} {employee.LastName}" : "Unknown",

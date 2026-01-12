@@ -10,20 +10,20 @@ namespace SoitMed.Services
         #region Offer Request Management
 
         Task<OfferRequestResponseDTO> CreateOfferRequestAsync(CreateOfferRequestDTO createDto, string userId);
-        Task<OfferRequestResponseDTO?> GetOfferRequestAsync(long requestId, string userId, string userRole);
+        Task<OfferRequestResponseDTO?> GetOfferRequestAsync(string requestId, string userId, string userRole);
         Task<List<OfferRequestResponseDTO>> GetOfferRequestsAsync(string? status, string? requestedBy, string userId, string userRole);
         Task<List<OfferRequestResponseDTO>> GetOfferRequestsBySalesManAsync(string salesmanId, string? status);
         Task<List<OfferRequestResponseDTO>> GetOfferRequestsAssignedToAsync(string supportId, string? status);
-        Task<OfferRequestResponseDTO> AssignToSupportAsync(long requestId, string supportId, string userId);
-        Task<OfferRequestResponseDTO> UpdateStatusAsync(long requestId, string status, string? notes, string userId);
-        Task<bool> DeleteOfferRequestAsync(long requestId, string userId);
+        Task<OfferRequestResponseDTO> AssignToSupportAsync(string requestId, string supportId, string userId);
+        Task<OfferRequestResponseDTO> UpdateStatusAsync(string requestId, string status, string? notes, string userId);
+        Task<bool> DeleteOfferRequestAsync(string requestId, string userId);
 
         #endregion
 
         #region Business Logic Methods
 
         Task<bool> ValidateOfferRequestAsync(CreateOfferRequestDTO requestDto);
-        Task<bool> CanModifyOfferRequestAsync(long requestId, string userId);
+        Task<bool> CanModifyOfferRequestAsync(string requestId, string userId);
         Task<List<OfferRequestResponseDTO>> GetPendingRequestsAsync();
 
         #endregion

@@ -117,14 +117,14 @@ namespace SoitMed.DTO
 
     public class TaskProgressSimpleDTO
     {
-        public long Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public DateTime ProgressDate { get; set; }
         public string ProgressType { get; set; } = string.Empty;
         public string? Description { get; set; }
 		public string? VoiceDescriptionUrl { get; set; }
         public string? VisitResult { get; set; }
         public string? NextStep { get; set; }
-        public long? OfferRequestId { get; set; }
+        public string? OfferRequestId { get; set; }
     }
 
     public class OfferRequestSimpleDTO

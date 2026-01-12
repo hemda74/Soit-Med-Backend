@@ -10,7 +10,7 @@ namespace SoitMed.Models
     public class RecentOfferActivity : BaseEntity
     {
         [Required]
-        public long OfferId { get; set; }
+        public string OfferId { get; set; } = string.Empty;
         
         [Required]
         [MaxLength(50)]

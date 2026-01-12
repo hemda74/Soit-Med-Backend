@@ -84,7 +84,7 @@ namespace SoitMed.Repositories
                 .ToListAsync();
         }
 
-        public async Task<OfferRequest?> GetRequestWithDetailsAsync(long requestId)
+        public async Task<OfferRequest?> GetRequestWithDetailsAsync(string requestId)
         {
             return await _context.OfferRequests
                 .Include(or => or.Requester)
@@ -92,10 +92,10 @@ namespace SoitMed.Repositories
                 .Include(or => or.AssignedSupportUser)
                 .Include(or => or.TaskProgress)
                 .Include(or => or.CreatedOffer)
-                .FirstOrDefaultAsync(or => or.Id == requestId.ToString());
+                .FirstOrDefaultAsync(or => or.Id == requestId);
         }
 
-        public async Task<List<OfferRequest>> GetRequestsByTaskProgressIdAsync(long taskProgressId)
+        public async Task<List<OfferRequest>> GetRequestsByTaskProgressIdAsync(string taskProgressId)
         {
             return await _context.OfferRequests
                 .AsNoTracking()
@@ -191,7 +191,7 @@ namespace SoitMed.Repositories
             return TimeSpan.FromMilliseconds(averageTime);
         }
 
-        public async Task<List<OfferRequest>> GetByIdsAsync(IEnumerable<long> ids)
+        public async Task<List<OfferRequest>> GetByIdsAsync(IEnumerable<string> ids)
         {
             var idList = ids.ToList();
             if (!idList.Any())
@@ -199,7 +199,7 @@ namespace SoitMed.Repositories
 
             return await _context.OfferRequests
                 .AsNoTracking()
-                .Where(or => idList.Contains(long.Parse(or.Id)))
+                .Where(or => idList.Contains(or.Id))
                 .ToListAsync();
         }
     }

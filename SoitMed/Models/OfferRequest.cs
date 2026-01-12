@@ -15,7 +15,7 @@ namespace SoitMed.Models
         [Required]
         public string ClientId { get; set; }
 
-        public long? TaskProgressId { get; set; } // Link to the progress that triggered this request
+        public string? TaskProgressId { get; set; } // Link to the progress that triggered this request
 
         [Required, MaxLength(2000)]
         public string RequestedProducts { get; set; } // JSON or comma-separated

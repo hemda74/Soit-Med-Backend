@@ -69,9 +69,9 @@ namespace SoitMed.DTO
 
     public class TaskProgressResponseDTO
     {
-        public long Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public int TaskId { get; set; }
-        public long? ClientId { get; set; }
+        public string? ClientId { get; set; }
         public string? ClientName { get; set; }
         public string EmployeeId { get; set; } = string.Empty;
         public string EmployeeName { get; set; } = string.Empty;
@@ -82,7 +82,7 @@ namespace SoitMed.DTO
         public string? VoiceDescriptionUrl { get; set; }
         public string? NotInterestedComment { get; set; }
         public string? NextStep { get; set; }
-        public long? OfferRequestId { get; set; }
+        public string? OfferRequestId { get; set; }
         public long? OfferId { get; set; }
         public long? DealId { get; set; }
         public DateTime? NextFollowUpDate { get; set; }
@@ -105,7 +105,7 @@ namespace SoitMed.DTO
     {
         public string? ClientId { get; set; } // Optional - will be auto-resolved for customer roles
 
-        public long? TaskProgressId { get; set; }
+        public string? TaskProgressId { get; set; }
 
         [Required]
         [MaxLength(2000)]
@@ -117,7 +117,7 @@ namespace SoitMed.DTO
 
     public class OfferRequestResponseDTO
     {
-        public long Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public string RequestedBy { get; set; } = string.Empty;
         public string RequestedByName { get; set; } = string.Empty;
         public string ClientId { get; set; }
@@ -128,7 +128,7 @@ namespace SoitMed.DTO
         public string Status { get; set; } = string.Empty;
         public string? AssignedTo { get; set; }
         public string? AssignedToName { get; set; }
-        public long? CreatedOfferId { get; set; }
+        public string? CreatedOfferId { get; set; }
     }
 
     // ==================== Offer DTOs ====================
@@ -361,7 +361,7 @@ namespace SoitMed.DTO
 
     public class OfferSummaryDTO
     {
-        public long Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = string.Empty;
@@ -385,9 +385,9 @@ namespace SoitMed.DTO
     public class OfferEquipmentDTO
     {
         [JsonPropertyName("id")]
-        public long Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         [JsonPropertyName("offerId")]
-        public long OfferId { get; set; }
+        public string OfferId { get; set; } = string.Empty;
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
         [JsonPropertyName("model")]
@@ -450,8 +450,8 @@ namespace SoitMed.DTO
     // Terms DTOs
     public class OfferTermsDTO
     {
-        public long Id { get; set; }
-        public long OfferId { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string OfferId { get; set; } = string.Empty;
         public string? WarrantyPeriod { get; set; }
         public string? DeliveryTime { get; set; }
         public string? MaintenanceTerms { get; set; }
@@ -476,8 +476,8 @@ namespace SoitMed.DTO
     // Installment Plan DTOs
     public class InstallmentPlanDTO
     {
-        public long Id { get; set; }
-        public long OfferId { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string OfferId { get; set; } = string.Empty;
         public int InstallmentNumber { get; set; }
         public decimal Amount { get; set; }
         public DateTime DueDate { get; set; }
@@ -512,7 +512,7 @@ namespace SoitMed.DTO
     public class CreateDealDTO
     {
         [Required]
-        public long OfferId { get; set; }
+        public string OfferId { get; set; } = string.Empty;
 
         [Required]
         public string ClientId { get; set; }
@@ -535,8 +535,8 @@ namespace SoitMed.DTO
 
     public class DealResponseDTO
     {
-        public long Id { get; set; }
-        public long? OfferId { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string? OfferId { get; set; }
         public string ClientId { get; set; }
         public string ClientName { get; set; } = string.Empty;
         public string SalesManId { get; set; } = string.Empty;
@@ -733,7 +733,7 @@ namespace SoitMed.DTO
 
     public class OfferActivityDTO
     {
-        public long OfferId { get; set; }
+        public string OfferId { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty; // Accepted, Completed, Sent, Rejected
         public string Description { get; set; } = string.Empty;
         public string? ClientName { get; set; }

@@ -666,7 +666,7 @@ namespace SoitMed.Services
                 // Update OfferRequest status to Sent (if linked to a request)
                 if (!string.IsNullOrEmpty(offer.OfferRequestId))
                 {
-                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(long.Parse(offer.OfferRequestId));
+                    var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId);
                     if (offerRequest != null && offerRequest.Status != "Sent")
                     {
                         offerRequest.MarkAsSent();
@@ -1057,7 +1057,7 @@ namespace SoitMed.Services
                     // Notify original requester if different from customer
                     if (!string.IsNullOrEmpty(offer.OfferRequestId))
                     {
-                        var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(long.Parse(offer.OfferRequestId));
+                        var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId);
                         if (offerRequest != null && offerRequest.RequestedBy != userId)
                         {
                             await _notificationService.CreateNotificationAsync(
@@ -1670,7 +1670,7 @@ namespace SoitMed.Services
 
                 return new OfferEquipmentDTO
                 {
-                    Id = long.Parse(equipment.Id),
+                    Id = equipment.Id,
                     OfferId = equipment.OfferId,
                     Name = equipment.Name,
                     Model = equipment.Model,
@@ -1768,7 +1768,7 @@ namespace SoitMed.Services
 
                     return new OfferEquipmentDTO
                     {
-                        Id = long.Parse(e.Id),
+                        Id = e.Id,
                         OfferId = e.OfferId,
                         Name = e.Name,
                         // Use equipment data if available, otherwise fall back to matched product data
@@ -1848,7 +1848,7 @@ namespace SoitMed.Services
 
                 return new OfferEquipmentDTO
                 {
-                    Id = long.Parse(equipment.Id),
+                    Id = equipment.Id,
                     OfferId = equipment.OfferId,
                     Name = equipment.Name,
                     Model = equipment.Model,
@@ -1885,7 +1885,7 @@ namespace SoitMed.Services
 
                 return new OfferEquipmentDTO
                 {
-                    Id = long.Parse(equipment.Id),
+                    Id = equipment.Id,
                     OfferId = equipment.OfferId,
                     Name = equipment.Name,
                     Model = equipment.Model,
@@ -2112,7 +2112,7 @@ namespace SoitMed.Services
 
                     return new OfferTermsDTO
                     {
-                        Id = long.Parse(existingTerms.Id),
+                        Id = existingTerms.Id,
                         OfferId = existingTerms.OfferId,
                         WarrantyPeriod = existingTerms.WarrantyPeriod,
                         DeliveryTime = existingTerms.DeliveryTime,
@@ -2136,7 +2136,7 @@ namespace SoitMed.Services
 
                     return new OfferTermsDTO
                     {
-                        Id = long.Parse(terms.Id),
+                        Id = terms.Id,
                         OfferId = terms.OfferId,
                         WarrantyPeriod = terms.WarrantyPeriod,
                         DeliveryTime = terms.DeliveryTime,
@@ -2209,7 +2209,7 @@ namespace SoitMed.Services
 
                 return installments.Select(i => new InstallmentPlanDTO
                 {
-                    Id = long.Parse(i.Id),
+                    Id = i.Id,
                     OfferId = i.OfferId,
                     InstallmentNumber = i.InstallmentNumber,
                     Amount = i.Amount,
@@ -2271,7 +2271,7 @@ namespace SoitMed.Services
                     Equipment = equipment,
                     Terms = terms != null ? new OfferTermsDTO
                     {
-                        Id = long.Parse(terms.Id),
+                        Id = terms.Id,
                         OfferId = terms.OfferId,
                         WarrantyPeriod = terms.WarrantyPeriod,
                         DeliveryTime = terms.DeliveryTime,
@@ -2280,7 +2280,7 @@ namespace SoitMed.Services
                     } : null,
                     Installments = installments.Select(i => new InstallmentPlanDTO
                     {
-                        Id = long.Parse(i.Id),
+                        Id = i.Id,
                         OfferId = i.OfferId,
                         InstallmentNumber = i.InstallmentNumber,
                         Amount = i.Amount,
@@ -2329,7 +2329,7 @@ namespace SoitMed.Services
             var clientsList = clientIds.Any() ? await _unitOfWork.Clients.GetByIdsAsync(clientIds) : new List<Client>();
             var usersList = userIds.Any() ? await _unitOfWork.Users.GetByIdsAsync(userIds) : new List<ApplicationUser>();
 
-            var clientsDict = clientsList.ToDictionary(c => long.Parse(c.Id));
+            var clientsDict = clientsList.ToDictionary(c => c.Id);
             var usersDict = usersList.ToDictionary(u => u.Id);
 
             // Map synchronously using pre-loaded data
@@ -2347,7 +2347,7 @@ namespace SoitMed.Services
             string? requesterName = null;
             if (!string.IsNullOrEmpty(offer.OfferRequestId))
             {
-                var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(long.Parse(offer.OfferRequestId));
+                var offerRequest = await _unitOfWork.OfferRequests.GetByIdAsync(offer.OfferRequestId);
                 if (offerRequest != null)
                 {
                     requesterId = offerRequest.RequestedBy;
@@ -2406,9 +2406,9 @@ namespace SoitMed.Services
         }
 
         // Synchronous overload that uses pre-loaded data to avoid DbContext concurrency issues
-        private OfferResponseDTO MapToOfferResponseDTO(SalesOffer offer, Dictionary<long, Client> clientsDict, Dictionary<string, ApplicationUser> usersDict)
+        private OfferResponseDTO MapToOfferResponseDTO(SalesOffer offer, Dictionary<string, Client> clientsDict, Dictionary<string, ApplicationUser> usersDict)
         {
-            clientsDict.TryGetValue(long.Parse(offer.ClientId), out var client);
+            clientsDict.TryGetValue(offer.ClientId, out var client);
             usersDict.TryGetValue(offer.CreatedBy ?? string.Empty, out var creator);
             usersDict.TryGetValue(offer.AssignedTo ?? string.Empty, out var salesman);
 

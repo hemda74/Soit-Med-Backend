@@ -43,7 +43,7 @@ namespace SoitMed.Models
         public string? NextStep { get; set; } // "NeedsDeal", "NeedsOffer"
 
         // Links to created requests
-        public long? OfferRequestId { get; set; }
+        public string? OfferRequestId { get; set; }
 
         // ========== Follow-up ==========
         public DateTime? NextFollowUpDate { get; set; }

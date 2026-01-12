@@ -51,8 +51,12 @@ namespace SoitMed.Services
             }
 
             var dto = MapToDto(config);
-            
-            _cache.Set(cacheKey, dto, TimeSpan.FromMinutes(30));
+
+            _cache.Set(cacheKey, dto, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30),
+                Size = 1
+            });
             
             return dto;
         }

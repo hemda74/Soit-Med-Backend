@@ -99,11 +99,11 @@ namespace SoitMed.Services
 
                 // Load sequentially to avoid DbContext concurrency issues (same DbContext instance)
                 var taskProgresses = await _unitOfWork.TaskProgresses
-                    .GetProgressesByClientIdAsync(clientId.ToString());
+                    .GetProgressesByClientIdAsync(clientId);
                 var offers = await _unitOfWork.SalesOffers
                     .GetOffersByClientIdAsync(clientId.ToString());
                 var deals = await _unitOfWork.SalesDeals
-                    .GetDealsByClientIdAsync(clientId.ToString());
+                    .GetDealsByClientIdAsync(clientId);
 
                 // Calculate statistics
                 // Count deals that are approved, sent to legal, or successful as successful deals
@@ -669,7 +669,7 @@ namespace SoitMed.Services
             
             return new OfferSummaryDTO
             {
-                Id = long.Parse(offer.Id),
+                Id = offer.Id,
                 CreatedAt = offer.CreatedAt,
                 TotalAmount = offer.TotalAmount,
                 Status = offer.Status,

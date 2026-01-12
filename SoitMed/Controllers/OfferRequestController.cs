@@ -88,7 +88,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpGet("{id}")]
         [Authorize(Roles = "SalesMan,SalesManager,SalesSupport,SuperAdmin")]
-        public async Task<IActionResult> GetOfferRequest(long id)
+        public async Task<IActionResult> GetOfferRequest(string id)
         {
             try
             {
@@ -122,7 +122,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPut("{id}/assign")]
         [Authorize(Roles = "SalesManager,SalesSupport,SuperAdmin")]
-        public async Task<IActionResult> AssignOfferRequest(long id, [FromBody] AssignOfferRequestDTO assignDto)
+        public async Task<IActionResult> AssignOfferRequest(string id, [FromBody] AssignOfferRequestDTO assignDto)
         {
             try
             {
@@ -153,7 +153,7 @@ namespace SoitMed.Controllers
         /// </summary>
         [HttpPut("{id}/status")]
         [Authorize(Roles = "SalesSupport,SalesManager,SuperAdmin")]
-        public async Task<IActionResult> UpdateOfferRequestStatus(long id, [FromBody] UpdateOfferRequestStatusDTO statusDto)
+        public async Task<IActionResult> UpdateOfferRequestStatus(string id, [FromBody] UpdateOfferRequestStatusDTO statusDto)
         {
             try
             {

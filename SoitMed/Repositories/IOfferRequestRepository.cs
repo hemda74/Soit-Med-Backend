@@ -15,8 +15,8 @@ namespace SoitMed.Repositories
         Task<List<OfferRequest>> GetPendingRequestsAsync();
         Task<List<OfferRequest>> GetCompletedRequestsAsync();
         Task<List<OfferRequest>> GetCancelledRequestsAsync();
-        Task<OfferRequest?> GetRequestWithDetailsAsync(long requestId);
-        Task<List<OfferRequest>> GetRequestsByTaskProgressIdAsync(long taskProgressId);
+        Task<OfferRequest?> GetRequestWithDetailsAsync(string requestId);
+        Task<List<OfferRequest>> GetRequestsByTaskProgressIdAsync(string taskProgressId);
         Task<int> GetRequestCountByStatusAsync(string status);
         Task<int> GetRequestCountBySalesManAsync(string salesmanId, DateTime? startDate, DateTime? endDate);
         Task<int> GetRequestCountBySupportAsync(string supportId, DateTime? startDate, DateTime? endDate);
@@ -24,7 +24,7 @@ namespace SoitMed.Repositories
         Task<List<OfferRequest>> GetRequestsWithOffersAsync();
         Task<List<OfferRequest>> GetRequestsWithoutOffersAsync();
         Task<TimeSpan?> GetAverageProcessingTimeAsync(DateTime? startDate, DateTime? endDate);
-        Task<List<OfferRequest>> GetByIdsAsync(IEnumerable<long> ids);
+        Task<List<OfferRequest>> GetByIdsAsync(IEnumerable<string> ids);
     }
 }
 

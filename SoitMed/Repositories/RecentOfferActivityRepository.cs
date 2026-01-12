@@ -17,7 +17,7 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<IReadOnlyList<RecentOfferActivity>> GetActivitiesByOfferIdAsync(long offerId, CancellationToken cancellationToken = default)
+        public async Task<IReadOnlyList<RecentOfferActivity>> GetActivitiesByOfferIdAsync(string offerId, CancellationToken cancellationToken = default)
         {
             return await _context.RecentOfferActivities
                 .Where(a => a.OfferId == offerId)
