@@ -36,7 +36,7 @@ namespace SoitMed.Common
 
         /// <summary>
         /// Legacy Media API Base URL (for serving legacy media files)
-        /// Example: http://localhost:5266 or http://10.10.9.100:5266
+        /// Example: http://localhost:5266 or http://10.10.9.104:5266
         /// </summary>
         public string LegacyMediaApiBaseUrl { get; set; } = string.Empty;
 

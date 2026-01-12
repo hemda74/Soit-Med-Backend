@@ -272,7 +272,7 @@ Add to `appsettings.json`:
 		"AdminUserId": "Hemdan_Test_Administration_002"
 	},
 	"ConnectionStrings": {
-		"TbsConnection": "Server=10.10.9.100\\SQLEXPRESS,1433;Database=TBS;User Id=soitmed;Password=***;TrustServerCertificate=True;"
+		"TbsConnection": "Server=10.10.9.104\\SQLEXPRESS,1433;Database=TBS;User Id=soitmed;Password=***;TrustServerCertificate=True;"
 	}
 }
 ```

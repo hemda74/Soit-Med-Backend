@@ -47,7 +47,7 @@ The Contract Migration Service migrates contracts, installments, and payment dat
 		"TbsConnection": "Server=...;Database=TBS;..."
 	},
 	"ConnectionSettings": {
-		"LegacyMediaApiBaseUrl": "http://10.10.9.100:5266"
+		"LegacyMediaApiBaseUrl": "http://10.10.9.104:5266"
 	}
 }
 ```
@@ -85,7 +85,7 @@ The `MediaPathTransformer` service:
 
 2. **Builds new API URL**:
 
-      - If `LegacyMediaApiBaseUrl` configured: `http://10.10.9.100:5266/api/Media/files/image.jpg`
+      - If `LegacyMediaApiBaseUrl` configured: `http://10.10.9.104:5266/api/Media/files/image.jpg`
       - Otherwise: `/api/LegacyMedia/files/image.jpg`
 
 3. **Handles multiple files**:
