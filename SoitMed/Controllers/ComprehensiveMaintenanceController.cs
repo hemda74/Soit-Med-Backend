@@ -153,7 +153,7 @@ namespace SoitMed.Controllers
         {
             try
             {
-                var result = await _maintenanceService.GetCustomerEquipmentAsync(customerId, request);
+                var result = await _maintenanceService.GetCustomerEquipmentAsync(customerId);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -240,7 +240,7 @@ namespace SoitMed.Controllers
         {
             try
             {
-                var result = await _maintenanceService.GetEquipmentVisitsAsync(equipmentId, criteria);
+                var result = await _maintenanceService.GetEquipmentVisitsAsync(equipmentId, includeLegacy: true);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -306,7 +306,15 @@ namespace SoitMed.Controllers
         {
             try
             {
-                var result = await _maintenanceService.CompleteVisitAsync(visitId, request);
+                var result = await _maintenanceService.CompleteVisitAsync(new CompleteVisitRequestDTO 
+                { 
+                    VisitId = visitId,
+                    Report = request.Report,
+                    ActionsTaken = request.ActionsTaken,
+                    PartsUsed = request.PartsUsed?.ToString() ?? string.Empty,
+                    Notes = request.Notes,
+                    Source = "Web"
+                });
                 return Ok(result);
             }
             catch (Exception ex)
@@ -342,7 +350,7 @@ namespace SoitMed.Controllers
         {
             try
             {
-                var result = await _maintenanceService.GetCustomerContractsAsync(customerId, request);
+                var result = await _maintenanceService.GetCustomerContractsAsync(customerId);
                 return Ok(result);
             }
             catch (Exception ex)

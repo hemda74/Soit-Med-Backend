@@ -1,21 +1,127 @@
 using System.ComponentModel.DataAnnotations;
+using SoitMed.Models.Enums;
 
 namespace SoitMed.DTO
 {
+    // Generic API Response class
+    public class ApiResponse<T>
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; }
+        public T Data { get; set; }
+        public List<string> Errors { get; set; }
+        public DateTime Timestamp { get; set; }
+        
+        public static ApiResponse<T> SuccessResult(T data, string message = "Operation successful")
+        {
+            return new ApiResponse<T>
+            {
+                Success = true,
+                Message = message,
+                Data = data,
+                Errors = new List<string>(),
+                Timestamp = DateTime.UtcNow
+            };
+        }
+        
+        public static ApiResponse<T> ErrorResult(string message, List<string> errors = null)
+        {
+            return new ApiResponse<T>
+            {
+                Success = false,
+                Message = message,
+                Data = default(T),
+                Errors = errors ?? new List<string>(),
+                Timestamp = DateTime.UtcNow
+            };
+        }
+    }
+    
     // Alias classes for backward compatibility
     public class CreateCustomerRequest : CreateCustomerDTO { }
     public class UpdateCustomerRequest : UpdateCustomerDTO { }
-    public class CreateEquipmentRequest : CreateEquipmentDTO { }
-    public class UpdateEquipmentRequest : UpdateEquipmentDTO { }
-    public class CreateVisitRequest : ScheduleVisitRequestDTO { }
-    public class UpdateVisitRequest : UpdateVisitRequestDTO { }
+    public class CreateEquipmentRequest : CreateEquipmentDTO 
+    { 
+        public string Model { get; set; }
+        public string Manufacturer { get; set; }
+        public DateTime? WarrantyExpiryDate { get; set; }
+    }
+    public class UpdateEquipmentRequest : UpdateEquipmentDTO 
+    { 
+        public string Model { get; set; }
+        public string Manufacturer { get; set; }
+        public DateTime? WarrantyExpiryDate { get; set; }
+    }
+    public class CreateVisitRequestDTO
+    {
+        [Required]
+        public string CustomerId { get; set; }
+        
+        [Required]
+        public string EquipmentId { get; set; }
+        
+        [Required]
+        public string EngineerId { get; set; }
+        
+        [Required]
+        public DateTime ScheduledDate { get; set; }
+        
+        [Required]
+        [StringLength(20)]
+        public string VisitType { get; set; }
+        
+        [StringLength(1000)]
+        public string IssueDescription { get; set; }
+        
+        public decimal? EstimatedCost { get; set; }
+        
+        public string VisitDate { get; set; }
+    }
+    public class CreateVisitRequest : CreateVisitRequestDTO { }
+    public class UpdateVisitRequest : UpdateVisitRequestDTO 
+    { 
+        public DateTime? VisitDate { get; set; }
+        public string VisitType { get; set; }
+        public string EquipmentSerialNumber { get; set; }
+        public string CompletionDate { get; set; }
+        public string CreatedAt { get; set; }
+    }
     public class CompleteVisitRequest : CompleteVisitRequestDTO { }
-    public class CustomerVisitStats : CustomerVisitStatsDTO { }
-    public class CustomerSearchCriteria : CustomerSearchParametersDTO { }
-    public class VisitDTO : MaintenanceVisitDTO { }
+    public class CustomerVisitStats : CustomerVisitStatsDTO 
+    { 
+        public int EmergencyVisits { get; set; }
+        public int PreventiveVisits { get; set; }
+        public int InstallationVisits { get; set; }
+        public DateTime? LastVisitDate { get; set; }
+        public DateTime? NextScheduledDate { get; set; }
+    }
+    public class CustomerSearchCriteria : CustomerSearchParametersDTO 
+    { 
+        public int PageNumber { get; set; }
+        public bool IncludeLegacy { get; set; }
+    }
+    public class VisitDTO : MaintenanceVisitDTO 
+    { 
+        public DateTime VisitDate { get; set; }
+        public string EquipmentSerialNumber { get; set; }
+        public DateTime? CompletionDate { get; set; }
+        public string CreatedAt { get; set; }
+        public string VisitType { get; set; }
+    }
     public class PagedRequest : PagedRequestDTO { }
-    public class VisitSearchCriteria : VisitSearchParametersDTO { }
-    public class VisitCompletionResponse : VisitCompletionResponseDTO { }
+    public class VisitSearchCriteria : VisitSearchParametersDTO 
+    { 
+        public string VisitType { get; set; }
+    }
+    public class VisitCompletionResponse : VisitCompletionResponseDTO 
+    { 
+        public DateTime? CompletedAt { get; set; }
+        public string EquipmentSerialNumber { get; set; }
+        public string VisitDate { get; set; }
+        public string CompletionDate { get; set; }
+        public string CreatedAt { get; set; }
+        public string VisitType { get; set; }
+    }
     
     // Pagination DTOs
     public class PagedRequestDTO
@@ -56,6 +162,10 @@ namespace SoitMed.DTO
         public string CustomerName { get; set; }
         public List<MaintenanceVisitDTO> Visits { get; set; }
         public int TotalVisits { get; set; }
+        
+        // Additional properties needed by EnhancedMaintenanceService
+        public CustomerDTO Customer { get; set; }
+        public List<EquipmentDTO> Equipment { get; set; }
     }
     
     public class EquipmentVisitsDTO 
@@ -64,10 +174,21 @@ namespace SoitMed.DTO
         public string EquipmentModel { get; set; }
         public List<MaintenanceVisitDTO> Visits { get; set; }
         public int TotalVisits { get; set; }
+        
+        // Additional properties needed by EnhancedMaintenanceService
+        public EquipmentDTO Equipment { get; set; }
     }
     
-    public class CreateContractRequest : CreateMaintenanceContractDTO { }
-    public class UpdateContractRequest : UpdateMaintenanceContractDTO { }
+    public class CreateContractRequest : CreateMaintenanceContractDTO 
+    { 
+        public string ClientId { get; set; }
+    }
+    public class UpdateContractRequest : UpdateMaintenanceContractDTO 
+    { 
+        public string ContractNumber { get; set; }
+        public DateTime? StartDate { get; set; }
+        public string ContractType { get; set; }
+    }
     public class MaintenanceDashboardStats : MaintenanceDashboardStatsDTO { }
     
     // Payment DTOs
@@ -79,6 +200,11 @@ namespace SoitMed.DTO
         public string CustomerId { get; set; }
         public decimal? MinAmount { get; set; }
         public decimal? MaxAmount { get; set; }
+        
+        // Additional properties needed by AccountingService
+        public int? MaintenanceRequestId { get; set; }
+        public int? SparePartRequestId { get; set; }
+        public PaymentMethod? PaymentMethod { get; set; }
     }
     
     public class ConfirmPaymentDTO 
@@ -178,8 +304,6 @@ namespace SoitMed.DTO
         public DateTime? PaymentDate { get; set; }
         public string Notes { get; set; }
     }
-    
-    // Additional DTOs for interface methods
     public class MaintenanceDashboardDTO 
     {
         public int TotalCustomers { get; set; }
@@ -199,12 +323,25 @@ namespace SoitMed.DTO
         public decimal Revenue { get; set; }
     }
     
-    public class RevenueReportDTO 
+    // Additional DTOs for interface methods
+    public class MaintenanceDashboardStatsDTO 
     {
-        public decimal TotalRevenue { get; set; }
+        public int TotalCustomers { get; set; }
+        public int TotalEquipment { get; set; }
+        public int ActiveVisits { get; set; }
         public decimal MonthlyRevenue { get; set; }
-        public decimal AverageRevenuePerVisit { get; set; }
-        public List<MonthlyRevenueDTO> MonthlyBreakdown { get; set; }
+        public List<CustomerVisitStatsDTO> RecentCustomers { get; set; }
+        public List<EquipmentVisitStatsDTO> TopEquipment { get; set; }
+        public int Year { get; set; }
+        public int TotalVisits { get; set; }
+        public int CompletedVisits { get; set; }
+        public decimal Revenue { get; set; }
+        
+        // Additional properties needed by services
+        public int MonthlyVisits { get; set; }
+        public int PendingVisits { get; set; }
+        public int ActiveContracts { get; set; }
+        public double VisitCompletionRate { get; set; }
     }
     
     public class MonthlyRevenueDTO 
@@ -212,6 +349,14 @@ namespace SoitMed.DTO
         public string Month { get; set; }
         public decimal Revenue { get; set; }
         public int VisitCount { get; set; }
+    }
+    
+    public class RevenueReportDTO 
+    {
+        public decimal TotalRevenue { get; set; }
+        public decimal MonthlyRevenue { get; set; }
+        public decimal AverageRevenuePerVisit { get; set; }
+        public List<MonthlyRevenueDTO> MonthlyBreakdown { get; set; }
     }
     
     public class MigrationStatusDTO 
@@ -369,6 +514,9 @@ namespace SoitMed.DTO
         public DateTime? PurchaseDate { get; set; }
         public int VisitCount { get; set; }
         public DateTime? WarrantyExpiry { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool IsActive { get; set; }
+        public int MaintenanceVisitsCount { get; set; }
         
         // Additional properties needed by services
         public List<string> RecentIssues { get; set; }
@@ -377,6 +525,7 @@ namespace SoitMed.DTO
         public decimal TotalMaintenanceCost { get; set; }
         public DateTime? LastVisitDate { get; set; }
         public List<string> AttachmentPaths { get; set; }
+        public DateTime? WarrantyExpiryDate { get; set; }
     }
 
     public class CreateEquipmentDTO
@@ -437,6 +586,9 @@ namespace SoitMed.DTO
         public DateTime? UpdatedAt { get; set; }
         public List<PartsUsageDTO> PartsUsed { get; set; }
         public List<MediaFileDTO> MediaFiles { get; set; }
+        public string EquipmentSerialNumber { get; set; }
+        public DateTime? VisitDate { get; set; }
+        public DateTime? CompletionDate { get; set; }
     }
 
     public class ScheduleVisitRequestDTO
@@ -512,6 +664,11 @@ namespace SoitMed.DTO
         public string Status { get; set; }
         public string Message { get; set; }
         public string InvoiceId { get; set; }
+        public string EquipmentSerialNumber { get; set; }
+        public string VisitDate { get; set; }
+        public string CompletionDateVisit { get; set; }
+        public string CreatedAtVisit { get; set; }
+        public string VisitTypeVisit { get; set; }
     }
     #endregion
 
@@ -539,6 +696,10 @@ namespace SoitMed.DTO
         public List<MaintenanceVisitDTO> Visits { get; set; }
         public bool IsExpiringSoon { get; set; }
         public int DaysUntilExpiry { get; set; }
+        
+        // Additional properties needed by services
+        public string ClientId { get; set; }
+        public string ClientName { get; set; }
     }
 
     public class CreateMaintenanceContractDTO
@@ -715,6 +876,7 @@ namespace SoitMed.DTO
         public string Specialization { get; set; }
         public string Department { get; set; }
         public string JobTitle { get; set; }
+        public string Specialty { get; set; }
         public bool IsActive { get; set; }
         public DateTime? HireDate { get; set; }
         public List<string> Certifications { get; set; }
@@ -928,6 +1090,13 @@ namespace SoitMed.DTO
         public DateTime CreatedAt { get; set; }
         public DateTime? PaidAt { get; set; }
         public DateTime? ConfirmedAt { get; set; }
+        
+        // Additional properties needed by services
+        public string SparePartRequestId { get; set; }
+        public string ProcessedByAccountantId { get; set; }
+        public string ProcessedByAccountantName { get; set; }
+        public DateTime AccountingDate { get; set; }
+        public string AccountingNotes { get; set; }
     }
 
     public class StripePaymentDTO
@@ -960,6 +1129,8 @@ namespace SoitMed.DTO
         public string CancelUrl { get; set; }
 
         public string Description { get; set; }
+        
+        public string PaymentId { get; set; }
     }
 
     public class LocalGatewayPaymentDTO
@@ -977,6 +1148,8 @@ namespace SoitMed.DTO
         public string CVV { get; set; }
 
         public string CardholderName { get; set; }
+        
+        public string PaymentToken { get; set; }
     }
 
     public class CashPaymentDTO
@@ -991,6 +1164,7 @@ namespace SoitMed.DTO
         public string Notes { get; set; }
 
         public string ReceiptNumber { get; set; }
+        public string PaymentReference { get; set; }
     }
 
     public class BankTransferDTO
@@ -1010,6 +1184,8 @@ namespace SoitMed.DTO
         public DateTime? TransferDate { get; set; }
 
         public string Notes { get; set; }
+        public string BankReference { get; set; }
+        public string PaymentReference { get; set; }
     }
 
     public class RefundDTO
@@ -1038,6 +1214,10 @@ namespace SoitMed.DTO
         public string PaymentMethod { get; set; }
 
         public string InvoiceId { get; set; }
+        
+        public int? MaintenanceRequestId { get; set; }
+        
+        public int? SparePartRequestId { get; set; }
 
         public DateTime? PaymentDate { get; set; }
 
@@ -1092,7 +1272,11 @@ namespace SoitMed.DTO
         [Required]
         public string VisitId { get; set; }
         
-        public DateTime? CompletionDate { get; set; }
+        public string EquipmentSerialNumber { get; set; }
+        public string VisitDate { get; set; }
+        public string CompletionDate { get; set; }
+        public string CreatedAt { get; set; }
+        public string VisitType { get; set; }
         
         public string Status { get; set; }
         
@@ -1123,7 +1307,11 @@ namespace SoitMed.DTO
         
         public string VisitId { get; set; }
         
-        public DateTime? CompletionDate { get; set; }
+        public string EquipmentSerialNumber { get; set; }
+        public string VisitDate { get; set; }
+        public DateTime CompletionDate { get; set; }
+        public string CreatedAt { get; set; }
+        public string VisitType { get; set; }
         
         public string Status { get; set; }
         
@@ -1151,6 +1339,8 @@ namespace SoitMed.DTO
         public double UptimePercentage { get; set; }
         
         public string MaintenancePriority { get; set; }
+        
+        public string Source { get; set; }
     }
     
     public class RepairRequestDTO 
@@ -1198,14 +1388,49 @@ namespace SoitMed.DTO
         public DateTime? UpdatedAt { get; set; }
         
         public string CreatedBy { get; set; }
+        
+        // Additional properties needed by controller
+        public int? DoctorId { get; set; }
+        public int? TechnicianId { get; set; }
+        public string Description { get; set; }
+        public string Symptoms { get; set; }
+        public decimal? EstimatedHours { get; set; }
+        public string RepairNotes { get; set; }
+        public string PartsUsed { get; set; }
+        public decimal RepairCost { get; set; }
+        public decimal ActualHours { get; set; }
     }
     
     public class RepairRequestResponseDTO
     {
+        public string Id { get; set; }
         public bool Success { get; set; }
         public string Message { get; set; }
         public RepairRequestDTO RepairRequest { get; set; }
         public List<string> Errors { get; set; }
+        
+        // Additional properties needed by controllers
+        public string EquipmentId { get; set; }
+        public string EquipmentName { get; set; }
+        public string EquipmentQRCode { get; set; }
+        public string HospitalName { get; set; }
+        public string Description { get; set; }
+        public string Symptoms { get; set; }
+        public string Priority { get; set; }
+        public string Status { get; set; }
+        public string RequestorName { get; set; }
+        public string RequestorType { get; set; }
+        public DateTime RequestedAt { get; set; }
+        public DateTime? AssignedAt { get; set; }
+        public DateTime? StartedAt { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public string RepairNotes { get; set; }
+        public string PartsUsed { get; set; }
+        public decimal RepairCost { get; set; }
+        public decimal EstimatedHours { get; set; }
+        public decimal ActualHours { get; set; }
+        public string? AssignedEngineerName { get; internal set; }
+        public string AssignedEngineerId { get; internal set; }
     }
     
     public class UpdateRepairRequestDTO 
@@ -1269,25 +1494,6 @@ namespace SoitMed.DTO
         public DateTime? UpdatedAt { get; set; }
     }
     
-    // Additional DTOs needed
-    public class MaintenanceDashboardStatsDTO
-    {
-        public int TotalCustomers { get; set; }
-        public int TotalEquipment { get; set; }
-        public int ActiveContracts { get; set; }
-        public int ExpiringContractsNext30Days { get; set; }
-        public int ScheduledVisitsToday { get; set; }
-        public int VisitsInProgress { get; set; }
-        public int PendingVisits { get; set; }
-        public int OverdueVisits { get; set; }
-        public decimal MonthlyRevenue { get; set; }
-        public decimal YearlyRevenue { get; set; }
-        public List<TopCustomerDTO> TopCustomers { get; set; }
-        public List<EngineerPerformanceDTO> TopEngineers { get; set; }
-        public List<EquipmentIssueDTO> RecentIssues { get; set; }
-        public List<ExpiringContractDTO> ExpiringContracts { get; set; }
-    }
-    
     public class RejectPaymentDTO
     {
         [Required]
@@ -1303,6 +1509,39 @@ namespace SoitMed.DTO
         public DateTime? RejectionDate { get; set; }
     }
     
+    public class EngineerResponseDTO
+    {
+        public bool Success { get; set; }
+        public EngineerDTO Engineer { get; set; }
+        public string Message { get; set; }
+        public List<string> Errors { get; set; }
+        
+        // Additional properties needed by controllers
+        public string EngineerId { get; set; }
+        public string Name { get; set; }
+        public string Specialty { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool IsActive { get; set; }
+        public string UserId { get; set; }
+        public List<GovernorateSimpleDTO> Governorates { get; set; }
+    }
+    
+    public class GovernorateSimpleDTO
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public bool IsActive { get; set; }
+        public string GovernorateId { get; set; }
+    }
+    
+    public class GovernorateResponseDTO
+    {
+        public bool Success { get; set; }
+        public List<GovernorateSimpleDTO> Governorates { get; set; }
+        public string Message { get; set; }
+        public List<string> Errors { get; set; }
+    }
+    
     // Accounting DTOs
     public class FinancialReportDTO
     {
@@ -1312,6 +1551,13 @@ namespace SoitMed.DTO
         public decimal NetProfit { get; set; }
         public List<PaymentMethodStatisticsDTO> PaymentMethodStats { get; set; }
         public List<MonthlyFinancialDTO> MonthlyBreakdown { get; set; }
+        
+        // Additional properties needed by AccountingService
+        public int TotalPayments { get; set; }
+        public decimal OutstandingPayments { get; set; }
+        public int TotalTransactions { get; set; }
+        public Dictionary<string, decimal> RevenueByPaymentMethod { get; set; }
+        public Dictionary<string, int> CountByPaymentMethod { get; set; }
     }
     
     public class PaymentMethodStatisticsDTO
@@ -1320,6 +1566,14 @@ namespace SoitMed.DTO
         public decimal TotalAmount { get; set; }
         public int TransactionCount { get; set; }
         public double Percentage { get; set; }
+        
+        // Additional properties needed by AccountingService
+        public string PaymentMethodName { get; set; }
+        public int Count { get; set; }
+        public decimal AverageAmount { get; set; }
+        public int SuccessCount { get; set; }
+        public int FailedCount { get; set; }
+        public double SuccessRate { get; set; }
     }
     
     public class MonthlyFinancialDTO

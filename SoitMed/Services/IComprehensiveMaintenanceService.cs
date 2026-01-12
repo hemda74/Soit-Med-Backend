@@ -14,15 +14,19 @@ namespace SoitMed.Services
         Task<CustomerDTO> GetCustomerByIdAsync(string customerId);
         Task<CustomerDTO> CreateCustomerAsync(CreateCustomerDTO customer);
         Task<CustomerDTO> UpdateCustomerAsync(string customerId, UpdateCustomerDTO customer);
+        Task<bool> DeleteCustomerAsync(string customerId);
+        Task<CustomerVisitStatsDTO> GetCustomerVisitStatisticsAsync(string customerId, DateTime? startDate = null, DateTime? endDate = null);
         #endregion
 
         #region Equipment Management
         Task<EquipmentVisitsDTO> GetEquipmentVisitsAsync(string equipmentIdentifier, bool includeLegacy = true);
         Task<EquipmentDTO> GetEquipmentByIdAsync(string equipmentId);
         Task<List<EquipmentDTO>> GetCustomerEquipmentAsync(string customerId);
+        Task<List<EquipmentDTO>> GetEquipmentAsync(string customerId);
         Task<EquipmentDTO> CreateEquipmentAsync(CreateEquipmentDTO equipment);
         Task<EquipmentDTO> UpdateEquipmentAsync(string equipmentId, UpdateEquipmentDTO equipment);
         Task<EquipmentDTO> UpdateEquipmentStatusAsync(string equipmentId, string status);
+        Task<bool> DeleteEquipmentAsync(string equipmentId);
         #endregion
 
         #region Visit Management
@@ -32,7 +36,9 @@ namespace SoitMed.Services
         Task<List<MaintenanceVisitDTO>> GetEquipmentVisitsAsync(string equipmentId);
         Task<MaintenanceVisitDTO> ScheduleVisitAsync(ScheduleVisitRequestDTO request);
         Task<MaintenanceVisitDTO> UpdateVisitAsync(string visitId, UpdateVisitRequestDTO request);
-        Task<bool> CancelVisitAsync(string visitId, string reason);
+        Task<MaintenanceVisitDTO> GetVisitAsync(string visitId);
+        Task<MaintenanceVisitDTO> CreateVisitAsync(CreateVisitRequestDTO request);
+        Task<bool> DeleteVisitAsync(string visitId);
         #endregion
 
         #region Contract Management
@@ -42,6 +48,8 @@ namespace SoitMed.Services
         Task<MaintenanceContractDTO> UpdateContractAsync(string contractId, UpdateMaintenanceContractDTO contract);
         Task<List<MaintenanceContractDTO>> GetExpiringContractsAsync(int daysThreshold = 30);
         Task<bool> RenewContractAsync(string contractId, RenewContractRequestDTO request);
+        Task<MaintenanceContractDTO> GetContractAsync(string contractId);
+        Task<bool> DeleteContractAsync(string contractId);
         #endregion
 
         #region Visit Reports & Media
@@ -57,6 +65,7 @@ namespace SoitMed.Services
         Task<CustomerVisitStatsDTO> GetCustomerVisitStatsAsync(string customerId, DateTime? startDate = null, DateTime? endDate = null);
         Task<EquipmentVisitStatsDTO> GetEquipmentVisitStatsAsync(string equipmentId);
         Task<MaintenanceDashboardDTO> GetMaintenanceDashboardAsync();
+        Task<MaintenanceDashboardStatsDTO> GetMaintenanceDashboardStatsAsync();
         Task<List<MonthlyVisitStatsDTO>> GetMonthlyVisitStatsAsync(int months = 12);
         Task<RevenueReportDTO> GetRevenueReportAsync(DateTime? startDate = null, DateTime? endDate = null);
         #endregion

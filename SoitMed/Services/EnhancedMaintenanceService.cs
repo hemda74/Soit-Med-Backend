@@ -71,10 +71,10 @@ namespace SoitMed.Services
                     };
 
                     // Get equipment from new database
-                    result.Equipment = await GetCustomerEquipmentFromNewDB((int)newCustomer.Id);
+                    result.Equipment = (await GetCustomerEquipmentFromNewDB(int.Parse(newCustomer.Id))).Cast<EquipmentDTO>().ToList();
                     
                     // Get visits from new database
-                    result.Visits = await GetCustomerVisitsFromNewDB((int)newCustomer.Id);
+                    result.Visits = (await GetCustomerVisitsFromNewDB(int.Parse(newCustomer.Id))).Cast<MaintenanceVisitDTO>().ToList();
                 }
 
                 // Include legacy data if requested
@@ -202,7 +202,16 @@ namespace SoitMed.Services
                     };
 
                     // Get visits for this equipment from new database
-                    result.Visits = await GetEquipmentVisitsFromNewDB(newEquipment.Id);
+                    result.Visits = (await GetEquipmentVisitsFromNewDB(int.Parse(newEquipment.Id))).Select(v => new MaintenanceVisitDTO
+                    {
+                        Id = v.Id,
+                        EquipmentId = v.EquipmentId,
+                        VisitDate = v.VisitDate,
+                        Status = v.Status,
+                        Report = v.Report,
+                        CompletionDate = v.CompletionDate,
+                        CreatedAt = DateTime.Parse(v.CreatedAt)
+                    }).ToList();
                 }
 
                 return result;
@@ -251,7 +260,7 @@ namespace SoitMed.Services
                     EngineerName = x.v.EngineerId, // TODO: Get engineer name
                     Report = x.v.Report,
                     ActionsTaken = x.v.ActionsTaken,
-                    PartsUsed = x.v.PartsUsed,
+                    PartsUsed = string.IsNullOrEmpty(x.v.PartsUsed) ? new List<PartsUsageDTO>() : ParsePartsUsage(x.v.PartsUsed),
                     ServiceFee = x.v.ServiceFee,
                     Outcome = x.v.Outcome.ToString(),
                     Source = "New"
@@ -266,7 +275,7 @@ namespace SoitMed.Services
         private async Task<List<VisitDTO>> GetEquipmentVisitsFromNewDB(int equipmentId)
         {
             return await _newDbContext.MaintenanceVisits
-                .Where(v => v.DeviceId == equipmentId)
+                .Where(v => v.DeviceId == equipmentId.ToString())
                 .Select(v => new VisitDTO
                 {
                     Id = v.Id.ToString(),
@@ -276,7 +285,7 @@ namespace SoitMed.Services
                     EngineerName = v.EngineerId, // TODO: Get engineer name
                     Report = v.Report,
                     ActionsTaken = v.ActionsTaken,
-                    PartsUsed = v.PartsUsed,
+                    PartsUsed = string.IsNullOrEmpty(v.PartsUsed) ? new List<PartsUsageDTO>() : ParsePartsUsage(v.PartsUsed),
                     ServiceFee = v.ServiceFee,
                     Outcome = v.Outcome.ToString(),
                     Source = "New"
@@ -393,7 +402,7 @@ namespace SoitMed.Services
                     EngineerName = x.v.EmpCode != null ? x.v.EmpCode.ToString() : "Unknown",
                     Report = x.vr.ReportDecription,
                     ActionsTaken = x.v.Notes,
-                    PartsUsed = "", // Legacy doesn't track parts used separately
+                    PartsUsed = new List<PartsUsageDTO>(), // Legacy doesn't track parts used separately
                     ServiceFee = x.v.VisitingValue,
                     Outcome = GetLegacyVisitOutcome(x.vr),
                     Source = "Legacy"
@@ -421,7 +430,7 @@ namespace SoitMed.Services
                     EngineerName = x.v.EmpCode != null ? x.v.EmpCode.ToString() : "Unknown",
                     Report = x.vr.ReportDecription,
                     ActionsTaken = x.v.Notes,
-                    PartsUsed = "", // Legacy doesn't track parts used separately
+                    PartsUsed = new List<PartsUsageDTO>(), // Legacy doesn't track parts used separately
                     ServiceFee = x.v.VisitingValue,
                     Outcome = GetLegacyVisitOutcome(x.vr),
                     Source = "Legacy"
@@ -497,7 +506,7 @@ namespace SoitMed.Services
                 result.TotalRevenue += legacyStats.TotalRevenue;
 
                 result.CompletionRate = result.TotalVisits > 0 ? 
-                    (decimal)result.CompletedVisits / result.TotalVisits * 100 : 0;
+                    (double)result.CompletedVisits / result.TotalVisits * 100 : 0;
 
                 return result;
             }
@@ -560,7 +569,7 @@ namespace SoitMed.Services
             // Update visit details
             visit.Report = dto.Report;
             visit.ActionsTaken = dto.ActionsTaken;
-            visit.PartsUsed = dto.PartsUsed;
+            visit.PartsUsed = dto.PartsUsedString;
             visit.ServiceFee = dto.ServiceFee;
             visit.Outcome = Enum.Parse<MaintenanceVisitOutcome>(dto.Outcome);
             visit.Status = VisitStatus.Completed;
@@ -649,5 +658,37 @@ namespace SoitMed.Services
         }
 
         #endregion
+
+        private List<PartsUsageDTO> ParsePartsUsage(string partsUsed)
+        {
+            var result = new List<PartsUsageDTO>();
+            
+            if (string.IsNullOrWhiteSpace(partsUsed))
+                return result;
+
+            try
+            {
+                // Simple parsing - split by comma and create PartsUsageDTO objects
+                var parts = partsUsed.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var part in parts)
+                {
+                    var trimmedPart = part.Trim();
+                    if (!string.IsNullOrEmpty(trimmedPart))
+                    {
+                        result.Add(new PartsUsageDTO
+                        {
+                            PartName = trimmedPart,
+                           
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error parsing parts usage: {PartsUsed}", partsUsed);
+            }
+
+            return result;
+        }
     }
 }
