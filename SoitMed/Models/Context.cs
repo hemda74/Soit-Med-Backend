@@ -9,6 +9,7 @@ using SoitMed.Models.Payment;
 using SoitMed.Models.Legacy;
 using SoitMed.Models.Contract;
 using SoitMed.Models.Security;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace SoitMed.Models
 {
@@ -124,9 +125,30 @@ namespace SoitMed.Models
 
         }
 
+        private static long ParseLongOrDefault(string value)
+        {
+            return long.TryParse(value, out var parsed) ? parsed : 0;
+        }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Convert string Id to bigint for BaseEntity-derived entities to match existing DB schema
+            var stringToLongConverter = new ValueConverter<string, long>(
+                convertToProviderExpression: v => ParseLongOrDefault(v),
+                convertFromProviderExpression: v => v.ToString()
+            );
+
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+                {
+                    modelBuilder.Entity(entityType.ClrType)
+                        .Property("Id")
+                        .HasConversion(stringToLongConverter);
+                }
+            }
 
             // Configure Department-User relationship
             modelBuilder.Entity<ApplicationUser>()

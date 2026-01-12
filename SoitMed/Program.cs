@@ -527,6 +527,86 @@ END";
                     }
                 }
 
+                using (var scope = app.Services.CreateScope())
+                {
+                    try
+                    {
+                        var db = scope.ServiceProvider.GetRequiredService<Context>();
+                        var connection = db.Database.GetDbConnection();
+                        await connection.OpenAsync();
+
+                        using (var command = connection.CreateCommand())
+                        {
+                            command.CommandText = @"
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'[dbo].[Clients]')
+    AND name = 'HasEmail'
+)
+BEGIN
+    ALTER TABLE [dbo].[Clients]
+    ADD [HasEmail] BIT NOT NULL DEFAULT 0;
+END";
+                            await command.ExecuteNonQueryAsync();
+                        }
+
+                        using (var command = connection.CreateCommand())
+                        {
+                            command.CommandText = @"
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'[dbo].[Clients]')
+    AND name = 'EmailStatus'
+)
+BEGIN
+    ALTER TABLE [dbo].[Clients]
+    ADD [EmailStatus] NVARCHAR(20) NOT NULL DEFAULT 'Unknown';
+END";
+                            await command.ExecuteNonQueryAsync();
+                        }
+
+                        using (var command = connection.CreateCommand())
+                        {
+                            command.CommandText = @"
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'[dbo].[Clients]')
+    AND name = 'EmailCreatedBy'
+)
+BEGIN
+    ALTER TABLE [dbo].[Clients]
+    ADD [EmailCreatedBy] NVARCHAR(100) NOT NULL DEFAULT '';
+END";
+                            await command.ExecuteNonQueryAsync();
+                        }
+
+                        using (var command = connection.CreateCommand())
+                        {
+                            command.CommandText = @"
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'[dbo].[Clients]')
+    AND name = 'EmailCreatedAt'
+)
+BEGIN
+    ALTER TABLE [dbo].[Clients]
+    ADD [EmailCreatedAt] DATETIME2 NULL;
+END";
+                            await command.ExecuteNonQueryAsync();
+                        }
+                    }
+                    catch (Exception guardEx)
+                    {
+                        var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+                        var startupLogger = loggerFactory.CreateLogger("StartupDbGuard");
+                        startupLogger.LogError(guardEx, "Failed to ensure Clients email tracking columns exist");
+                    }
+                }
+
                 // Seed roles
                 using (var scope = app.Services.CreateScope())
                 {
