@@ -99,11 +99,11 @@ namespace SoitMed.Services
 
                 // Load sequentially to avoid DbContext concurrency issues (same DbContext instance)
                 var taskProgresses = await _unitOfWork.TaskProgresses
-                    .GetProgressesByClientIdAsync(clientId);
+                    .GetProgressesByClientIdAsync(clientId.ToString());
                 var offers = await _unitOfWork.SalesOffers
-                    .GetOffersByClientIdAsync(clientId);
+                    .GetOffersByClientIdAsync(clientId.ToString());
                 var deals = await _unitOfWork.SalesDeals
-                    .GetDealsByClientIdAsync(clientId);
+                    .GetDealsByClientIdAsync(clientId.ToString());
 
                 // Calculate statistics
                 // Count deals that are approved, sent to legal, or successful as successful deals
@@ -291,7 +291,7 @@ namespace SoitMed.Services
                         // Look up the governorate name from the Governorates table first
                         var governorate = await context.Governorates
                             .AsNoTracking()
-                            .FirstOrDefaultAsync(g => g.GovernorateId == searchDto.GovernorateId.Value);
+                            .FirstOrDefaultAsync(g => g.GovernorateId == searchDto.GovernorateId.Value.ToString());
                         
                         if (governorate != null && !string.IsNullOrWhiteSpace(governorate.Name))
                         {
@@ -578,7 +578,7 @@ namespace SoitMed.Services
 
             return new ClientResponseDTO
             {
-                Id = client.Id,
+                Id = long.Parse(client.Id),
                 Name = client.Name,
                 Type = client.Type,
                 OrganizationName = client.OrganizationName,
@@ -642,7 +642,7 @@ namespace SoitMed.Services
         {
             return new TaskProgressSummaryDTO
             {
-                Id = taskProgress.Id,
+                Id = long.Parse(taskProgress.Id),
                 ProgressDate = taskProgress.ProgressDate,
                 ProgressType = taskProgress.ProgressType,
                 VisitResult = taskProgress.VisitResult,
@@ -669,7 +669,7 @@ namespace SoitMed.Services
             
             return new OfferSummaryDTO
             {
-                Id = offer.Id,
+                Id = long.Parse(offer.Id),
                 CreatedAt = offer.CreatedAt,
                 TotalAmount = offer.TotalAmount,
                 Status = offer.Status,
@@ -681,7 +681,7 @@ namespace SoitMed.Services
         {
             return new DealSummaryDTO
             {
-                Id = deal.Id,
+                Id = long.Parse(deal.Id),
                 ClosedDate = deal.ClosedDate,
                 DealValue = deal.DealValue,
                 Status = deal.Status

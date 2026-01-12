@@ -49,7 +49,7 @@ namespace SoitMed.Controllers
 
         [HttpGet("{id}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> GetEngineer(int id)
+        public async Task<IActionResult> GetEngineer(string id)
         {
             var Engineer = await context.Engineers
                 .Include(e => e.EngineerGovernorates.Where(eg => eg.IsActive))
@@ -131,7 +131,7 @@ namespace SoitMed.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> UpdateEngineer(int id, EngineerDTO EngineerDTO)
+        public async Task<IActionResult> UpdateEngineer(string id, EngineerDTO EngineerDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -197,7 +197,7 @@ namespace SoitMed.Controllers
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> DeleteEngineer(int id)
+        public async Task<IActionResult> DeleteEngineer(string id)
         {
             var Engineer = await context.Engineers
                 .Include(e => e.EngineerGovernorates)
@@ -223,7 +223,7 @@ namespace SoitMed.Controllers
 
         [HttpGet("{id}/governorates")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> GetEngineerGovernorates(int id)
+        public async Task<IActionResult> GetEngineerGovernorates(string id)
         {
             var Engineer = await context.Engineers
                 .Include(e => e.EngineerGovernorates.Where(eg => eg.IsActive))

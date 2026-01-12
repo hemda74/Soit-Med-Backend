@@ -90,7 +90,7 @@ namespace SoitMed.DTO
     /// </summary>
     public class ClientEquipmentVerificationDto
     {
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
         public string ClientName { get; set; } = string.Empty;
         public int? LegacyCustomerId { get; set; }
         public string? RelatedUserId { get; set; }

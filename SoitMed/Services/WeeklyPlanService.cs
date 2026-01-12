@@ -331,11 +331,11 @@ namespace SoitMed.Services
                 }).ToList();
 
                 // Get offers created from these offer requests
-                if (offerRequestsData.Any(or => or.CreatedOfferId.HasValue))
+                if (offerRequestsData.Any(or => !string.IsNullOrEmpty(or.CreatedOfferId)))
                 {
                     var offerIds = offerRequestsData
-                        .Where(or => or.CreatedOfferId.HasValue)
-                        .Select(or => or.CreatedOfferId ?? 0)
+                        .Where(or => !string.IsNullOrEmpty(or.CreatedOfferId))
+                        .Select(or => or.CreatedOfferId)
                         .Distinct()
                         .ToList();
 
@@ -360,7 +360,7 @@ namespace SoitMed.Services
                         
                         return new SalesOfferSimpleDTO
                         {
-                            Id = o.Id,
+                            Id = long.Parse(o.Id),
                             Products = o.Products,
                             TotalAmount = o.TotalAmount,
                             ValidUntil = validUntilList,
@@ -374,14 +374,14 @@ namespace SoitMed.Services
                     {
                         var dealIds = offersData
                             .Where(o => o.Deal != null)
-                            .Select(o => o.Deal?.Id ?? 0)
+                            .Select(o => o.Deal?.Id != null ? long.Parse(o.Deal.Id) : 0)
                             .Distinct()
                             .ToList();
 
                         var dealsData = await UnitOfWork.SalesDeals.GetByIdsAsync(dealIds);
                         deals = dealsData.Select(d => new SalesDealSimpleDTO
                             {
-                                Id = d.Id,
+                                Id = long.Parse(d.Id),
                                 DealValue = d.DealValue,
                                 ClosedDate = d.ClosedDate,
                                 Status = d.Status,
@@ -416,7 +416,7 @@ namespace SoitMed.Services
                 ProgressCount = task.Progresses.Count,
                 Progresses = task.Progresses.Select(p => new TaskProgressSimpleDTO
                 {
-                    Id = p.Id,
+                    Id = long.Parse(p.Id),
                     ProgressDate = p.ProgressDate,
                     ProgressType = p.ProgressType,
                     Description = p.Description,

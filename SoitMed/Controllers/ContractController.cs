@@ -118,13 +118,13 @@ namespace SoitMed.Controllers
                 // Client filter
                 if (filter.ClientId.HasValue)
                 {
-                    query = query.Where(c => c.ClientId == filter.ClientId.Value);
+                    query = query.Where(c => c.ClientId == filter.ClientId.Value.ToString());
                 }
 
                 // Deal filter
                 if (filter.DealId.HasValue)
                 {
-                    query = query.Where(c => c.DealId == filter.DealId.Value);
+                    query = query.Where(c => c.DealId == filter.DealId.Value.ToString());
                 }
 
                 // Start date range filter
@@ -298,12 +298,12 @@ namespace SoitMed.Controllers
                     .ToListAsync();
 
                 // Get contract IDs to load related data (InstallmentSchedules, Deal, etc.)
-                var contractIds = contractsData.Select(c => c.Id).ToList();
+                var contractIds = contractsData.Select(c => long.Parse(c.Id)).ToList();
                 
                 // Load InstallmentSchedules for installment counts
                 var installmentSchedules = await context.InstallmentSchedules
                     .AsNoTracking()
-                    .Where(s => contractIds.Contains(s.ContractId))
+                    .Where(s => contractIds.Contains(long.Parse(s.ContractId)))
                     .ToListAsync();
                 
                 var installmentCounts = installmentSchedules
@@ -316,12 +316,12 @@ namespace SoitMed.Controllers
                     });
 
                 // Load Deal information if needed
-                var dealIds = contractsData.Where(c => c.DealId.HasValue).Select(c => c.DealId!.Value).Distinct().ToList();
+                var dealIds = contractsData.Where(c => !string.IsNullOrEmpty(c.DealId)).Select(c => long.Parse(c.DealId)).Distinct().ToList();
                 var deals = dealIds.Any() 
                     ? await context.SalesDeals
                         .AsNoTracking()
-                        .Where(d => dealIds.Contains(d.Id))
-                        .ToDictionaryAsync(d => d.Id, d => d)
+                        .Where(d => dealIds.Contains(long.Parse(d.Id)))
+                        .ToDictionaryAsync(d => long.Parse(d.Id), d => d)
                     : new Dictionary<long, Models.SalesDeal>();
 
                 // Load MainContract information from TBS for legacy contracts
@@ -363,7 +363,7 @@ namespace SoitMed.Controllers
                 var contractDTOs = contractsData.Select(c =>
                 {
                     var installments = installmentCounts.GetValueOrDefault(c.Id);
-                    var deal = c.DealId.HasValue && deals.ContainsKey(c.DealId.Value) ? deals[c.DealId.Value] : null;
+                    var deal = !string.IsNullOrEmpty(c.DealId) && deals.ContainsKey(long.Parse(c.DealId)) ? deals[long.Parse(c.DealId)] : null;
                     
                     // Get MainContract info for legacy contracts
                     int? mainContractId = null;
@@ -405,7 +405,7 @@ namespace SoitMed.Controllers
                     
                     return new ContractResponseDTO
                     {
-                        Id = c.Id,
+                        Id = long.Parse(c.Id),
                         ContractNumber = c.ContractNumber,
                         Title = c.Title,
                         ContractContent = c.ContractContent,
@@ -421,7 +421,7 @@ namespace SoitMed.Controllers
                         ClientName = c.ClientName, // From JOIN - guaranteed correct
                         ClientPhone = c.ClientPhone,
                         ClientEmail = c.ClientEmail,
-                        DealId = c.DealId,
+                        DealId = !string.IsNullOrEmpty(c.DealId) ? long.Parse(c.DealId) : null,
                         DealTitle = deal != null ? $"Deal #{deal.Id} - {deal.DealValue:C}" : null,
                         CashAmount = c.CashAmount,
                         InstallmentAmount = c.InstallmentAmount,
@@ -1004,7 +1004,7 @@ namespace SoitMed.Controllers
 
             return new ContractResponseDTO
             {
-                Id = contract.Id,
+                Id = long.Parse(contract.Id),
                 ContractNumber = contract.ContractNumber,
                 Title = contract.Title,
                 ContractContent = contract.ContractContent,
@@ -1020,7 +1020,7 @@ namespace SoitMed.Controllers
                 ClientName = contract.Client?.Name ?? "Unknown",
                 ClientPhone = contract.Client?.Phone,
                 ClientEmail = contract.Client?.Email,
-                DealId = contract.DealId,
+                DealId = !string.IsNullOrEmpty(contract.DealId) ? long.Parse(contract.DealId) : null,
                 DealTitle = contract.Deal != null ? $"Deal #{contract.Deal.Id} - {contract.Deal.DealValue:C}" : null,
                 CashAmount = contract.CashAmount,
                 InstallmentAmount = contract.InstallmentAmount,

@@ -12,7 +12,7 @@ namespace SoitMed.Services
         {
             return new ClientResponseDTO
             {
-                Id = client.Id,
+                Id = long.Parse(client.Id),
                 Name = client.Name,
                 Type = client.Type,
                 Specialization = client.Specialization,
@@ -77,7 +77,7 @@ namespace SoitMed.Services
         {
             return new ClientFollowUpDTO
             {
-                Id = client.Id,
+                Id = long.Parse(client.Id),
                 Name = client.Name,
                 Type = client.Type,
                 LastContactDate = client.LastContactDate,

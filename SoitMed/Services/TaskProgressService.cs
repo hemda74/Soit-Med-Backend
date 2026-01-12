@@ -71,13 +71,13 @@ namespace SoitMed.Services
 
                 // Auto-create OfferRequest if client is interested and needs offer
                 _logger.LogInformation(" Checking auto-create conditions: VisitResult={VisitResult}, NextStep={NextStep}, HasClientId={HasClientId}", 
-                    createDto.VisitResult, createDto.NextStep, task.ClientId.HasValue);
+                    createDto.VisitResult, createDto.NextStep, !string.IsNullOrEmpty(task.ClientId));
                 
-                if (createDto.VisitResult == "Interested" && createDto.NextStep == "NeedsOffer" && task.ClientId.HasValue)
+                if (createDto.VisitResult == "Interested" && createDto.NextStep == "NeedsOffer" && !string.IsNullOrEmpty(task.ClientId))
                 {
                     try
                     {
-                        _logger.LogInformation("Conditions met! Auto-creating OfferRequest for ProgressId: {ProgressId}, ClientId: {ClientId}", progress.Id, task.ClientId.Value);
+                        _logger.LogInformation("Conditions met! Auto-creating OfferRequest for ProgressId: {ProgressId}, ClientId: {ClientId}", progress.Id, task.ClientId);
                         
                         // Combine description and notes for comprehensive offer request details
                         var requestDetails = new System.Text.StringBuilder();
@@ -101,8 +101,8 @@ namespace SoitMed.Services
                         
                         var offerRequestDto = new CreateOfferRequestDTO
                         {
-                            ClientId = task.ClientId.Value,
-                            TaskProgressId = progress.Id,
+                            ClientId = task.ClientId,
+                            TaskProgressId = long.Parse(progress.Id),
                             RequestedProducts = requestDetails.ToString(),
                             SpecialNotes = string.IsNullOrWhiteSpace(specialNotes) ? null : specialNotes
                         };
@@ -127,7 +127,7 @@ namespace SoitMed.Services
                 else
                 {
                     _logger.LogWarning("Auto-create OfferRequest skipped. VisitResult={VisitResult}, NextStep={NextStep}, HasClientId={HasClientId}", 
-                        createDto.VisitResult, createDto.NextStep, task.ClientId.HasValue);
+                        createDto.VisitResult, createDto.NextStep, !string.IsNullOrEmpty(task.ClientId));
                 }
 
                 _logger.LogInformation("Task progress created successfully. ProgressId: {ProgressId}, TaskId: {TaskId}, OfferRequestId: {OfferRequestId}", 
@@ -484,7 +484,7 @@ namespace SoitMed.Services
                 var progresses = await _unitOfWork.TaskProgresses.GetProgressesByClientIdAsync(clientId);
                 return progresses.Select(p => new TaskProgressSummaryDTO
                 {
-                    Id = p.Id,
+                    Id = long.Parse(p.Id),
                     ProgressDate = p.ProgressDate,
                     ProgressType = p.ProgressType,
                     VisitResult = p.VisitResult,
@@ -504,14 +504,14 @@ namespace SoitMed.Services
 
         private async Task<TaskProgressResponseDTO> MapToResponseDTO(TaskProgress progress)
         {
-            var client = progress.ClientId.HasValue ? await _unitOfWork.Clients.GetByIdAsync(progress.ClientId.Value) : null;
+            var client = !string.IsNullOrEmpty(progress.ClientId) ? await _unitOfWork.Clients.GetByIdAsync(progress.ClientId) : null;
             var employee = await _unitOfWork.Users.GetByIdAsync(progress.EmployeeId);
 
             return new TaskProgressResponseDTO
             {
-                Id = progress.Id,
+                Id = long.Parse(progress.Id),
                 TaskId = progress.TaskId,
-                ClientId = progress.ClientId,
+                ClientId = !string.IsNullOrEmpty(progress.ClientId) ? long.Parse(progress.ClientId) : null,
                 ClientName = client?.Name ?? "Unknown",
                 EmployeeId = progress.EmployeeId,
                 EmployeeName = employee != null ? $"{employee.FirstName} {employee.LastName}" : "Unknown",

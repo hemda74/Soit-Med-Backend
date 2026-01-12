@@ -34,7 +34,7 @@ namespace SoitMed.Repositories
         {
             return await _dbSet
                 .Include(e => e.User)
-                .FirstOrDefaultAsync(e => e.EngineerId == id, cancellationToken);
+                .FirstOrDefaultAsync(e => e.EngineerId == id.ToString(), cancellationToken);
         }
 
         public async Task<Engineer?> GetEngineerWithGovernoratesAsync(int id, CancellationToken cancellationToken = default)
@@ -42,14 +42,14 @@ namespace SoitMed.Repositories
             return await _dbSet
                 .Include(e => e.EngineerGovernorates)
                 .ThenInclude(eg => eg.Governorate)
-                .FirstOrDefaultAsync(e => e.EngineerId == id, cancellationToken);
+                .FirstOrDefaultAsync(e => e.EngineerId == id.ToString(), cancellationToken);
         }
 
         public async Task<Engineer?> GetEngineerWithAssignedRepairRequestsAsync(int id, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(e => e.AssignedRepairRequests)
-                .FirstOrDefaultAsync(e => e.EngineerId == id, cancellationToken);
+                .FirstOrDefaultAsync(e => e.EngineerId == id.ToString(), cancellationToken);
         }
 
         public async Task<bool> ExistsByUserIdAsync(string userId, CancellationToken cancellationToken = default)
@@ -61,7 +61,7 @@ namespace SoitMed.Repositories
         public async Task<IEnumerable<Engineer>> GetEngineersByGovernorateAsync(int governorateId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .Where(e => e.EngineerGovernorates.Any(eg => eg.GovernorateId == governorateId))
+                .Where(e => e.EngineerGovernorates.Any(eg => eg.GovernorateId == governorateId.ToString()))
                 .ToListAsync(cancellationToken);
         }
     }

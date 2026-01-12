@@ -11,7 +11,7 @@ namespace SoitMed.Services
         /// <param name="offerId">The ID of the offer</param>
         /// <param name="language">Language for PDF (en or ar)</param>
         /// <returns>PDF file bytes</returns>
-        Task<byte[]> GenerateOfferPdfAsync(long offerId, string language = "en");
+        Task<byte[]> GenerateOfferPdfAsync(string offerId, string language = "en");
     }
 }
 

@@ -134,6 +134,30 @@ namespace SoitMed.Models
         public virtual ICollection<Deal> Deals { get; set; } = new List<Deal>(); // All deals (success/failed)
         #endregion
 
+        #region Email Status Tracking
+        /// <summary>
+        /// Indicates if the client has an email address
+        /// </summary>
+        public bool HasEmail { get; set; }
+
+        /// <summary>
+        /// Email verification status
+        /// </summary>
+        [StringLength(20)]
+        public string EmailStatus { get; set; } = "Unknown"; // Verified, Unverified, Unknown
+
+        /// <summary>
+        /// Who created/verified the email
+        /// </summary>
+        [StringLength(100)]
+        public string EmailCreatedBy { get; set; }
+
+        /// <summary>
+        /// When the email was created/verified
+        /// </summary>
+        public DateTime? EmailCreatedAt { get; set; }
+        #endregion
+
         #region Business Logic Methods
         /// <summary>
         /// Updates the client's contact information

@@ -65,7 +65,7 @@ namespace SoitMed.Services
                     .Take(pageSize)
                     .Select(c => new ClientWithEmailStatusDTO
                     {
-                        Id = c.Id,
+                        Id = long.Parse(c.Id),
                         Name = c.Name,
                         Email = c.Email,
                         Phone = c.Phone,
@@ -138,7 +138,7 @@ namespace SoitMed.Services
 
                 // Check if email is already used by another client
                 var existingClient = await _context.Clients
-                    .FirstOrDefaultAsync(c => c.Email == dto.Email && c.Id != clientId);
+                    .FirstOrDefaultAsync(c => c.Email == dto.Email && c.Id != clientId.ToString());
                 
                 if (existingClient != null)
                 {
@@ -169,7 +169,7 @@ namespace SoitMed.Services
 
                 var result = new ClientWithEmailStatusDTO
                 {
-                    Id = client.Id,
+                    Id = long.Parse(client.Id),
                     Name = client.Name,
                     Email = client.Email,
                     Phone = client.Phone,
@@ -258,7 +258,7 @@ namespace SoitMed.Services
 
                 var result = new ClientWithEmailStatusDTO
                 {
-                    Id = client.Id,
+                    Id = long.Parse(client.Id),
                     Name = client.Name,
                     Email = client.Email,
                     Phone = client.Phone,
@@ -311,7 +311,7 @@ namespace SoitMed.Services
                 {
                     new ClientEmailHistoryDTO
                     {
-                        ClientId = clientId,
+                        ClientId = clientId.ToString(),
                         OldEmail = client.Email,
                         NewEmail = client.Email,
                         Action = "Current Email",
@@ -374,7 +374,6 @@ namespace SoitMed.Services
 
                 var oldStatus = user.IsActive;
                 user.IsActive = !user.IsActive;
-                user.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
 

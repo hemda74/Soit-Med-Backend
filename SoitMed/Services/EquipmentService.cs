@@ -45,7 +45,7 @@ namespace SoitMed.Services
                     return Enumerable.Empty<EquipmentResponseDTO>();
                 }
 
-                var equipmentIds = new HashSet<int>();
+                var equipmentIds = new HashSet<string>();
 
                 // 1. Equipment directly linked via Client's RelatedUserId -> ApplicationUser -> Equipment.CustomerId
                 if (!string.IsNullOrEmpty(client.RelatedUserId))
@@ -214,7 +214,7 @@ namespace SoitMed.Services
                     CreatedAt = e.CreatedAt,
                     LastMaintenanceDate = e.LastMaintenanceDate,
                     IsActive = e.IsActive,
-                    QrToken = e.QrToken,
+                    QrToken = e.QrToken != Guid.Empty ? e.QrToken.ToString() : null,
                     IsQrPrinted = e.IsQrPrinted
                 }).ToList();
 
@@ -234,7 +234,7 @@ namespace SoitMed.Services
         {
             try
             {
-                var equipmentIds = new HashSet<int>();
+                var equipmentIds = new HashSet<string>();
 
                 // 1. Equipment directly linked via CustomerId
                 var equipmentFromDirectLink = await _context.Equipment
@@ -330,7 +330,7 @@ namespace SoitMed.Services
                     CreatedAt = e.CreatedAt,
                     LastMaintenanceDate = e.LastMaintenanceDate,
                     IsActive = e.IsActive,
-                    QrToken = e.QrToken,
+                    QrToken = e.QrToken != Guid.Empty ? e.QrToken.ToString() : null,
                     IsQrPrinted = e.IsQrPrinted
                 }).ToList();
 
@@ -517,7 +517,7 @@ namespace SoitMed.Services
                 {
                     result.Add(new EquipmentResponseDTO
                     {
-                        Id = machine.MachineId, // Use legacy machine ID
+                        Id = machine.MachineId.ToString(), // Use legacy machine ID
                         Name = !string.IsNullOrEmpty(machine.ModelName) ? machine.ModelName : machine.ModelNameEn ?? "Unknown",
                         QRCode = machine.SerialNumber, // Use serial number as QR code identifier
                         Description = machine.ModelNameEn,
@@ -528,11 +528,11 @@ namespace SoitMed.Services
                         HospitalId = string.Empty,
                         HospitalName = string.Empty,
                         RepairVisitCount = visitCounts.GetValueOrDefault(machine.MachineId, 0),
-                        Status = EquipmentStatus.Operational,
+                        Status = EquipmentStatus.Operational.ToString(),
                         CreatedAt = DateTime.UtcNow,
                         LastMaintenanceDate = null,
                         IsActive = true,
-                        QrToken = Guid.NewGuid(),
+                        QrToken = Guid.NewGuid().ToString(),
                         IsQrPrinted = false
                     });
                 }

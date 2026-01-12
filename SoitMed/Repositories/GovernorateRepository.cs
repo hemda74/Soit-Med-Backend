@@ -25,7 +25,7 @@ namespace SoitMed.Repositories
         public async Task<bool> ExistsByNameExcludingIdAsync(string name, int id, CancellationToken cancellationToken = default)
         {
             return await _dbSet
-                .AnyAsync(g => g.Name == name && g.GovernorateId != id, cancellationToken);
+                .AnyAsync(g => g.Name == name && g.GovernorateId != id.ToString(), cancellationToken);
         }
 
         public async Task<IEnumerable<Governorate>> GetActiveGovernoratesAsync(CancellationToken cancellationToken = default)
@@ -40,7 +40,7 @@ namespace SoitMed.Repositories
             return await _dbSet
                 .Include(g => g.EngineerGovernorates)
                 .ThenInclude(eg => eg.Engineer)
-                .FirstOrDefaultAsync(g => g.GovernorateId == id, cancellationToken);
+                .FirstOrDefaultAsync(g => g.GovernorateId == id.ToString(), cancellationToken);
         }
     }
 }

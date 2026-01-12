@@ -8,6 +8,7 @@ using SoitMed.Models.Equipment;
 using SoitMed.Models.Payment;
 using SoitMed.Models.Legacy;
 using SoitMed.Models.Contract;
+using SoitMed.Models.Security;
 
 namespace SoitMed.Models
 {
@@ -48,6 +49,9 @@ namespace SoitMed.Models
         public DbSet<Payment.Payment> Payments { get; set; }
         public DbSet<Payment.PaymentTransaction> PaymentTransactions { get; set; }
         public DbSet<Payment.PaymentGatewayConfig> PaymentGatewayConfigs { get; set; }
+
+        // Security entities
+        public DbSet<SecurityConfiguration> SecurityConfigurations { get; set; }
 
         // User image entities
         public DbSet<UserImage> UserImages { get; set; }
@@ -113,6 +117,7 @@ namespace SoitMed.Models
         // Comprehensive Maintenance Module entities
         public DbSet<VisitReport> VisitReports { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
+        public DbSet<MaintenanceContract> MaintenanceContracts { get; set; }
         
         public Context(DbContextOptions<Context> options) : base(options)
         {
@@ -884,7 +889,7 @@ namespace SoitMed.Models
             // MaintenanceContract relationships
             modelBuilder.Entity<MaintenanceContract>()
                 .HasOne(mc => mc.Client)
-                .WithMany(c => c.MaintenanceContracts)
+                .WithMany()
                 .HasForeignKey(mc => mc.ClientId)
                 .OnDelete(DeleteBehavior.Restrict);
 
@@ -895,8 +900,8 @@ namespace SoitMed.Models
             modelBuilder.Entity<MaintenanceContract>()
                 .HasIndex(mc => new { mc.ClientId, mc.Status });
 
-            // ContractItem relationships
-            modelBuilder.Entity<ContractItem>()
+            // ContractItem relationships - TODO: Create ContractItem model
+            /*modelBuilder.Entity<ContractItem>()
                 .HasOne(ci => ci.Contract)
                 .WithMany(mc => mc.ContractItems)
                 .HasForeignKey(ci => ci.ContractId)
@@ -906,11 +911,11 @@ namespace SoitMed.Models
                 .HasOne(ci => ci.Equipment)
                 .WithMany(e => e.ContractItems)
                 .HasForeignKey(ci => ci.EquipmentId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Cascade);*/
 
-            modelBuilder.Entity<ContractItem>()
+            /*modelBuilder.Entity<ContractItem>()
                 .HasIndex(ci => new { ci.ContractId, ci.EquipmentId })
-                .IsUnique();
+                .IsUnique();*/
 
             // VisitReport relationships
             modelBuilder.Entity<VisitReport>()
@@ -919,26 +924,26 @@ namespace SoitMed.Models
                 .HasForeignKey<VisitReport>(vr => vr.VisitId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // MediaFile relationships
-            modelBuilder.Entity<MediaFile>()
+            // MediaFile relationships - TODO: Create MediaFile model
+            /*modelBuilder.Entity<MediaFile>()
                 .HasOne(mf => mf.Visit)
                 .WithMany(v => v.MediaFiles)
                 .HasForeignKey(mf => mf.VisitId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<MediaFile>()
-                .HasIndex(mf => new { mf.VisitId, mf.FileType });
+                .HasIndex(mf => new { mf.VisitId, mf.FileType });*/
 
-            // SparePart relationships
-            modelBuilder.Entity<SparePart>()
+            // SparePart relationships - TODO: Create SparePart model
+            /*modelBuilder.Entity<SparePart>()
                 .HasIndex(sp => sp.PartNumber)
                 .IsUnique();
 
             modelBuilder.Entity<SparePart>()
-                .HasIndex(sp => new { sp.Category, sp.IsActive });
+                .HasIndex(sp => new { sp.Category, sp.IsActive });*/
 
-            // UsedSparePart relationships
-            modelBuilder.Entity<UsedSparePart>()
+            // UsedSparePart relationships - TODO: Create UsedSparePart model
+            /*modelBuilder.Entity<UsedSparePart>()
                 .HasOne(usp => usp.Visit)
                 .WithMany(v => v.UsedSpareParts)
                 .HasForeignKey(usp => usp.VisitId)
@@ -948,10 +953,10 @@ namespace SoitMed.Models
                 .HasOne(usp => usp.SparePart)
                 .WithMany(sp => sp.UsedSpareParts)
                 .HasForeignKey(usp => usp.SparePartId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Restrict);*/
 
-            // Invoice relationships
-            modelBuilder.Entity<Invoice>()
+            // Invoice relationships - TODO: Fix Invoice model Client properties
+            /*modelBuilder.Entity<Invoice>()
                 .HasOne(i => i.Client)
                 .WithMany(c => c.Invoices)
                 .HasForeignKey(i => i.ClientId)
@@ -962,10 +967,10 @@ namespace SoitMed.Models
                 .IsUnique();
 
             modelBuilder.Entity<Invoice>()
-                .HasIndex(i => new { i.ClientId, i.Status });
+                .HasIndex(i => new { i.ClientId, i.Status });*/
 
-            // InvoiceItem relationships
-            modelBuilder.Entity<InvoiceItem>()
+            // InvoiceItem relationships - TODO: Create InvoiceItem model
+            /*modelBuilder.Entity<InvoiceItem>()
                 .HasOne(ii => ii.Invoice)
                 .WithMany(i => i.InvoiceItems)
                 .HasForeignKey(ii => ii.InvoiceId)
@@ -979,22 +984,22 @@ namespace SoitMed.Models
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Payment>()
-                .HasIndex(p => new { p.InvoiceId, p.PaymentDate });
+                .HasIndex(p => new { p.InvoiceId, p.PaymentDate });*/
 
             // Configure decimal precision for financial fields
-            modelBuilder.Entity<MaintenanceContract>()
+            /*modelBuilder.Entity<MaintenanceContract>()
                 .Property(mc => mc.ContractValue)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2);*/
 
-            modelBuilder.Entity<ContractItem>()
+            /*modelBuilder.Entity<ContractItem>()
                 .Property(ci => ci.Price)
                 .HasPrecision(18, 2);
 
             modelBuilder.Entity<SparePart>()
                 .Property(sp => sp.UnitPrice)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2);*/
 
-            modelBuilder.Entity<UsedSparePart>()
+            /*modelBuilder.Entity<UsedSparePart>()
                 .Property(usp => usp.UnitPrice)
                 .HasPrecision(18, 2);
 
@@ -1020,11 +1025,11 @@ namespace SoitMed.Models
 
             modelBuilder.Entity<InvoiceItem>()
                 .Property(ii => ii.TotalPrice)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2);*/
 
-            modelBuilder.Entity<Payment>()
+            /*modelBuilder.Entity<Payment>()
                 .Property(p => p.Amount)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2);*/
         }
     }
 }

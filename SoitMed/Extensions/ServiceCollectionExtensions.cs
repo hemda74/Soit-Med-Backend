@@ -64,9 +64,7 @@ namespace SoitMed.Extensions
             // Chat services
             services.AddScoped<IChatService, ChatService>();
 
-            // Legacy import service
-            services.AddScoped<ILegacyImporterService, LegacyImporterService>();
-
+            
             // Legacy media service
             services.AddScoped<ILegacyMediaService, LegacyMediaService>();
 

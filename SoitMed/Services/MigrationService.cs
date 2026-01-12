@@ -101,7 +101,7 @@ namespace SoitMed.Services
         {
             return new ClientEquipmentVerificationDto 
             { 
-                ClientId = clientId,
+                ClientId = clientId.ToString(),
                 ClientName = "Placeholder",
                 TotalEquipment = 0,
                 EquipmentFromVisits = 0,

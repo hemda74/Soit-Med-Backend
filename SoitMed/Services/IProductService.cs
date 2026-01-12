@@ -7,18 +7,18 @@ namespace SoitMed.Services
     /// </summary>
     public interface IProductService
     {
-        Task<List<ProductResponseDTO>> GetAllProductsAsync(string? category = null, long? categoryId = null, bool? inStock = null);
-        Task<ProductResponseDTO?> GetProductByIdAsync(long id);
+        Task<List<ProductResponseDTO>> GetAllProductsAsync(string? category = null, string? categoryId = null, bool? inStock = null);
+        Task<ProductResponseDTO?> GetProductByIdAsync(string id);
         Task<List<ProductResponseDTO>> GetProductsByCategoryAsync(string category);
         Task<List<ProductResponseDTO>> SearchProductsAsync(string searchTerm);
         Task<ProductResponseDTO> CreateProductAsync(CreateProductDTO createDto, string userId);
-        Task<ProductResponseDTO> UpdateProductAsync(long id, UpdateProductDTO updateDto, string userId);
-        Task<bool> DeleteProductAsync(long id);
-        Task<ProductResponseDTO> UpdateProductImageAsync(long id, string imagePath);
-        Task<ProductResponseDTO> UpdateProviderImageAsync(long id, string imagePath);
-        Task<ProductResponseDTO> UpdateDataSheetAsync(long id, string pdfPath);
-        Task<ProductResponseDTO> UpdateCatalogAsync(long id, string pdfPath);
-        Task<ProductResponseDTO> UpdateInventoryQuantityAsync(long id, int inventoryQuantity);
+        Task<ProductResponseDTO> UpdateProductAsync(string id, UpdateProductDTO updateDto, string userId);
+        Task<bool> DeleteProductAsync(string id);
+        Task<ProductResponseDTO> UpdateProductImageAsync(string id, string imagePath);
+        Task<ProductResponseDTO> UpdateProviderImageAsync(string id, string imagePath);
+        Task<ProductResponseDTO> UpdateDataSheetAsync(string id, string pdfPath);
+        Task<ProductResponseDTO> UpdateCatalogAsync(string id, string pdfPath);
+        Task<ProductResponseDTO> UpdateInventoryQuantityAsync(string id, int inventoryQuantity);
     }
 }
 

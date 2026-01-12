@@ -210,7 +210,7 @@ namespace SoitMed.Services
                 .GroupBy(p => p.PaymentMethod)
                 .Select(g => new PaymentMethodStatisticsDTO
                 {
-                    PaymentMethod = g.Key,
+                    PaymentMethod = g.Key.ToString(),
                     PaymentMethodName = g.Key.ToString(),
                     Count = g.Count(),
                     TotalAmount = g.Sum(p => p.Amount),
@@ -218,7 +218,7 @@ namespace SoitMed.Services
                     SuccessCount = g.Count(p => p.Status == PaymentStatus.Completed),
                     FailedCount = g.Count(p => p.Status == PaymentStatus.Failed),
                     SuccessRate = g.Count() > 0 
-                        ? (decimal)g.Count(p => p.Status == PaymentStatus.Completed) / g.Count() * 100 
+                        ? (double)g.Count(p => p.Status == PaymentStatus.Completed) / g.Count() * 100 
                         : 0
                 })
                 .ToList();
@@ -245,8 +245,8 @@ namespace SoitMed.Services
                 filters.MaintenanceRequestId ?? 0);
             
             // Apply additional filters
-            if (filters.Status.HasValue)
-                payments = payments.Where(p => p.Status == filters.Status.Value);
+            if (!string.IsNullOrEmpty(filters.Status))
+                payments = payments.Where(p => p.Status.ToString() == filters.Status);
             if (filters.PaymentMethod.HasValue)
                 payments = payments.Where(p => p.PaymentMethod == filters.PaymentMethod.Value);
 
@@ -265,8 +265,8 @@ namespace SoitMed.Services
                 filters.SparePartRequestId ?? 0);
             
             // Apply additional filters
-            if (filters.Status.HasValue)
-                payments = payments.Where(p => p.Status == filters.Status.Value);
+            if (!string.IsNullOrEmpty(filters.Status))
+                payments = payments.Where(p => p.Status.ToString() == filters.Status);
             if (filters.PaymentMethod.HasValue)
                 payments = payments.Where(p => p.PaymentMethod == filters.PaymentMethod.Value);
 
@@ -288,21 +288,21 @@ namespace SoitMed.Services
 
             return new PaymentResponseDTO
             {
-                Id = payment.Id,
-                MaintenanceRequestId = payment.MaintenanceRequestId,
-                SparePartRequestId = payment.SparePartRequestId,
+                Id = payment.Id.ToString(),
+                MaintenanceRequestId = payment.MaintenanceRequestId?.ToString(),
+                SparePartRequestId = payment.SparePartRequestId?.ToString(),
                 CustomerId = payment.CustomerId,
                 CustomerName = customer?.UserName ?? "",
                 Amount = payment.Amount,
-                PaymentMethod = payment.PaymentMethod,
+                PaymentMethod = payment.PaymentMethod.ToString(),
                 PaymentMethodName = payment.PaymentMethod.ToString(),
-                Status = payment.Status,
+                Status = payment.Status.ToString(),
                 StatusName = payment.Status.ToString(),
                 TransactionId = payment.TransactionId,
                 PaymentReference = payment.PaymentReference,
                 ProcessedByAccountantId = payment.ProcessedByAccountantId,
                 ProcessedByAccountantName = accountant?.UserName ?? "",
-                ProcessedAt = payment.ProcessedAt,
+                ProcessedAt = payment.ProcessedAt ?? DateTime.UtcNow,
                 AccountingNotes = payment.AccountingNotes,
                 CreatedAt = payment.CreatedAt,
                 PaidAt = payment.PaidAt,

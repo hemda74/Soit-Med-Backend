@@ -41,7 +41,7 @@ namespace SoitMed.DTO
 
     public class ClientEmailHistoryDTO
     {
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
         public string? OldEmail { get; set; }
         public string NewEmail { get; set; } = string.Empty;
         public string Action { get; set; } = string.Empty;

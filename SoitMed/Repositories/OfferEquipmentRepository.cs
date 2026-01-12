@@ -9,7 +9,7 @@ namespace SoitMed.Repositories
         {
         }
 
-        public async Task<IEnumerable<OfferEquipment>> GetByOfferIdAsync(long offerId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<OfferEquipment>> GetByOfferIdAsync(string offerId, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Where(e => e.OfferId == offerId)

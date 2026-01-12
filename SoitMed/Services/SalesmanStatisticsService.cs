@@ -223,7 +223,7 @@ namespace SoitMed.Services
 
             return new SalesManTargetDTO
             {
-                Id = target.Id,
+                Id = long.Parse(target.Id),
                 SalesManId = target.SalesManId,
                 SalesManName = target.SalesManId != null 
                     ? $"{target.SalesMan?.FirstName} {target.SalesMan?.LastName}" 
@@ -314,7 +314,7 @@ namespace SoitMed.Services
 
             return new SalesManTargetDTO
             {
-                Id = target.Id,
+                Id = long.Parse(target.Id),
                 SalesManId = target.SalesManId,
                 SalesManName = target.SalesManId != null 
                     ? $"{target.SalesMan?.FirstName} {target.SalesMan?.LastName}" 
@@ -369,7 +369,7 @@ namespace SoitMed.Services
 
             return new SalesManTargetDTO
             {
-                Id = target.Id,
+                Id = long.Parse(target.Id),
                 SalesManId = target.SalesManId,
                 SalesManName = target.SalesManId != null 
                     ? $"{target.SalesMan?.FirstName} {target.SalesMan?.LastName}" 
@@ -414,7 +414,7 @@ namespace SoitMed.Services
 
                 result.Add(new SalesManTargetDTO
                 {
-                    Id = target.Id,
+                    Id = long.Parse(target.Id),
                     SalesManId = target.SalesManId,
                     SalesManName = target.SalesManId != null 
                         ? $"{target.SalesMan?.FirstName} {target.SalesMan?.LastName}" 
@@ -456,7 +456,7 @@ namespace SoitMed.Services
 
             return new SalesManTargetDTO
             {
-                Id = target.Id,
+                Id = long.Parse(target.Id),
                 SalesManId = target.SalesManId,
                 SalesManName = "Team",
                 Year = target.Year,
@@ -499,7 +499,7 @@ namespace SoitMed.Services
                 var manager = await _unitOfWork.Users.GetByIdAsync(individualMoneyTarget.CreatedByManagerId);
                 individualMoneyTargetDto = new SalesManTargetDTO
                 {
-                    Id = individualMoneyTarget.Id,
+                    Id = long.Parse(individualMoneyTarget.Id),
                     SalesManId = individualMoneyTarget.SalesManId,
                     SalesManName = "Individual",
                     Year = individualMoneyTarget.Year,
@@ -526,7 +526,7 @@ namespace SoitMed.Services
                 var salesman = await _unitOfWork.Users.GetByIdAsync(individualActivityTarget.SalesManId);
                 individualActivityTargetDto = new SalesManTargetDTO
                 {
-                    Id = individualActivityTarget.Id,
+                    Id = long.Parse(individualActivityTarget.Id),
                     SalesManId = individualActivityTarget.SalesManId,
                     SalesManName = "Individual",
                     Year = individualActivityTarget.Year,
@@ -553,7 +553,7 @@ namespace SoitMed.Services
                 var manager = await _unitOfWork.Users.GetByIdAsync(teamMoneyTarget.CreatedByManagerId);
                 teamMoneyTargetDto = new SalesManTargetDTO
                 {
-                    Id = teamMoneyTarget.Id,
+                    Id = long.Parse(teamMoneyTarget.Id),
                     SalesManId = teamMoneyTarget.SalesManId,
                     SalesManName = "Team",
                     Year = teamMoneyTarget.Year,
@@ -579,7 +579,7 @@ namespace SoitMed.Services
             {
                 teamActivityTargetDto = new SalesManTargetDTO
                 {
-                    Id = teamActivityTarget.Id,
+                    Id = long.Parse(teamActivityTarget.Id),
                     SalesManId = teamActivityTarget.SalesManId,
                     SalesManName = "Team",
                     Year = teamActivityTarget.Year,

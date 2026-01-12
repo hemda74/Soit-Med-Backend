@@ -13,10 +13,10 @@ namespace SoitMed.Models
     public class SalesOffer : BaseEntity
     {
         #region Basic Information
-        public long? OfferRequestId { get; set; }
+        public string? OfferRequestId { get; set; }
         
         [Required]
-        public long ClientId { get; set; }
+        public string ClientId { get; set; }
         
         [Required]
         public string CreatedBy { get; set; } = string.Empty; // Sales Support ID

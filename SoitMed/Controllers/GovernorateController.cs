@@ -30,25 +30,28 @@ namespace SoitMed.Controllers
             var governorates = await _cacheService.GetOrCreateAsync(
                 CacheKeys.Reference.Governorates,
                 async () => await context.Governorates
-                    .Select(g => new GovernorateResponseDTO
+                    .Select(g => new GovernorateSimpleDTO
                     {
                         GovernorateId = g.GovernorateId,
                         Name = g.Name,
-                        CreatedAt = g.CreatedAt,
-                        IsActive = g.IsActive,
-                        EngineerCount = g.EngineerGovernorates.Count(eg => eg.IsActive)
+                        IsActive = g.IsActive
                     })
                     .ToListAsync(),
                 TimeSpan.FromHours(24)
             );
 
-            return Ok(governorates);
+            return Ok(new GovernorateResponseDTO
+            {
+                Success = true,
+                Governorates = governorates,
+                Message = "Governorates retrieved successfully"
+            });
         }
 
         [HttpGet("{id}")]
         [Authorize]
         [CaseInsensitiveRoleAuthorization("SuperAdmin", "Admin", "SalesManager", "SalesSupport")]
-        public async Task<IActionResult> GetGovernorate(int id)
+        public async Task<IActionResult> GetGovernorate(string id)
         {
             var response = await _cacheService.GetOrCreateAsync(
                 $"Governorates:{id}",
@@ -64,13 +67,11 @@ namespace SoitMed.Controllers
                         return null;
                     }
 
-                    return new GovernorateResponseDTO
+                    return new GovernorateSimpleDTO
                     {
                         GovernorateId = governorate.GovernorateId,
                         Name = governorate.Name,
-                        CreatedAt = governorate.CreatedAt,
-                        IsActive = governorate.IsActive,
-                        EngineerCount = governorate.EngineerGovernorates.Count(eg => eg.IsActive)
+                        IsActive = governorate.IsActive
                     };
                 },
                 TimeSpan.FromHours(12)
@@ -87,7 +88,7 @@ namespace SoitMed.Controllers
         // Required API endpoint: GET /governorates/{id}/Engineers
         [HttpGet("{id}/Engineers")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> GetGovernorateEngineers(int id)
+        public async Task<IActionResult> GetGovernorateEngineers(string id)
         {
             var governorate = await context.Governorates
                 .Include(g => g.EngineerGovernorates.Where(eg => eg.IsActive))
@@ -153,7 +154,7 @@ namespace SoitMed.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> UpdateGovernorate(int id, GovernorateDTO governorateDTO)
+        public async Task<IActionResult> UpdateGovernorate(string id, GovernorateDTO governorateDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -185,7 +186,7 @@ namespace SoitMed.Controllers
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> DeleteGovernorate(int id)
+        public async Task<IActionResult> DeleteGovernorate(string id)
         {
             var governorate = await context.Governorates
                 .Include(g => g.EngineerGovernorates)
@@ -214,7 +215,7 @@ namespace SoitMed.Controllers
         // Engineer assignment endpoints
         [HttpPost("{governorateId}/Engineers/{EngineerId}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> AssignEngineerToGovernorate(int governorateId, int EngineerId)
+        public async Task<IActionResult> AssignEngineerToGovernorate(string governorateId, string EngineerId)
         {
             var governorate = await context.Governorates.FindAsync(governorateId);
             if (governorate == null)
@@ -270,7 +271,7 @@ namespace SoitMed.Controllers
 
         [HttpDelete("{governorateId}/Engineers/{EngineerId}")]
         [Authorize(Roles = "SuperAdmin,Admin")]
-        public async Task<IActionResult> RemoveEngineerFromGovernorate(int governorateId, int EngineerId)
+        public async Task<IActionResult> RemoveEngineerFromGovernorate(string governorateId, string EngineerId)
         {
             var assignment = await context.EngineerGovernorates
                 .Include(eg => eg.Engineer)

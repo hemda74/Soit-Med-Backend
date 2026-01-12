@@ -12,7 +12,7 @@ namespace SoitMed.Models
         [Required]
         public int TaskId { get; set; } // Link to WeeklyPlanTask
 
-        public long? ClientId { get; set; } // Link to Client for history tracking
+        public string? ClientId { get; set; } // Link to Client for history tracking
 
         [Required]
         public string EmployeeId { get; set; } // Who made this progress

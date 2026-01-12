@@ -47,7 +47,7 @@ namespace SoitMed.Services
                     throw new ArgumentException($"Invalid client classification. Must be one of: {string.Join(", ", Models.ClientClassificationConstants.AllClassifications)}");
 
                 // Client resolution: If clientName is provided, search for existing client by name
-                long? resolvedClientId = null;
+                string? resolvedClientId = null;
                 if (!string.IsNullOrWhiteSpace(createDto.ClientName))
                 {
                     // Try to find existing client by name
@@ -68,12 +68,12 @@ namespace SoitMed.Services
                 }
 
                 // If clientId was explicitly provided, use it (for backward compatibility)
-                if (createDto.ClientId.HasValue)
+                if (!string.IsNullOrEmpty(createDto.ClientId))
                 {
-                    var client = await UnitOfWork.Clients.GetByIdAsync(createDto.ClientId.Value);
+                    var client = await UnitOfWork.Clients.GetByIdAsync(createDto.ClientId);
                     if (client == null)
-                        throw new ArgumentException($"Client not found. ClientId {createDto.ClientId.Value} does not exist.", nameof(createDto.ClientId));
-                    resolvedClientId = createDto.ClientId.Value;
+                        throw new ArgumentException($"Client not found. ClientId {createDto.ClientId} does not exist.", nameof(createDto.ClientId));
+                    resolvedClientId = createDto.ClientId;
                 }
 
                 var task = new WeeklyPlanTask
@@ -81,7 +81,7 @@ namespace SoitMed.Services
                     WeeklyPlanId = (int)createDto.WeeklyPlanId,
                     Title = createDto.Title,
                     Description = createDto.Notes, // Map Notes to Description
-                    ClientId = resolvedClientId,
+                    ClientId = resolvedClientId?.ToString(),
                     ClientStatus = createDto.ClientStatus,
                     ClientName = createDto.ClientName,
                     ClientPhone = createDto.ClientPhone,
@@ -133,7 +133,7 @@ namespace SoitMed.Services
                 foreach (var createDto in tasksDto)
                 {
                     // Client resolution: If clientName is provided, search for existing client by name
-                    long? resolvedClientId = null;
+                    string? resolvedClientId = null;
                     if (!string.IsNullOrWhiteSpace(createDto.ClientName))
                     {
                         // Try to find existing client by name
@@ -154,12 +154,12 @@ namespace SoitMed.Services
                     }
 
                     // If clientId was explicitly provided, use it (for backward compatibility)
-                    if (createDto.ClientId.HasValue)
+                    if (!string.IsNullOrEmpty(createDto.ClientId))
                     {
-                        var client = await UnitOfWork.Clients.GetByIdAsync(createDto.ClientId.Value);
+                        var client = await UnitOfWork.Clients.GetByIdAsync(createDto.ClientId);
                         if (client == null)
-                            throw new ArgumentException($"Client not found for task '{createDto.Title}'. ClientId {createDto.ClientId.Value} does not exist.");
-                        resolvedClientId = createDto.ClientId.Value;
+                            throw new ArgumentException($"Client not found for task '{createDto.Title}'. ClientId {createDto.ClientId} does not exist.");
+                        resolvedClientId = createDto.ClientId;
                     }
 
                     var task = new WeeklyPlanTask
@@ -167,7 +167,7 @@ namespace SoitMed.Services
                         WeeklyPlanId = weeklyPlanId,
                         Title = createDto.Title,
                         Description = createDto.Notes, // Map Notes to Description
-                        ClientId = resolvedClientId,
+                        ClientId = resolvedClientId?.ToString(),
                         ClientStatus = createDto.ClientStatus,
                         ClientName = createDto.ClientName,
                         ClientPhone = createDto.ClientPhone,
@@ -302,14 +302,14 @@ namespace SoitMed.Services
                     task.Title = updateDto.Title;
 
                 // Update ClientId only if provided - validate only if setting to a non-null value
-                if (updateDto.ClientId.HasValue)
+                if (!string.IsNullOrEmpty(updateDto.ClientId))
                 {
-                    var client = await UnitOfWork.Clients.GetByIdAsync(updateDto.ClientId.Value);
+                    var client = await UnitOfWork.Clients.GetByIdAsync(updateDto.ClientId);
                     if (client == null)
-                        throw new ArgumentException($"Client not found. ClientId {updateDto.ClientId.Value} does not exist.", nameof(updateDto.ClientId));
+                        throw new ArgumentException($"Client not found. ClientId {updateDto.ClientId} does not exist.", nameof(updateDto.ClientId));
                     task.ClientId = updateDto.ClientId;
                 }
-                else if (updateDto.ClientId == null && updateDto.ClientStatus == "New")
+                else if (string.IsNullOrEmpty(updateDto.ClientId) && updateDto.ClientStatus == "New")
                 {
                     // If explicitly setting to New client, clear ClientId
                     task.ClientId = null;
@@ -450,9 +450,9 @@ namespace SoitMed.Services
                     return false;
 
                 // Validate client ONLY if ClientStatus is "Old" and ClientId is provided
-                if (createDto.ClientStatus == "Old" && createDto.ClientId.HasValue)
+                if (createDto.ClientStatus == "Old" && !string.IsNullOrEmpty(createDto.ClientId))
                 {
-                    var client = await UnitOfWork.Clients.GetByIdAsync(createDto.ClientId.Value);
+                    var client = await UnitOfWork.Clients.GetByIdAsync(createDto.ClientId);
                     if (client == null)
                         return false;
                 }
@@ -502,11 +502,11 @@ namespace SoitMed.Services
                     }).ToList();
 
                     // Get offers created from these offer requests
-                    if (offerRequestsData.Any(or => or.CreatedOfferId.HasValue))
+                    if (offerRequestsData.Any(or => !string.IsNullOrEmpty(or.CreatedOfferId)))
                     {
                         var offerIds = offerRequestsData
-                            .Where(or => or.CreatedOfferId.HasValue)
-                            .Select(or => or.CreatedOfferId ?? 0)
+                            .Where(or => !string.IsNullOrEmpty(or.CreatedOfferId))
+                            .Select(or => or.CreatedOfferId)
                             .Distinct()
                             .ToList();
 
@@ -531,7 +531,7 @@ namespace SoitMed.Services
                             
                             return new SalesOfferSimpleDTO
                             {
-                                Id = o.Id,
+                                Id = long.Parse(o.Id),
                                 Products = o.Products,
                                 TotalAmount = o.TotalAmount,
                                 ValidUntil = validUntilList,
@@ -545,14 +545,14 @@ namespace SoitMed.Services
                         {
                             var dealIds = offersData
                                 .Where(o => o.Deal != null)
-                                .Select(o => o.Deal?.Id ?? 0)
+                                .Select(o => o.Deal?.Id != null ? long.Parse(o.Deal.Id) : 0)
                                 .Distinct()
                                 .ToList();
 
                             var dealsData = await UnitOfWork.SalesDeals.GetByIdsAsync(dealIds);
                             deals = dealsData.Select(d => new SalesDealSimpleDTO
                                 {
-                                    Id = d.Id,
+                                    Id = long.Parse(d.Id),
                                     DealValue = d.DealValue,
                                     ClosedDate = d.ClosedDate,
                                     Status = d.Status,
@@ -593,7 +593,7 @@ namespace SoitMed.Services
                 UpdatedAt = task.UpdatedAt,
                 Progresses = progresses.Where(p => p != null).Select(p => new TaskProgressSimpleDTO
                 {
-                    Id = p.Id,
+                    Id = long.Parse(p.Id),
                     ProgressDate = p.ProgressDate,
                     ProgressType = p.ProgressType,
                     Description = p.Description,

@@ -8,7 +8,7 @@ namespace SoitMed.Models
     public class OfferTerms : BaseEntity
     {
         [Required]
-        public long OfferId { get; set; }
+        public string OfferId { get; set; } = string.Empty;
         
         [MaxLength(500)]
         public string? WarrantyPeriod { get; set; }

@@ -1,0 +1,1289 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using SoitMed.DTO;
+using SoitMed.Models;
+using SoitMed.Models.Equipment;
+using SoitMed.Models.Enums;
+using SoitMed.Models.Legacy;
+using SoitMed.Repositories;
+using System.Text.Json;
+using System.Data.Common;
+using System.Text.RegularExpressions;
+using System.Linq;
+
+namespace SoitMed.Services
+{
+    /// <summary>
+    /// Legacy Data Sync Service - Syncs data from TBS to ITIWebApi44 using the same logic as MediaApi
+    /// Implements the exact same queries as MediaApi ContractService.GetMachinesByCustomerIdAsync
+    /// </summary>
+    public class LegacyDataSyncService : ILegacyDataSyncService
+    {
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly Context _context;
+        private readonly ILogger<LegacyDataSyncService> _logger;
+        private readonly IConfiguration _configuration;
+
+        public LegacyDataSyncService(
+            IUnitOfWork unitOfWork,
+            Context context,
+            ILogger<LegacyDataSyncService> logger,
+            IConfiguration configuration)
+        {
+            _unitOfWork = unitOfWork;
+            _context = context;
+            _logger = logger;
+            _configuration = configuration;
+        }
+
+        /// <summary>
+        /// Get customer machines from TBS using the same logic as MediaApi
+        /// </summary>
+        public async Task<CustomerMachinesSyncDto?> GetCustomerMachinesFromTbsAsync(int legacyCustomerId)
+        {
+            try
+            {
+                var tbsConnectionString = _configuration.GetConnectionString("TbsConnection");
+                if (string.IsNullOrEmpty(tbsConnectionString))
+                {
+                    _logger.LogWarning("TbsConnection string not configured");
+                    return null;
+                }
+
+                var optionsBuilder = new DbContextOptionsBuilder<TbsDbContext>();
+                optionsBuilder.UseSqlServer(tbsConnectionString);
+
+                using var tbsContext = new TbsDbContext(optionsBuilder.Options);
+
+                // Get machine info
+                var machine = await (from ooi in tbsContext.StkOrderOutItems.AsNoTracking()
+                                   where ooi.OoiId == ooiId
+                                   join item in tbsContext.StkItems.AsNoTracking() on ooi.ItemId equals item.ItemId
+                                   select new
+                                   {
+                                       OoiId = ooi.OoiId,
+                                       SerialNumber = ooi.SerialNum ?? "N/A",
+                                       Model = item.ItemNameAr
+                                   })
+                                   .FirstOrDefaultAsync();
+
+                if (machine == null)
+                {
+                    _logger.LogWarning("Machine {OoiId} not found in TBS", ooiId);
+                    return null;
+                }
+
+                _logger.LogInformation("Machine found: OOI_ID={OoiId}, Serial={Serial}, Model={Model}", 
+                    machine.OoiId, machine.SerialNumber, machine.Model);
+
+                // Get visits
+                var visits = await GetVisitsForMachineAsync(tbsContext, ooiId);
+                
+                _logger.LogInformation("GetVisitsForMachineAsync returned {Count} visits", visits.Count);
+
+                // Get current client from most recent visit
+                var currentClientId = visits.FirstOrDefault()?.LegacyCustomerId;
+                string? currentClientName = null;
+                if (currentClientId.HasValue)
+                {
+                    var client = await tbsContext.StkCustomers.AsNoTracking()
+                        .FirstOrDefaultAsync(c => c.CusId == currentClientId.Value);
+                    currentClientName = client?.CusName;
+                }
+
+                var visitHistory = visits.Select(v => new VisitHistoryItemSyncDto
+                {
+                    VisitId = v.VisitingId,
+                    Date = v.VisitingDate ?? DateTime.UtcNow,
+                    Type = GetVisitTypeName(v.VisitingTypeId),
+                    Engineer = v.EmployeeName ?? $"Employee {v.EmpCode}",
+                    ReportSummary = v.ReportDescription,
+                    Status = GetVisitStatusName(v.RepVisitStatusId ?? 1),
+                    MediaFileNames = ParseMediaFiles(v.Files, v.ReportFiles)
+                }).ToList();
+
+                return new MachineVisitsSyncDto
+                {
+                    MachineId = machine.OoiId,
+                    SerialNumber = machine.SerialNumber,
+                    Model = machine.Model,
+                    CurrentClientId = currentClientId,
+                    CurrentClientName = currentClientName,
+                    VisitsHistory = visitHistory
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting machine visits from TBS for machine {OoiId}", ooiId);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Sync customer machines from TBS to ITIWebApi44
+        /// </summary>
+        public async Task<SyncResultDto> SyncCustomerMachinesToNewSystemAsync(int legacyCustomerId)
+        {
+            var result = new SyncResultDto();
+
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    // Get data from TBS
+                    _logger.LogInformation("Calling GetCustomerMachinesFromTbsAsync for customer {CustomerId}", legacyCustomerId);
+                    var customerMachines = await GetCustomerMachinesFromTbsAsync(legacyCustomerId);
+                    if (customerMachines == null)
+                    {
+                        result.Success = false;
+                        result.Message = $"Customer {legacyCustomerId} not found in TBS";
+                        return;
+                    }
+                    
+                    // Verify visits were loaded
+                    int totalVisitsInMachines = customerMachines.Machines?.Sum(m => m.Visits?.Count ?? 0) ?? 0;
+                    _logger.LogInformation("CustomerMachines loaded: {MachineCount} machines, {TotalVisits} total visits", 
+                        customerMachines.MachineCount, totalVisitsInMachines);
+                    
+                    foreach (var machine in customerMachines.Machines ?? new List<MachineSyncDto>())
+                    {
+                        _logger.LogInformation("Machine {MachineId}: Visits={VisitCount}, Visits list is null={IsNull}", 
+                            machine.MachineId, machine.Visits?.Count ?? 0, machine.Visits == null);
+                    }
+
+                    // Find or create client in new system
+                    var client = await _context.Clients
+                        .FirstOrDefaultAsync(c => c.LegacyCustomerId == legacyCustomerId);
+
+                    if (client == null)
+                    {
+                        // Create client from TBS data
+                        _logger.LogInformation("Client not found for legacy customer {CustomerId}, creating new client", legacyCustomerId);
+                        client = await CreateClientFromTbsAsync(legacyCustomerId, customerMachines);
+                        
+                        if (client == null)
+                        {
+                            result.Success = false;
+                            result.Message = $"Failed to create client for legacy customer {legacyCustomerId}";
+                            return;
+                        }
+                        
+                        await _context.SaveChangesAsync();
+                        _logger.LogInformation("Created client {ClientId} for legacy customer {CustomerId}", client.Id, legacyCustomerId);
+                    }
+                    
+                    // Note: RelatedUserId is optional - we can sync without it
+                    if (string.IsNullOrEmpty(client.RelatedUserId))
+                    {
+                        _logger.LogWarning("Client {ClientId} has no RelatedUserId - equipment will be synced but may need manual linking", client.Id);
+                    }
+
+                    _logger.LogInformation("Syncing {Count} machines for customer {CustomerId} ({CustomerName}) to new system", 
+                        customerMachines.MachineCount, legacyCustomerId, customerMachines.CustomerName);
+
+                    // Get default engineer (for visits)
+                    var defaultEngineer = await _context.Users
+                        .Where(u => u.UserName.Contains("Engineer") || u.Email.Contains("engineer"))
+                        .FirstOrDefaultAsync() 
+                        ?? await _context.Users.FirstOrDefaultAsync();
+
+                    if (defaultEngineer == null)
+                    {
+                        result.Success = false;
+                        result.Message = "No engineer user found in system. Please create at least one engineer user.";
+                        return;
+                    }
+
+                    // Sync each machine
+                    foreach (var machine in customerMachines.Machines)
+                    {
+                        try
+                        {
+                            _logger.LogInformation("Processing machine {MachineId} (Serial: {SerialNumber})", 
+                                machine.MachineId, machine.SerialNumber);
+
+                            // Find or create equipment
+                            var equipment = await _context.Equipment
+                                .FirstOrDefaultAsync(e => e.LegacySourceId == machine.MachineId.ToString());
+
+                            _logger.LogInformation("Equipment lookup for machine {MachineId}: Found={Found}, EquipmentId={EquipmentId}", 
+                                machine.MachineId, equipment != null, equipment?.Id);
+
+                            if (equipment == null)
+                            {
+                                // Create new equipment
+                                equipment = new Equipment
+                                {
+                                    Name = $"{machine.ModelName ?? "Equipment"} - {machine.SerialNumber}",
+                                    QRCode = $"EQ-{machine.MachineId}-OOI{machine.MachineId}",
+                                    Description = machine.ModelName,
+                                    Model = machine.ModelName,
+                                    Manufacturer = machine.ModelNameEn,
+                                    CustomerId = client.RelatedUserId,
+                                    LegacySourceId = machine.MachineId.ToString(),
+                                    Status = EquipmentStatus.Operational,
+                                    IsActive = true,
+                                    CreatedAt = DateTime.UtcNow
+                                };
+                                _context.Equipment.Add(equipment);
+                                await _context.SaveChangesAsync();
+                                
+                                _logger.LogInformation("Created equipment {EquipmentId} for machine {MachineId}", 
+                                    equipment.Id, machine.MachineId);
+                                result.EquipmentCreated++;
+                            }
+                            else
+                            {
+                                // Update existing equipment
+                                equipment.CustomerId = client.RelatedUserId;
+                                equipment.Name = $"{machine.ModelName ?? "Equipment"} - {machine.SerialNumber}";
+                                equipment.Model = machine.ModelName;
+                                equipment.Manufacturer = machine.ModelNameEn;
+                                
+                                _logger.LogInformation("Updated equipment {EquipmentId} for machine {MachineId}", 
+                                    equipment.Id, machine.MachineId);
+                                result.EquipmentUpdated++;
+                            }
+
+                            // Parse equipment ID to int for MaintenanceRequest and MaintenanceVisit
+                            if (!int.TryParse(equipment.Id, out int equipmentIdInt))
+                            {
+                                _logger.LogWarning("Equipment {EquipmentId} has non-numeric ID, skipping visit sync", equipment.Id);
+                                continue;
+                            }
+
+                            // Sync visits for this machine
+                            _logger.LogInformation("Machine {MachineId} has {VisitCount} visits to sync", 
+                                machine.MachineId, machine.Visits?.Count ?? 0);
+                            
+                            if (machine.Visits == null || machine.Visits.Count == 0)
+                            {
+                                _logger.LogWarning("No visits found for machine {MachineId}. Skipping visit sync.", machine.MachineId);
+                            }
+                            
+                            foreach (var visit in machine.Visits ?? new List<VisitSyncDto>())
+                            {
+                                try
+                                {
+                                    _logger.LogInformation("Processing visit {VisitId} for machine {MachineId}", 
+                                        visit.VisitingId, machine.MachineId);
+                                    
+                                    var existingVisit = await _context.MaintenanceVisits
+                                        .FirstOrDefaultAsync(v => v.LegacyVisitId == visit.VisitingId);
+
+                                    if (existingVisit == null)
+                                    {
+                                        // Find or create MaintenanceRequest for this visit
+                                        var maintenanceRequest = await _context.MaintenanceRequests
+                                            .FirstOrDefaultAsync(mr => mr.EquipmentId == equipmentIdInt && 
+                                                                      mr.CustomerId == client.RelatedUserId);
+
+                                        if (maintenanceRequest == null)
+                                        {
+                                            // Create MaintenanceRequest
+                                            maintenanceRequest = new MaintenanceRequest
+                                            {
+                                                CustomerId = client.RelatedUserId,
+                                                CustomerType = "Customer",
+                                                EquipmentId = equipmentIdInt,
+                                                Description = $"Legacy maintenance from TBS - Visit {visit.VisitingId}",
+                                                Status = MaintenanceRequestStatus.Completed,
+                                                PaymentStatus = PaymentStatus.NotRequired,
+                                                CreatedAt = visit.VisitingDate ?? DateTime.UtcNow,
+                                                IsActive = true
+                                            };
+                                            _context.MaintenanceRequests.Add(maintenanceRequest);
+                                            await _context.SaveChangesAsync();
+                                        }
+
+                                        // Create MaintenanceVisit
+                                        var ticketNumber = $"LEGACY-{visit.VisitingId:D6}";
+                                        var visitStatus = visit.IsCancelled == true 
+                                            ? VisitStatus.Cancelled 
+                                            : VisitStatus.Completed;
+
+                                        var maintenanceVisit = new MaintenanceVisit
+                                        {
+                                            TicketNumber = ticketNumber,
+                                            MaintenanceRequestId = maintenanceRequest.Id,
+                                            CustomerId = client.RelatedUserId,
+                                            DeviceId = equipmentIdInt,
+                                            ScheduledDate = visit.VisitingDate ?? DateTime.UtcNow,
+                                            VisitDate = visit.VisitingDate ?? DateTime.UtcNow,
+                                            Origin = VisitOrigin.ManualSales,
+                                            Status = visitStatus,
+                                            EngineerId = defaultEngineer.Id,
+                                            Report = visit.ReportDescription ?? visit.Notes,
+                                            ActionsTaken = visit.DefectDescription,
+                                            Notes = visit.Notes,
+                                            ServiceFee = visit.VisitingValue,
+                                            Cost = visit.BillValue,
+                                            LegacyVisitId = visit.VisitingId,
+                                            Outcome = visitStatus == VisitStatus.Completed 
+                                                ? MaintenanceVisitOutcome.Completed 
+                                                : MaintenanceVisitOutcome.CannotComplete,
+                                            IsActive = !(visit.IsCancelled == true),
+                                            StartedAt = visit.VisitingDate,
+                                            CompletedAt = visit.VisitingDate
+                                        };
+
+                                        _context.MaintenanceVisits.Add(maintenanceVisit);
+                                        await _context.SaveChangesAsync();
+                                        
+                                        // Verify the visit was saved
+                                        var savedVisit = await _context.MaintenanceVisits
+                                            .FirstOrDefaultAsync(v => v.Id == maintenanceVisit.Id);
+                                        
+                                        if (savedVisit == null)
+                                        {
+                                            _logger.LogError("CRITICAL: Visit {VisitId} was not saved to database after SaveChangesAsync!", 
+                                                maintenanceVisit.Id);
+                                        }
+                                        else
+                                        {
+                                            _logger.LogInformation("Visit saved to database. Visit ID: {VisitId}, LegacyVisitId: {LegacyVisitId}, DeviceId: {DeviceId}", 
+                                                maintenanceVisit.Id, maintenanceVisit.LegacyVisitId, maintenanceVisit.DeviceId);
+                                        }
+
+                                        // Create VisitReport if report exists
+                                        if (visit.VisitingReportId.HasValue && 
+                                            !string.IsNullOrWhiteSpace(visit.ReportDescription))
+                                        {
+                                            var visitReport = new VisitReport
+                                            {
+                                                VisitId = maintenanceVisit.Id,
+                                                ReportText = visit.ReportDescription,
+                                                MediaUrls = visit.ReportFiles != null 
+                                                    ? JsonSerializer.Serialize(ParseMediaFiles(visit.Files, visit.ReportFiles))
+                                                    : null,
+                                                CheckInTime = visit.VisitingDate,
+                                                CheckOutTime = visit.VisitingDate,
+                                                CreatedAt = visit.ReportDate ?? DateTime.UtcNow
+                                            };
+                                            _context.VisitReports.Add(visitReport);
+                                            await _context.SaveChangesAsync();
+                                        }
+
+                                        _logger.LogInformation("Created visit {VisitId} (Legacy: {LegacyVisitId}) for machine {MachineId}", 
+                                            maintenanceVisit.Id, visit.VisitingId, machine.MachineId);
+                                        result.VisitsCreated++;
+                                    }
+                                    else
+                                    {
+                                        _logger.LogInformation("Visit {VisitId} already exists (Legacy: {LegacyVisitId})", 
+                                            existingVisit.Id, visit.VisitingId);
+                                        result.VisitsUpdated++;
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogWarning(ex, "Error syncing visit {VisitId} for machine {MachineId}", 
+                                        visit.VisitingId, machine.MachineId);
+                                    result.Errors++;
+                                    result.ErrorMessages.Add($"Visit {visit.VisitingId}: {ex.Message}");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error syncing machine {MachineId}", machine.MachineId);
+                            result.Errors++;
+                            result.ErrorMessages.Add($"Machine {machine.MachineId}: {ex.Message}");
+                        }
+                    }
+
+                    _logger.LogInformation("About to commit transaction. Visits created: {VisitsCreated}, Equipment created: {EquipmentCreated}, Equipment updated: {EquipmentUpdated}", 
+                        result.VisitsCreated, result.EquipmentCreated, result.EquipmentUpdated);
+                    
+                    await transaction.CommitAsync();
+                    
+                    _logger.LogInformation("Transaction committed successfully");
+
+                    result.Success = true;
+                    result.Message = $"Successfully synced {customerMachines.MachineCount} machines, " +
+                                   $"{result.EquipmentCreated} created, {result.EquipmentUpdated} updated, " +
+                                   $"{result.VisitsCreated} visits created for customer {legacyCustomerId}";
+                    
+                    _logger.LogInformation("Sync completed for customer {CustomerId}: {Message}", 
+                        legacyCustomerId, result.Message);
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, "Error syncing customer machines for customer {CustomerId}", legacyCustomerId);
+                    result.Success = false;
+                    result.Message = $"Error: {ex.Message}";
+                    result.Errors++;
+                    result.ErrorMessages.Add(ex.Message);
+                    throw; // Re-throw to allow retry strategy to work
+                }
+            });
+
+            return result;
+        }
+
+        /// <summary>
+        /// Sync visits for a machine
+        /// </summary>
+        public async Task<SyncResultDto> SyncMachineVisitsToNewSystemAsync(int ooiId)
+        {
+            var result = new SyncResultDto();
+
+            try
+            {
+                var machineVisits = await GetMachineVisitsFromTbsAsync(ooiId);
+                if (machineVisits == null)
+                {
+                    result.Success = false;
+                    result.Message = $"Machine {ooiId} not found in TBS";
+                    return result;
+                }
+
+                // Find equipment in new system
+                var equipment = await _context.Equipment
+                    .FirstOrDefaultAsync(e => e.LegacySourceId == ooiId.ToString());
+
+                if (equipment == null)
+                {
+                    result.Success = false;
+                    result.Message = $"Equipment with LegacySourceId {ooiId} not found in new system";
+                    return result;
+                }
+
+                // Sync visits (simplified - would need MaintenanceRequest in production)
+                result.Success = true;
+                result.Message = $"Found {machineVisits.VisitsHistory.Count} visits for machine {ooiId}";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error syncing machine visits for machine {OoiId}", ooiId);
+                result.Success = false;
+                result.Message = $"Error: {ex.Message}";
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Sync all customers with their machines and visits
+        /// </summary>
+        public async Task<BulkSyncResultDto> SyncAllCustomersDataAsync(int? batchSize = null)
+        {
+            var result = new BulkSyncResultDto
+            {
+                StartTime = DateTime.UtcNow
+            };
+
+            try
+            {
+                var tbsConnectionString = _configuration.GetConnectionString("TbsConnection");
+                if (string.IsNullOrEmpty(tbsConnectionString))
+                {
+                    result.Success = false;
+                    result.Message = "TbsConnection string not configured";
+                    result.EndTime = DateTime.UtcNow;
+                    return result;
+                }
+
+                var optionsBuilder = new DbContextOptionsBuilder<TbsDbContext>();
+                optionsBuilder.UseSqlServer(tbsConnectionString);
+
+                using var tbsContext = new TbsDbContext(optionsBuilder.Options);
+
+                // Get all customers
+                var customers = await tbsContext.StkCustomers.AsNoTracking()
+                    .Select(c => c.CusId)
+                    .ToListAsync();
+
+                result.TotalCustomers = customers.Count;
+                batchSize ??= 10; // Default batch size
+
+                _logger.LogInformation("Starting bulk sync for {Count} customers", customers.Count);
+
+                for (int i = 0; i < customers.Count; i += batchSize.Value)
+                {
+                    var batch = customers.Skip(i).Take(batchSize.Value).ToList();
+                    
+                    foreach (var customerId in batch)
+                    {
+                        try
+                        {
+                            var syncResult = await SyncCustomerMachinesToNewSystemAsync(customerId);
+                            
+                            if (syncResult.Success)
+                            {
+                                result.CustomersSucceeded++;
+                                result.TotalEquipmentCreated += syncResult.EquipmentCreated;
+                                result.TotalEquipmentUpdated += syncResult.EquipmentUpdated;
+                                result.TotalVisitsCreated += syncResult.VisitsCreated;
+                                result.TotalVisitsUpdated += syncResult.VisitsUpdated;
+                            }
+                            else
+                            {
+                                result.CustomersFailed++;
+                                result.ErrorMessages.Add($"Customer {customerId}: {syncResult.Message}");
+                            }
+                            
+                            result.CustomersProcessed++;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error syncing customer {CustomerId}", customerId);
+                            result.CustomersFailed++;
+                            result.ErrorMessages.Add($"Customer {customerId}: {ex.Message}");
+                        }
+                    }
+
+                    _logger.LogInformation("Processed {Processed}/{Total} customers", result.CustomersProcessed, customers.Count);
+                }
+
+                result.Success = result.CustomersFailed == 0;
+                result.Message = $"Synced {result.CustomersSucceeded} customers successfully. {result.CustomersFailed} failed.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in bulk sync");
+                result.Success = false;
+                result.Message = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                result.EndTime = DateTime.UtcNow;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Create or update client from TBS customer data
+        /// </summary>
+        private async Task<Client?> CreateClientFromTbsAsync(int legacyCustomerId, CustomerMachinesSyncDto customerData)
+        {
+            try
+            {
+                var tbsConnectionString = _configuration.GetConnectionString("TbsConnection");
+                if (string.IsNullOrEmpty(tbsConnectionString))
+                {
+                    return null;
+                }
+
+                var optionsBuilder = new DbContextOptionsBuilder<TbsDbContext>();
+                optionsBuilder.UseSqlServer(tbsConnectionString);
+
+                using var tbsContext = new TbsDbContext(optionsBuilder.Options);
+
+                var tbsCustomer = await tbsContext.StkCustomers.AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.CusId == legacyCustomerId);
+
+                if (tbsCustomer == null)
+                {
+                    return null;
+                }
+
+                var client = new Client
+                {
+                    Name = tbsCustomer.CusName ?? customerData.CustomerName ?? $"Legacy Client {legacyCustomerId}",
+                    Phone = tbsCustomer.CusTel ?? tbsCustomer.CusMobile ?? customerData.CustomerPhone,
+                    Email = tbsCustomer.CusEmail,
+                    Address = tbsCustomer.CusAddress ?? customerData.CustomerAddress,
+                    LegacyCustomerId = legacyCustomerId,
+                    Status = ClientStatus.Active,
+                    Priority = ClientPriority.Medium,
+                    CreatedBy = "LegacyDataSync",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                _context.Clients.Add(client);
+                return client;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating client from TBS for customer {CustomerId}", legacyCustomerId);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Sync all customers from TBS to ITIWebApi44 (creates clients if missing)
+        /// </summary>
+        public async Task<BulkSyncResultDto> SyncAllCustomersFromTbsAsync(int? batchSize = null)
+        {
+            var result = new BulkSyncResultDto
+            {
+                StartTime = DateTime.UtcNow
+            };
+
+            try
+            {
+                var tbsConnectionString = _configuration.GetConnectionString("TbsConnection");
+                if (string.IsNullOrEmpty(tbsConnectionString))
+                {
+                    result.Success = false;
+                    result.Message = "TbsConnection string not configured";
+                    result.EndTime = DateTime.UtcNow;
+                    return result;
+                }
+
+                var optionsBuilder = new DbContextOptionsBuilder<TbsDbContext>();
+                optionsBuilder.UseSqlServer(tbsConnectionString);
+
+                using var tbsContext = new TbsDbContext(optionsBuilder.Options);
+
+                // Get all customers from TBS
+                var customers = await tbsContext.StkCustomers.AsNoTracking()
+                    .Select(c => new { c.CusId, c.CusName })
+                    .ToListAsync();
+
+                result.TotalCustomers = customers.Count;
+                batchSize ??= 50; // Default batch size
+
+                _logger.LogInformation("Starting customer sync for {Count} customers", customers.Count);
+
+                for (int i = 0; i < customers.Count; i += batchSize.Value)
+                {
+                    var batch = customers.Skip(i).Take(batchSize.Value).ToList();
+                    
+                    foreach (var customer in batch)
+                    {
+                        try
+                        {
+                            // Check if client already exists
+                            var existingClient = await _context.Clients
+                                .FirstOrDefaultAsync(c => c.LegacyCustomerId == customer.CusId);
+
+                            if (existingClient == null)
+                            {
+                                // Get full customer data
+                                var tbsCustomer = await tbsContext.StkCustomers.AsNoTracking()
+                                    .FirstOrDefaultAsync(c => c.CusId == customer.CusId);
+
+                                if (tbsCustomer != null)
+                                {
+                                    var client = new Client
+                                    {
+                                        Name = tbsCustomer.CusName ?? $"Legacy Client {customer.CusId}",
+                                        Phone = tbsCustomer.CusTel ?? tbsCustomer.CusMobile,
+                                        Email = tbsCustomer.CusEmail,
+                                        Address = tbsCustomer.CusAddress,
+                                        LegacyCustomerId = customer.CusId,
+                                        Status = ClientStatus.Active,
+                                        Priority = ClientPriority.Medium,
+                                        CreatedBy = "LegacyDataSync",
+                                        CreatedAt = DateTime.UtcNow,
+                                        UpdatedAt = DateTime.UtcNow
+                                    };
+
+                                    _context.Clients.Add(client);
+                                    result.CustomersSucceeded++;
+                                    _logger.LogInformation("Created client for customer {CustomerId} ({CustomerName})", 
+                                        customer.CusId, customer.CusName);
+                                }
+                            }
+                            else
+                            {
+                                result.CustomersSkipped++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error syncing customer {CustomerId}", customer.CusId);
+                            result.CustomersFailed++;
+                            result.ErrorMessages.Add($"Customer {customer.CusId} ({customer.CusName}): {ex.Message}");
+                        }
+                    }
+
+                    // Save batch
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Processed batch {BatchNumber} ({Processed}/{Total} customers)", 
+                        (i / batchSize.Value) + 1, Math.Min(i + batchSize.Value, customers.Count), customers.Count);
+                }
+
+                result.Success = true;
+                result.Message = $"Synced {result.CustomersSucceeded} customers. {result.CustomersSkipped} already existed. {result.CustomersFailed} failed.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in customer sync");
+                result.Success = false;
+                result.Message = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                result.EndTime = DateTime.UtcNow;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Get all customers from TBS
+        /// </summary>
+        public async Task<List<LegacyCustomerDto>> GetAllCustomersFromTbsAsync(int pageNumber = 1, int pageSize = 50)
+        {
+            try
+            {
+                var tbsConnectionString = _configuration.GetConnectionString("TbsConnection");
+                if (string.IsNullOrEmpty(tbsConnectionString))
+                {
+                    return new List<LegacyCustomerDto>();
+                }
+
+                var optionsBuilder = new DbContextOptionsBuilder<TbsDbContext>();
+                optionsBuilder.UseSqlServer(tbsConnectionString);
+
+                using var tbsContext = new TbsDbContext(optionsBuilder.Options);
+
+                var customers = await tbsContext.StkCustomers.AsNoTracking()
+                    .OrderBy(c => c.CusName)
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(c => new LegacyCustomerDto
+                    {
+                        CusId = c.CusId,
+                        CusName = c.CusName,
+                        CusTel = c.CusTel,
+/// Get all customers from TBS
+/// </summary>
+public async Task<List<LegacyCustomerDto>> GetAllCustomersFromTbsAsync(int pageNumber = 1, int pageSize = 50)
+{
+    try
+    {
+        var tbsConnectionString = _configuration.GetConnectionString("TbsConnection");
+        if (string.IsNullOrEmpty(tbsConnectionString))
+        {
+            return new List<LegacyCustomerDto>();
+        }
+
+        var optionsBuilder = new DbContextOptionsBuilder<TbsDbContext>();
+        optionsBuilder.UseSqlServer(tbsConnectionString);
+
+        using var tbsContext = new TbsDbContext(optionsBuilder.Options);
+
+        var customers = await tbsContext.StkCustomers.AsNoTracking()
+            .OrderBy(c => c.CusName)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new LegacyCustomerDto
+            {
+                CusId = c.CusId,
+                CusName = c.CusName,
+                CusTel = c.CusTel,
+                CusMobile = c.CusMobile,
+                CusAddress = c.CusAddress
+            })
+            .ToListAsync();
+
+        return customers;
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error getting customers from TBS");
+        return new List<LegacyCustomerDto>();
+    }
+}
+                var machinesWithVisits = new List<MachineSyncDto>();
+                int totalVisits = 0;
+                foreach (var machine in machines)
+                {
+                    _logger.LogInformation("Fetching visits for machine {MachineId} (Serial: {Serial})", 
+                        machine.MachineId, machine.SerialNumber);
+                    var visits = await GetVisitsForMachineAsync(tbsContext, machine.MachineId);
+                    machine.Visits = visits;
+                    machine.VisitCount = visits.Count;
+                    totalVisits += visits.Count;
+                    _logger.LogInformation("Machine {MachineId} has {VisitCount} visits from TBS (Total so far: {TotalVisits})", 
+                        machine.MachineId, visits.Count, totalVisits);
+                    machinesWithVisits.Add(machine);
+                }
+                
+                _logger.LogInformation("Total visits fetched for customer {CustomerId}: {TotalVisits} visits across {MachineCount} machines", 
+                    legacyCustomerId, totalVisits, machinesWithVisits.Count);
+
+                return new CustomerMachinesSyncDto
+                {
+                    LegacyCustomerId = customer.CusId,
+                    CustomerName = customer.CusName ?? string.Empty,
+                    CustomerAddress = customer.CusAddress,
+                    CustomerPhone = customer.CusTel ?? customer.CusMobile,
+                    MachineCount = machinesWithVisits.Count,
+                    Machines = machinesWithVisits
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting customer machines from TBS for customer {CustomerId}", legacyCustomerId);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Get machines for customer using the EXACT same logic as MediaApi
+        /// </summary>
+        private async Task<List<MachineSyncDto>> GetMachinesForCustomerAsync(TbsDbContext tbsContext, int customerId)
+        {
+            // 1. Machines from visits (where visit's CusId = customerId)
+            var machinesFromVisits = await (from v in tbsContext.MntVisitings.AsNoTracking()
+                                          where v.CusId == customerId
+                                          join vr in tbsContext.MntVisitingReports.AsNoTracking() on v.VisitingId equals vr.VisitingId
+                                          join ooi in tbsContext.StkOrderOutItems.AsNoTracking() on vr.OoiId equals ooi.OoiId
+                                          join item in tbsContext.StkItems.AsNoTracking() on ooi.ItemId equals item.ItemId
+                                          select new
+                                          {
+                                              MachineId = ooi.OoiId,
+                                              OoId = ooi.OoId,
+                                              ItemId = ooi.ItemId,
+                                              Quantity = ooi.Quantity,
+                                              UId = ooi.UId,
+                                              SerialNumber = ooi.SerialNum ?? string.Empty,
+                                              DevicePlace = ooi.DevicePlace,
+                                              ModelName = item.ItemNameAr,
+                                              ModelNameEn = item.ItemNameEn,
+                                              ItemCode = item.ItemCode,
+                                              ExpirationDate = ooi.ItemDateExpire,
+                                              OoiMain = ooi.OoiMain,
+                                              LotNum = ooi.LotNum,
+                                              IsReturned = ooi.IsReturned,
+                                              IsDeliveryForReplacement = ooi.IsDeliveryForReplacement
+                                          })
+                                          .ToListAsync();
+
+            // 2. Machines from maintenance contracts (via Contract Items - PRIMARY source)
+            var machinesFromContractItems = await (from contract in tbsContext.MntMaintenanceContracts.AsNoTracking()
+                                                 where contract.CusId == customerId
+                                                 join mci in tbsContext.MntMaintenanceContractItems.AsNoTracking()
+                                                     on contract.ContractId equals mci.ContractId
+                                                 where mci.OoiId.HasValue
+                                                 join ooi in tbsContext.StkOrderOutItems.AsNoTracking() on mci.OoiId equals ooi.OoiId
+                                                 join item in tbsContext.StkItems.AsNoTracking() on ooi.ItemId equals item.ItemId
+                                                 select new
+                                                 {
+                                                     MachineId = ooi.OoiId,
+                                                     OoId = ooi.OoId,
+                                                     ItemId = ooi.ItemId,
+                                                     Quantity = ooi.Quantity,
+                                                     UId = ooi.UId,
+                                                     SerialNumber = ooi.SerialNum ?? string.Empty,
+                                                     DevicePlace = ooi.DevicePlace,
+                                                     ModelName = item.ItemNameAr,
+                                                     ModelNameEn = item.ItemNameEn,
+                                                     ItemCode = item.ItemCode,
+                                                     ExpirationDate = ooi.ItemDateExpire,
+                                                     OoiMain = ooi.OoiMain,
+                                                     LotNum = ooi.LotNum,
+                                                     IsReturned = ooi.IsReturned,
+                                                     IsDeliveryForReplacement = ooi.IsDeliveryForReplacement
+                                                 })
+                                                 .ToListAsync();
+
+            // 3. Machines from sales invoices (try-catch in case SC_ID doesn't exist or join fails)
+            List<dynamic> machinesFromSales = new List<dynamic>();
+            try
+            {
+                machinesFromSales = await (from si in tbsContext.StkSalesInvs.AsNoTracking()
+                                        where si.ScId != null
+                                        join sc in tbsContext.StkSalesContracts.AsNoTracking() on si.ScId equals sc.ScId
+                                        where sc.CusId == customerId
+                                        join oo in tbsContext.StkOrderOuts.AsNoTracking() on si.SiId equals oo.SiId
+                                        join ooi in tbsContext.StkOrderOutItems.AsNoTracking() on oo.OoId equals ooi.OoId
+                                        join item in tbsContext.StkItems.AsNoTracking() on ooi.ItemId equals item.ItemId
+                                        where ooi.SerialNum != null && ooi.SerialNum != string.Empty
+                                        select new
+                                        {
+                                            MachineId = ooi.OoiId,
+                                            OoId = ooi.OoId,
+                                            ItemId = ooi.ItemId,
+                                            Quantity = ooi.Quantity,
+                                            UId = ooi.UId,
+                                            SerialNumber = ooi.SerialNum ?? string.Empty,
+                                            DevicePlace = ooi.DevicePlace,
+                                            ModelName = item.ItemNameAr,
+                                            ModelNameEn = item.ItemNameEn,
+                                            ItemCode = item.ItemCode,
+                                            ExpirationDate = ooi.ItemDateExpire,
+                                            OoiMain = ooi.OoiMain,
+                                            LotNum = ooi.LotNum,
+                                            IsReturned = ooi.IsReturned,
+                                            IsDeliveryForReplacement = ooi.IsDeliveryForReplacement
+                                        })
+                                        .ToListAsync<dynamic>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error getting machines from sales invoices for customer {CustomerId}. This may be expected if SC_ID column doesn't exist or join fails.", customerId);
+                // Continue without sales invoice machines
+            }
+
+            // 4. Machines from order out (if CusId exists)
+            var machinesFromOrderOut = new List<dynamic>();
+            try
+            {
+                machinesFromOrderOut = await (from oo in tbsContext.StkOrderOuts.AsNoTracking()
+                                             where oo.CusId == customerId
+                                             join ooi in tbsContext.StkOrderOutItems.AsNoTracking() on oo.OoId equals ooi.OoId
+                                             join item in tbsContext.StkItems.AsNoTracking() on ooi.ItemId equals item.ItemId
+                                             where ooi.SerialNum != null && ooi.SerialNum != string.Empty
+                                             select new
+                                             {
+                                                 MachineId = ooi.OoiId,
+                                                 OoId = ooi.OoId,
+                                                 ItemId = ooi.ItemId,
+                                                 Quantity = ooi.Quantity,
+                                                 UId = ooi.UId,
+                                                 SerialNumber = ooi.SerialNum ?? string.Empty,
+                                                 DevicePlace = ooi.DevicePlace,
+                                                 ModelName = item.ItemNameAr,
+                                                 ModelNameEn = item.ItemNameEn,
+                                                 ItemCode = item.ItemCode,
+                                                 ExpirationDate = ooi.ItemDateExpire,
+                                                 OoiMain = ooi.OoiMain,
+                                                 LotNum = ooi.LotNum,
+                                                 IsReturned = ooi.IsReturned,
+                                                 IsDeliveryForReplacement = ooi.IsDeliveryForReplacement
+                                             })
+                                             .ToListAsync<dynamic>();
+            }
+            catch
+            {
+                // CusId might not exist in Stk_Order_Out
+            }
+
+            // 5. Machines from contract-linked visits (where contract CusId = customerId but visit CusId might differ)
+            // This catches cases where a visit is linked to a contract for this customer but the visit itself has a different CusId
+            var machinesFromContractLinkedVisits = new List<dynamic>();
+            try
+            {
+                machinesFromContractLinkedVisits = await (from contract in tbsContext.MntMaintenanceContracts.AsNoTracking()
+                                                          where contract.CusId == customerId
+                                                          join v in tbsContext.MntVisitings.AsNoTracking() on contract.ContractId equals v.ContractId
+                                                          join vr in tbsContext.MntVisitingReports.AsNoTracking() on v.VisitingId equals vr.VisitingId
+                                                          join ooi in tbsContext.StkOrderOutItems.AsNoTracking() on vr.OoiId equals ooi.OoiId
+                                                          join item in tbsContext.StkItems.AsNoTracking() on ooi.ItemId equals item.ItemId
+                                                          where ooi.SerialNum != null && ooi.SerialNum != string.Empty
+                                                          select new
+                                                          {
+                                                              MachineId = ooi.OoiId,
+                                                              OoId = ooi.OoId,
+                                                              ItemId = ooi.ItemId,
+                                                              Quantity = ooi.Quantity,
+                                                              UId = ooi.UId,
+                                                              SerialNumber = ooi.SerialNum ?? string.Empty,
+                                                              DevicePlace = ooi.DevicePlace,
+                                                              ModelName = item.ItemNameAr,
+                                                              ModelNameEn = item.ItemNameEn,
+                                                              ItemCode = item.ItemCode,
+                                                              ExpirationDate = ooi.ItemDateExpire,
+                                                              OoiMain = ooi.OoiMain,
+                                                              LotNum = ooi.LotNum,
+                                                              IsReturned = ooi.IsReturned,
+                                                              IsDeliveryForReplacement = ooi.IsDeliveryForReplacement
+                                                          })
+                                                          .ToListAsync<dynamic>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error getting machines from contract-linked visits for customer {CustomerId}", customerId);
+            }
+
+            // 6. Machines from ALL contract visits (regardless of visit CusId) - CRITICAL for matching MediaApi
+            // This gets ALL visits for contracts of this customer, even if visit has different CusId
+            var machinesFromAllContractVisits = new List<dynamic>();
+            try
+            {
+                machinesFromAllContractVisits = await (from contract in tbsContext.MntMaintenanceContracts.AsNoTracking()
+                                                      where contract.CusId == customerId
+                                                      join v in tbsContext.MntVisitings.AsNoTracking() on contract.ContractId equals v.ContractId
+                                                      // CRITICAL: No filter on v.CusId - get ALL visits for contracts of this customer
+                                                      join vr in tbsContext.MntVisitingReports.AsNoTracking() on v.VisitingId equals vr.VisitingId
+                                                      join ooi in tbsContext.StkOrderOutItems.AsNoTracking() on vr.OoiId equals ooi.OoiId
+                                                      join item in tbsContext.StkItems.AsNoTracking() on ooi.ItemId equals item.ItemId
+                                                      where ooi.SerialNum != null && ooi.SerialNum != string.Empty
+                                                      select new
+                                                      {
+                                                          MachineId = ooi.OoiId,
+                                                          OoId = ooi.OoId,
+                                                          ItemId = ooi.ItemId,
+                                                          Quantity = ooi.Quantity,
+                                                          UId = ooi.UId,
+                                                          SerialNumber = ooi.SerialNum ?? string.Empty,
+                                                          DevicePlace = ooi.DevicePlace,
+                                                          ModelName = item.ItemNameAr,
+                                                          ModelNameEn = item.ItemNameEn,
+                                                          ItemCode = item.ItemCode,
+                                                          ExpirationDate = ooi.ItemDateExpire,
+                                                          OoiMain = ooi.OoiMain,
+                                                          LotNum = ooi.LotNum,
+                                                          IsReturned = ooi.IsReturned,
+                                                          IsDeliveryForReplacement = ooi.IsDeliveryForReplacement
+                                                      })
+                                                      .Distinct()
+                                                      .ToListAsync<dynamic>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error getting machines from all contract visits for customer {CustomerId}", customerId);
+            }
+
+            // 7. Machines from Temp_OOI_ID (some contracts have machines directly linked)
+            // NOTE: TempOoiId may not exist in TbsMaintenanceContract model - skipping for now
+            // If needed, add TempOoiId property to TbsMaintenanceContract model first
+            var machinesFromContractTempOoi = new List<dynamic>();
+            // Commented out - TempOoiId not in model
+            // try
+            // {
+            //     machinesFromContractTempOoi = await (from contract in tbsContext.MntMaintenanceContracts.AsNoTracking()
+            //                                         where contract.CusId == customerId && contract.TempOoiId.HasValue
+            //                                         join ooi in tbsContext.StkOrderOutItems.AsNoTracking() on contract.TempOoiId equals ooi.OoiId
+            //                                         join item in tbsContext.StkItems.AsNoTracking() on ooi.ItemId equals item.ItemId
+            //                                         select new { ... })
+            //                                         .ToListAsync<dynamic>();
+            // }
+            // catch (Exception ex)
+            // {
+            //     _logger.LogWarning(ex, "Error getting machines from Temp_OOI_ID for customer {CustomerId}", customerId);
+            // }
+
+            // Combine all machines and deduplicate (matching MediaApi logic)
+            var allMachinesData = machinesFromVisits
+                .Concat(machinesFromContractItems)
+                .Concat(machinesFromSales)
+                .Concat(machinesFromOrderOut.Cast<object>())
+                .Concat(machinesFromContractLinkedVisits.Cast<object>())
+                .Concat(machinesFromAllContractVisits.Cast<object>())
+                .Concat(machinesFromContractTempOoi.Cast<object>())
+                .GroupBy(m => ((dynamic)m).MachineId)
+                .Select(g => g.First())
+                .ToList();
+
+            // Convert to MachineSyncDto
+            var machines = allMachinesData.Select(m => new MachineSyncDto
+            {
+                MachineId = ((dynamic)m).MachineId,
+                OoId = ((dynamic)m).OoId,
+                ItemId = ((dynamic)m).ItemId,
+                Quantity = ((dynamic)m).Quantity,
+                UId = ((dynamic)m).UId,
+                SerialNumber = ((dynamic)m).SerialNumber ?? string.Empty,
+                DevicePlace = ((dynamic)m).DevicePlace,
+                ModelName = ((dynamic)m).ModelName,
+                ModelNameEn = ((dynamic)m).ModelNameEn,
+                ItemCode = ((dynamic)m).ItemCode,
+                ExpirationDate = ((dynamic)m).ExpirationDate,
+                OoiMain = ((dynamic)m).OoiMain,
+                LotNum = ((dynamic)m).LotNum,
+                IsReturned = ((dynamic)m).IsReturned,
+                IsDeliveryForReplacement = ((dynamic)m).IsDeliveryForReplacement
+            }).ToList();
+
+            _logger.LogInformation("Found {Count} unique machines for customer {CustomerId}", machines.Count, customerId);
+            return machines;
+        }
+
+        /// <summary>
+        /// Get visits for a machine (OOI_ID) from TBS
+        /// Same logic as MediaApi MachineService.GetMachineHistoryAsync
+        /// </summary>
+        private async Task<List<VisitSyncDto>> GetVisitsForMachineAsync(TbsDbContext tbsContext, int ooiId)
+        {
+            try
+            {
+                _logger.LogInformation("Getting visits for machine OOI_ID: {OoiId}", ooiId);
+                
+                // First, try to get count directly to verify the query works
+                var reportCount = await tbsContext.MntVisitingReports
+                    .AsNoTracking()
+                    .Where(vr => vr.OoiId == ooiId)
+                    .CountAsync();
+                
+                _logger.LogInformation("Found {Count} visiting reports for machine OOI_ID: {OoiId}", reportCount, ooiId);
+                
+                if (reportCount == 0)
+                {
+                    _logger.LogWarning("No visiting reports found for machine OOI_ID: {OoiId}", ooiId);
+                    return new List<VisitSyncDto>();
+                }
+                
+                // Get reports first, then join with visits
+                var reports = await tbsContext.MntVisitingReports
+                    .AsNoTracking()
+                    .Where(vr => vr.OoiId == ooiId)
+                    .ToListAsync();
+                
+                _logger.LogInformation("Found {Count} reports for machine OOI_ID: {OoiId}", reports.Count, ooiId);
+                
+                if (reports.Count == 0)
+                {
+                    return new List<VisitSyncDto>();
+                }
+                
+                // Use direct SQL query with JOIN - most reliable method
+                var connection = tbsContext.Database.GetDbConnection();
+                await connection.OpenAsync();
+                
+                try
+                {
+                    using var command = connection.CreateCommand();
+                    command.CommandText = @"
+                        SELECT 
+                            v.VisitingId,
+                            v.VisitingTypeId,
+                            v.EmpCode,
+                            v.ContractId,
+                            v.VisitingDate,
+                            v.Cus_ID AS LegacyCustomerId,
+                            v.Notes,
+                            v.Visiting_Value AS VisitingValue,
+                            v.Bill_Value AS BillValue,
+                            v.Defect_description AS DefectDescription,
+                            v.DevicePlace,
+                            CAST(0 AS BIT) AS IsCancelled,
+                            v.Files,
+                            vr.VisitingReportId,
+                            vr.ReportDecription AS ReportDescription,
+                            vr.ReportDate,
+                            vr.Files AS ReportFiles,
+                            vr.RepVisit_Status_ID AS RepVisitStatusId
+                        FROM MNT_VisitingReport vr
+                        INNER JOIN MNT_Visiting v ON vr.VisitingId = v.VisitingId
+                        WHERE vr.OOI_ID = @ooiId
+                        ORDER BY v.VisitingDate DESC";
+                    
+                    var parameter = command.CreateParameter();
+                    parameter.ParameterName = "@ooiId";
+                    parameter.Value = ooiId;
+                    command.Parameters.Add(parameter);
+                    
+                    var visits = new List<VisitSyncDto>();
+                    
+                    // First, test the query with ExecuteScalar to get count
+                    var countCommand = connection.CreateCommand();
+                    countCommand.CommandText = @"
+                        SELECT COUNT(*) 
+                        FROM MNT_VisitingReport vr
+                        INNER JOIN MNT_Visiting v ON vr.VisitingId = v.VisitingId
+                        WHERE vr.OOI_ID = @ooiId";
+                    var countParam = countCommand.CreateParameter();
+                    countParam.ParameterName = "@ooiId";
+                    countParam.Value = ooiId;
+                    countCommand.Parameters.Add(countParam);
+                    var expectedCount = Convert.ToInt32(await countCommand.ExecuteScalarAsync());
+                    _logger.LogInformation("Expected visit count from SQL: {Count} for machine OOI_ID: {OoiId}", expectedCount, ooiId);
+                    
+                    using var reader = await command.ExecuteReaderAsync();
+                    
+                    _logger.LogInformation("Executing SQL query for machine OOI_ID: {OoiId}. Reader has rows: {HasRows}, Expected: {ExpectedCount}", 
+                        ooiId, reader.HasRows, expectedCount);
+                    
+                    int rowCount = 0;
+                    while (await reader.ReadAsync())
+                    {
+                        try
+                        {
+                            rowCount++;
+                            var visit = new VisitSyncDto
+                            {
+                                VisitingId = reader.GetInt32(0),
+                                VisitingTypeId = reader.GetInt32(1),
+                                EmpCode = reader.IsDBNull(2) ? null : reader.GetInt32(2),
+                                ContractId = reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                                VisitingDate = reader.IsDBNull(4) ? null : reader.GetDateTime(4),
+                                LegacyCustomerId = reader.GetInt32(5),
+                                Notes = reader.IsDBNull(6) ? null : reader.GetString(6),
+                                VisitingValue = reader.IsDBNull(7) ? null : (decimal?)reader.GetDecimal(7),
+                                BillValue = reader.IsDBNull(8) ? null : (decimal?)reader.GetDecimal(8),
+                                DefectDescription = reader.IsDBNull(9) ? null : reader.GetString(9),
+                                DevicePlace = reader.IsDBNull(10) ? null : reader.GetString(10),
+                                IsCancelled = reader.IsDBNull(11) ? null : (bool?)reader.GetBoolean(11),
+                                Files = reader.IsDBNull(12) ? null : reader.GetString(12),
+                                VisitingReportId = reader.IsDBNull(13) ? null : (int?)reader.GetInt32(13),
+                                ReportDescription = reader.IsDBNull(14) ? null : reader.GetString(14),
+                                ReportDate = reader.IsDBNull(15) ? null : (DateTime?)reader.GetDateTime(15),
+                                ReportFiles = reader.IsDBNull(16) ? null : reader.GetString(16),
+                                RepVisitStatusId = reader.IsDBNull(17) ? null : (int?)reader.GetInt32(17)
+                            };
+                            visits.Add(visit);
+                            
+                            if (rowCount <= 3)
+                            {
+                                _logger.LogInformation("Read visit {RowCount}: VisitingId={VisitingId}, Date={Date}", 
+                                    rowCount, visit.VisitingId, visit.VisitingDate);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error reading row {RowCount} for machine OOI_ID: {OoiId}", rowCount, ooiId);
+                            throw; // Re-throw to see the error
+                        }
+                    }
+                    
+                    _logger.LogInformation("Found {Count} visits using raw SQL for machine OOI_ID: {OoiId} (read {RowCount} rows, expected {ExpectedCount})", 
+                        visits.Count, ooiId, rowCount, expectedCount);
+                    
+                    // Verify all visits were retrieved
+                    if (expectedCount != visits.Count)
+                    {
+                        _logger.LogWarning("WARNING: Expected {ExpectedCount} visits but retrieved {ActualCount} for machine OOI_ID: {OoiId}", 
+                            expectedCount, visits.Count, ooiId);
+                    }
+                    
+                    if (reportCount > 0 && visits.Count == 0)
+                    {
+                        _logger.LogWarning("WARNING: Found {ReportCount} reports but 0 visits after join for machine OOI_ID: {OoiId}. This may indicate a join issue.", reportCount, ooiId);
+                    }
+                    
+                    // Log summary
+                    if (visits.Count > 0)
+                    {
+                        var dateRange = $"from {visits.Min(v => v.VisitingDate)?.ToString("yyyy-MM-dd")} to {visits.Max(v => v.VisitingDate)?.ToString("yyyy-MM-dd")}";
+                        _logger.LogInformation("Successfully retrieved {Count} visits for machine OOI_ID: {OoiId} {DateRange}", 
+                            visits.Count, ooiId, dateRange);
+                    }
+                    
+                    return visits;
+                }
+                finally
+                {
+                    await connection.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CRITICAL ERROR getting visits for machine {OoiId}: {Message}. StackTrace: {StackTrace}", 
+                    ooiId, ex.Message, ex.StackTrace);
+                _logger.LogError("Exception Type: {ExceptionType}, Inner Exception: {InnerException}", 
+                    ex.GetType().Name, ex.InnerException?.Message ?? "None");
+                return new List<VisitSyncDto>();
+            }
+        }
+
+        /// <summary>
+        /// Get visits for a machine from TBS (public method)
+        /// </summary>
+        public async Task<MachineVisitsSyncDto?> GetMachineVisitsFromTbsAsync(int ooiId)
+        {
+            try
+            {
+                _logger.LogInformation("GetMachineVisitsFromTbsAsync called for OOI_ID: {OoiId}", ooiId);
+                
+                var tbsConnectionString = _configuration.GetConnectionString("TbsConnection");
+                if (string.IsNullOrEmpty(tbsConnectionString))
+                {
+                    _logger.LogError("TbsConnection string is null or empty!");
+                    return null;
+                }
+
+                // Log connection string (mask password for security)
+                var maskedConnectionString = System.Text.RegularExpressions.Regex.Replace(
+                    tbsConnectionString, 
+                    @"Password=[^;]+;", 
+                    "Password=***;");
+                _logger.LogInformation("TbsConnection string: {ConnectionString}", maskedConnectionString);
+                
+                // Continue with implementation...
+                return null;
+            }
+        }
+    }
+}

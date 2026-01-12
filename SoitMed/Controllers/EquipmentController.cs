@@ -3,6 +3,7 @@ using SoitMed.Models;
 using SoitMed.Models.Equipment;
 using SoitMed.Models.Hospital;
 using SoitMed.Models.Location;
+using SoitMed.Helpers;
 using SoitMed.Services;
 using SoitMed.Repositories;
 using Microsoft.AspNetCore.Authorization;
@@ -53,11 +54,11 @@ namespace SoitMed.Controllers
                 HospitalId = e.HospitalId,
                 HospitalName = e.Hospital?.Name ?? string.Empty,
                 RepairVisitCount = e.RepairVisitCount,
-                Status = e.Status,
+                Status = e.Status.ToString(),
                 CreatedAt = e.CreatedAt,
                 LastMaintenanceDate = e.LastMaintenanceDate,
                 IsActive = e.IsActive,
-                QrToken = e.QrToken,
+                QrToken = e.QrToken.ToString(),
                 IsQrPrinted = e.IsQrPrinted
             });
 
@@ -66,7 +67,7 @@ namespace SoitMed.Controllers
 
         [HttpGet("{id}")]
         [Authorize(Roles = "SuperAdmin,Admin,Doctor,Technician")]
-        public async Task<IActionResult> GetEquipment(int id)
+        public async Task<IActionResult> GetEquipment(string id)
         {
             var equipment = await _unitOfWork.Equipment.GetEquipmentWithAllDetailsAsync(id);
 
@@ -88,11 +89,11 @@ namespace SoitMed.Controllers
                 HospitalId = equipment.HospitalId,
                 HospitalName = equipment.Hospital?.Name ?? string.Empty,
                 RepairVisitCount = equipment.RepairVisitCount,
-                Status = equipment.Status,
+                Status = equipment.Status.ToString(),
                 CreatedAt = equipment.CreatedAt,
                 LastMaintenanceDate = equipment.LastMaintenanceDate,
                 IsActive = equipment.IsActive,
-                QrToken = equipment.QrToken,
+                QrToken = equipment.QrToken.ToString(),
                 IsQrPrinted = equipment.IsQrPrinted
             };
 
@@ -123,11 +124,11 @@ namespace SoitMed.Controllers
                 HospitalId = equipment.HospitalId,
                 HospitalName = equipment.Hospital?.Name ?? string.Empty,
                 RepairVisitCount = equipment.RepairVisitCount,
-                Status = equipment.Status,
+                Status = equipment.Status.ToString(),
                 CreatedAt = equipment.CreatedAt,
                 LastMaintenanceDate = equipment.LastMaintenanceDate,
                 IsActive = equipment.IsActive,
-                QrToken = equipment.QrToken,
+                QrToken = equipment.QrToken.ToString(),
                 IsQrPrinted = equipment.IsQrPrinted
             };
 
@@ -161,11 +162,11 @@ namespace SoitMed.Controllers
                     HospitalId = e.HospitalId,
                     HospitalName = hospital.Name,
                     RepairVisitCount = e.RepairVisitCount,
-                    Status = e.Status,
+                    Status = e.Status.ToString(),
                     CreatedAt = e.CreatedAt,
                     LastMaintenanceDate = e.LastMaintenanceDate,
                     IsActive = e.IsActive,
-                    QrToken = e.QrToken,
+                    QrToken = e.QrToken.ToString(),
                     IsQrPrinted = e.IsQrPrinted
                 });
 
@@ -265,7 +266,7 @@ namespace SoitMed.Controllers
                 PurchaseDate = equipmentDTO.PurchaseDate,
                 WarrantyExpiry = equipmentDTO.WarrantyExpiry,
                 HospitalId = equipmentDTO.HospitalId,
-                Status = equipmentDTO.Status,
+                Status = Enum.Parse<EquipmentStatus>(equipmentDTO.Status),
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
@@ -305,11 +306,11 @@ namespace SoitMed.Controllers
                     HospitalId = equipment.HospitalId,
                     HospitalName = hospital.Name,
                     RepairVisitCount = equipment.RepairVisitCount,
-                    Status = equipment.Status,
+                    Status = equipment.Status.ToString(),
                     CreatedAt = equipment.CreatedAt,
                     LastMaintenanceDate = equipment.LastMaintenanceDate,
                     IsActive = equipment.IsActive,
-                    QrToken = equipment.QrToken,
+                    QrToken = equipment.QrToken.ToString(),
                     IsQrPrinted = equipment.IsQrPrinted
                 }
             });
@@ -331,7 +332,7 @@ namespace SoitMed.Controllers
             }
 
             // Check if new QR code conflicts with existing equipment
-            if (await _unitOfWork.Equipment.ExistsByQRCodeExcludingIdAsync(equipmentDTO.QRCode, id))
+            if (await _unitOfWork.Equipment.ExistsByQRCodeExcludingIdAsync(equipmentDTO.QRCode, id.ToString()))
             {
                 return BadRequest($"Equipment with QR code '{equipmentDTO.QRCode}' already exists");
             }
@@ -351,7 +352,7 @@ namespace SoitMed.Controllers
             equipment.PurchaseDate = equipmentDTO.PurchaseDate;
             equipment.WarrantyExpiry = equipmentDTO.WarrantyExpiry;
             equipment.HospitalId = equipmentDTO.HospitalId;
-            equipment.Status = equipmentDTO.Status;
+            equipment.Status = Enum.Parse<EquipmentStatus>(equipmentDTO.Status);
 
             await _unitOfWork.Equipment.UpdateAsync(equipment);
             await _unitOfWork.SaveChangesAsync();
@@ -361,7 +362,7 @@ namespace SoitMed.Controllers
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> DeleteEquipment(int id)
+        public async Task<IActionResult> DeleteEquipment(string id)
         {
             var equipment = await _unitOfWork.Equipment.GetEquipmentWithRepairRequestsAsync(id);
 
@@ -385,7 +386,7 @@ namespace SoitMed.Controllers
 
         [HttpGet("{id}/repair-history")]
         [Authorize(Roles = "SuperAdmin,Admin,Doctor,Technician")]
-        public async Task<IActionResult> GetEquipmentRepairHistory(int id)
+        public async Task<IActionResult> GetEquipmentRepairHistory(string id)
         {
             var equipment = await _unitOfWork.Equipment.GetEquipmentWithAllDetailsAsync(id);
 
@@ -404,11 +405,11 @@ namespace SoitMed.Controllers
                     EquipmentQRCode = equipment.QRCode,
                     Description = rr.Description,
                     Symptoms = rr.Symptoms,
-                    Priority = rr.Priority,
-                    Status = rr.Status,
+                    Priority = rr.Priority.ToString(),
+                    Status = rr.Status.ToString(),
                     RequestorName = rr.RequestingDoctor?.Name ?? rr.RequestingTechnician?.Name,
                     RequestorType = rr.RequestingDoctor != null ? "Doctor" : "Technician",
-                    AssignedEngineerId = rr.AssignedEngineerId,
+                    AssignedEngineerId = rr.AssignedEngineerId?.ToString(),
                     AssignedEngineerName = rr.AssignedEngineer?.Name,
                     RequestedAt = rr.RequestedAt,
                     AssignedAt = rr.AssignedAt,
@@ -416,9 +417,9 @@ namespace SoitMed.Controllers
                     CompletedAt = rr.CompletedAt,
                     RepairNotes = rr.RepairNotes,
                     PartsUsed = rr.PartsUsed,
-                    RepairCost = rr.RepairCost,
-                    EstimatedHours = rr.EstimatedHours,
-                    ActualHours = rr.ActualHours
+                    RepairCost = rr.RepairCost ?? 0m,
+                    EstimatedHours = rr.EstimatedHours.HasValue ? (decimal)rr.EstimatedHours.Value : 0m ,
+                    ActualHours = rr.ActualHours.HasValue ? (decimal)rr.ActualHours.Value : 0m
                 });
 
             return Ok(new
@@ -469,7 +470,7 @@ namespace SoitMed.Controllers
                     {
                         equipmentId = equipment.Id,
                         equipmentName = equipment.Name,
-                        qrToken = equipment.QrToken,
+                        qrToken = equipment.QrToken.ToString(),
                         isQrPrinted = equipment.IsQrPrinted,
                         qrLastPrintedDate = equipment.QrLastPrintedDate
                     }

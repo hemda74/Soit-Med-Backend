@@ -9,7 +9,7 @@ namespace SoitMed.Models
     public class InstallmentPlan : BaseEntity
     {
         [Required]
-        public long OfferId { get; set; }
+        public string OfferId { get; set; } = string.Empty;
         
         [Required]
         public int InstallmentNumber { get; set; }

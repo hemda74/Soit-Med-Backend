@@ -289,11 +289,11 @@ namespace SoitMed.Controllers
             }
 
             // Validate governorates
-            var governorates = await _unitOfWork.Governorates.GetFilteredAsync(g => EngineerDTO.GovernorateIds.Contains(g.GovernorateId));
+            var governorates = await _unitOfWork.Governorates.GetFilteredAsync(g => EngineerDTO.GovernorateIds.Select(id => id.ToString()).Contains(g.GovernorateId));
 
             if (governorates.Count() != EngineerDTO.GovernorateIds.Count)
             {
-                var missingIds = EngineerDTO.GovernorateIds.Except(governorates.Select(g => g.GovernorateId));
+                var missingIds = EngineerDTO.GovernorateIds.Except(governorates.Select(g => int.Parse(g.GovernorateId)));
                 return BadRequest(ValidationHelperService.CreateBusinessLogicError(
                     $"Governorates with IDs [{string.Join(", ", missingIds)}] not found. Please verify the governorate IDs are correct.",
                     "GovernorateIds",

@@ -90,7 +90,7 @@ namespace SoitMed.Controllers
         {
             try
             {
-                var result = await _maintenanceVisitService.GetVisitsByEquipmentIdAsync(equipmentId);
+                var result = await _maintenanceVisitService.GetVisitsByEquipmentIdAsync(equipmentId.ToString());
                 if (result == null || !result.Any())
                 {
                     return NotFound(ErrorResponse($"No visits found for equipment {equipmentId}"));

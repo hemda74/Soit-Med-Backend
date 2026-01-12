@@ -6,18 +6,18 @@ namespace SoitMed.Models.Location
     public class EngineerGovernorate
     {
         [Key]
-        public int Id { get; set; }
+        public string Id { get; set; }
 
         // Foreign Key to Engineer
         [Required]
-        public int EngineerId { get; set; }
+        public string EngineerId { get; set; }
 
         [ForeignKey("EngineerId")]
         public virtual Engineer Engineer { get; set; } = null!;
 
         // Foreign Key to Governorate
         [Required]
-        public int GovernorateId { get; set; }
+        public string GovernorateId { get; set; }
 
         [ForeignKey("GovernorateId")]
         public virtual Governorate Governorate { get; set; } = null!;
