@@ -27,7 +27,7 @@ namespace SoitMed.Models
         [MaxLength(100)]
         public string? Category { get; set; } // e.g., "X-Ray", "Ultrasound", "CT Scanner" - Legacy field for backward compatibility
 
-        public long? CategoryId { get; set; } // Foreign key to ProductCategory
+        public string? CategoryId { get; set; } // Foreign key to ProductCategory
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]

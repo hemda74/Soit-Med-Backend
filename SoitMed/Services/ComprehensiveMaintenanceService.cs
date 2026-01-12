@@ -45,17 +45,25 @@ namespace SoitMed.Services
                     .Select(e => new EquipmentDTO
                     {
                         Id = e.Id.ToString(),
-                        SerialNumber = e.SerialNumber ?? e.QRCode, // Use SerialNumber if available, fallback to QRCode
-                        Model = e.Model,
-                        Manufacturer = e.Manufacturer,
-                        CustomerId = customerId,
+                        SerialNumber = e.QRCode, // Use QRCode as serial number
+                        Model = e.Model ?? string.Empty,
+                        Manufacturer = e.Manufacturer ?? string.Empty,
+                        CustomerId = e.CustomerId,
                         CustomerName = customer.Name,
-                        InstallationDate = e.InstallationDate?.ToString("yyyy-MM-dd") ?? e.PurchaseDate?.ToString("yyyy-MM-dd"),
-                        WarrantyExpiryDate = e.WarrantyExpiry?.ToString("yyyy-MM-dd"),
+                        InstallationDate = e.PurchaseDate,
                         Status = e.Status.ToString(),
-                        Location = e.Location, // This column was added by the script
-                        CreatedAt = e.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss"),
-                        MaintenanceVisitsCount = 0 // Will be calculated separately
+                        Location = e.Hospital != null ? e.Hospital.Name : string.Empty, // Use hospital name as location
+                        QRCode = e.QRCode,
+                        HospitalId = e.HospitalId ?? string.Empty,
+                        Name = e.Name,
+                        PurchaseDate = e.PurchaseDate,
+                        VisitCount = 0, // Will be calculated separately
+                        Description = e.Description ?? string.Empty,
+                        LastMaintenanceDate = e.LastMaintenanceDate,
+                        WarrantyExpiry = e.WarrantyExpiry,
+                        CreatedAt = e.CreatedAt,
+                        IsActive = true,
+                        MaintenanceVisitsCount = 0
                     })
                     .ToListAsync();
 
@@ -67,15 +75,15 @@ namespace SoitMed.Services
                     {
                         Id = v.Id.ToString(),
                         EquipmentId = v.DeviceId.ToString(),
-                        EquipmentSerialNumber = v.Device.SerialNumber ?? v.Device.QRCode,
-                        VisitDate = v.ScheduledDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                        VisitType = v.VisitType ?? 1, // Default to Installation if null
-                        Status = (VisitStatus)v.Status, // Map existing status to new enum
+                        EquipmentSerialNumber = v.QRCode ?? v.SerialCode,
+                        VisitDate = v.ScheduledDate,
+                        VisitType = v.Origin.ToString(),
+                        Status = v.Status.ToString(),
                         EngineerId = v.EngineerId,
-                        EngineerName = null, // Would need to join with ApplicationUser to get name
+                        EngineerName = null,
                         Report = v.Report,
-                        CompletionDate = v.CompletionDate?.ToString("yyyy-MM-ddTHH:mm:ss") ?? v.CompletedAt?.ToString("yyyy-MM-ddTHH:mm:ss"),
-                        CreatedAt = v.CreatedAt?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss")
+                        CompletionDate = v.CompletedAt,
+                        CreatedAt = v.VisitDate
                     })
                     .ToListAsync();
 
@@ -99,7 +107,7 @@ namespace SoitMed.Services
                         Email = customer.Email,
                         Address = customer.Address,
                         IsActive = true, // Default to active
-                        CreatedAt = customer.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                        CreatedAt = customer.CreatedAt
                     },
                     Equipment = equipment,
                     Visits = visits
@@ -138,15 +146,14 @@ namespace SoitMed.Services
                         Email = c.Email,
                         Address = c.Address,
                         IsActive = true, // Default to active
-                        CreatedAt = c.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                        CreatedAt = c.CreatedAt
                     })
                     .ToListAsync();
 
                 return new PagedResult<CustomerDTO>
                 {
-                    Data = customers,
+                    Items = customers,
                     TotalCount = totalCount,
-                    Page = criteria.Page,
                     PageSize = criteria.PageSize
                 };
             }
@@ -182,7 +189,7 @@ namespace SoitMed.Services
                     Email = customer.Email,
                     Address = customer.Address,
                     IsActive = true,
-                    CreatedAt = customer.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                    CreatedAt = customer.CreatedAt
                 };
             }
             catch (Exception ex)
@@ -220,7 +227,7 @@ namespace SoitMed.Services
                     Email = customer.Email,
                     Address = customer.Address,
                     IsActive = true,
-                    CreatedAt = customer.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                    CreatedAt = customer.CreatedAt
                 };
             }
             catch (Exception ex)
@@ -249,7 +256,7 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<CustomerVisitStats> GetCustomerVisitStatisticsAsync(string customerId, DateTime? startDate, DateTime? endDate)
+        public async Task<CustomerVisitStatsDTO> GetCustomerVisitStatisticsAsync(string customerId, DateTime? startDate = null, DateTime? endDate = null)
         {
             try
             {
@@ -268,14 +275,14 @@ namespace SoitMed.Services
                 {
                     CustomerId = customerId,
                     TotalVisits = visits.Count,
-                    CompletedVisits = visits.Count(v => v.Status == 5), // Completed status
-                    PendingVisits = visits.Count(v => v.Status == 1), // PendingApproval status
-                    EmergencyVisits = visits.Count(v => v.VisitType == 3), // Emergency type
-                    PreventiveVisits = visits.Count(v => v.VisitType == 2), // Preventive type
-                    InstallationVisits = visits.Count(v => v.VisitType == 1), // Installation type
-                    LastVisitDate = visits.OrderByDescending(v => v.ScheduledDate).FirstOrDefault()?.ScheduledDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    NextScheduledDate = visits.Where(v => v.ScheduledDate > DateTime.UtcNow && v.Status == 1)
-                                            .OrderBy(v => v.ScheduledDate).FirstOrDefault()?.ScheduledDate.ToString("yyyy-MM-ddTHH:mm:ss")
+                    CompletedVisits = visits.Count(v => v.Status == VisitStatus.Completed),
+                    PendingVisits = visits.Count(v => v.Status == VisitStatus.PendingApproval),
+                    EmergencyVisits = visits.Count(v => v.Origin == VisitOrigin.CustomerApp),
+                    PreventiveVisits = visits.Count(v => v.Origin == VisitOrigin.AutoContract),
+                    InstallationVisits = visits.Count(v => v.Origin == VisitOrigin.CallCenter),
+                    LastVisitDate = visits.OrderByDescending(v => v.ScheduledDate).FirstOrDefault()?.ScheduledDate,
+                    NextScheduledDate = visits.Where(v => v.ScheduledDate > DateTime.UtcNow && v.Status == VisitStatus.PendingApproval)
+                                            .OrderBy(v => v.ScheduledDate).FirstOrDefault()?.ScheduledDate
                 };
             }
             catch (Exception ex)
@@ -287,39 +294,37 @@ namespace SoitMed.Services
         #endregion
 
         #region Equipment Management
-        public async Task<EquipmentDTO> GetEquipmentAsync(string equipmentId)
+        public async Task<List<EquipmentDTO>> GetEquipmentAsync(string customerId)
         {
             try
             {
-                var id = int.Parse(equipmentId);
                 var equipment = await _newDbContext.Equipment
                     .Include(e => e.Customer)
-                    .FirstOrDefaultAsync(e => e.Id == id);
+                    .Where(e => e.CustomerId == customerId)
+                    .ToListAsync();
 
-                if (equipment == null)
-                    return null;
-
-                return new EquipmentDTO
+                return equipment.Select(e => new EquipmentDTO
                 {
-                    Id = equipment.Id.ToString(),
-                    SerialNumber = equipment.SerialNumber ?? equipment.QRCode,
-                    Model = equipment.Model,
-                    Manufacturer = equipment.Manufacturer,
-                    CustomerId = equipment.CustomerId,
-                    CustomerName = equipment.Customer?.Name,
-                    InstallationDate = equipment.InstallationDate?.ToString("yyyy-MM-dd") ?? equipment.PurchaseDate?.ToString("yyyy-MM-dd"),
-                    WarrantyExpiryDate = equipment.WarrantyExpiry?.ToString("yyyy-MM-dd"),
-                    Status = equipment.Status.ToString(),
-                    Location = equipment.Location,
-                    CreatedAt = equipment.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
-                };
+                    Id = e.Id,
+                    Name = e.Name,
+                    QRCode = e.QRCode,
+                    Description = e.Description,
+                    Model = e.Model,
+                    Manufacturer = e.Manufacturer,
+                    CustomerId = e.CustomerId,
+                    CustomerName = e.Customer?.FullName ?? string.Empty,
+                    Status = e.Status.ToString(),
+                    CreatedAt = e.CreatedAt,
+                    IsActive = e.IsActive
+                }).ToList();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting equipment {EquipmentId}", equipmentId);
+                _logger.LogError(ex, "Error getting equipment for customer {CustomerId}", customerId);
                 throw;
             }
         }
+        #endregion
 
         public async Task<PagedResult<EquipmentDTO>> GetCustomerEquipmentAsync(string customerId, PagedRequest request)
         {
@@ -336,23 +341,22 @@ namespace SoitMed.Services
                     .Select(e => new EquipmentDTO
                     {
                         Id = e.Id.ToString(),
-                        SerialNumber = e.SerialNumber ?? e.QRCode,
+                        SerialNumber = e.QRCode,
                         Model = e.Model,
                         Manufacturer = e.Manufacturer,
                         CustomerId = e.CustomerId,
-                        InstallationDate = e.InstallationDate?.ToString("yyyy-MM-dd") ?? e.PurchaseDate?.ToString("yyyy-MM-dd"),
-                        WarrantyExpiryDate = e.WarrantyExpiry?.ToString("yyyy-MM-dd"),
+                        InstallationDate = e.PurchaseDate,
+                        WarrantyExpiryDate = e.WarrantyExpiry,
                         Status = e.Status.ToString(),
-                        Location = e.Location,
-                        CreatedAt = e.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                        Location = e.Hospital != null ? e.Hospital.Name : string.Empty,
+                        CreatedAt = e.CreatedAt
                     })
                     .ToListAsync();
 
                 return new PagedResult<EquipmentDTO>
                 {
-                    Data = equipment,
+                    Items = equipment,
                     TotalCount = totalCount,
-                    Page = request.Page,
                     PageSize = request.PageSize
                 };
             }
@@ -371,14 +375,11 @@ namespace SoitMed.Services
                 {
                     Name = request.Model, // Using model as name for now
                     QRCode = request.SerialNumber,
-                    SerialNumber = request.SerialNumber, // Set the new SerialNumber column
                     Model = request.Model,
                     Manufacturer = request.Manufacturer,
                     CustomerId = request.CustomerId,
-                    PurchaseDate = string.IsNullOrWhiteSpace(request.InstallationDate) ? null : DateTime.Parse(request.InstallationDate),
-                    InstallationDate = string.IsNullOrWhiteSpace(request.InstallationDate) ? null : DateTime.Parse(request.InstallationDate),
-                    WarrantyExpiry = string.IsNullOrWhiteSpace(request.WarrantyExpiryDate) ? null : DateTime.Parse(request.WarrantyExpiryDate),
-                    Location = request.Location,
+                    PurchaseDate = request.InstallationDate,
+                    WarrantyExpiry = request.WarrantyExpiryDate,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -388,15 +389,15 @@ namespace SoitMed.Services
                 return new EquipmentDTO
                 {
                     Id = equipment.Id.ToString(),
-                    SerialNumber = equipment.SerialNumber,
+                    SerialNumber = equipment.QRCode,
                     Model = equipment.Model,
                     Manufacturer = equipment.Manufacturer,
                     CustomerId = equipment.CustomerId,
-                    InstallationDate = equipment.InstallationDate?.ToString("yyyy-MM-dd"),
-                    WarrantyExpiryDate = equipment.WarrantyExpiry?.ToString("yyyy-MM-dd"),
+                    InstallationDate = equipment.PurchaseDate,
+                    WarrantyExpiryDate = equipment.WarrantyExpiry,
                     Status = equipment.Status.ToString(),
-                    Location = equipment.Location,
-                    CreatedAt = equipment.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                    Location = equipment.Hospital?.Name ?? string.Empty,
+                    CreatedAt = equipment.CreatedAt
                 };
             }
             catch (Exception ex)
@@ -415,41 +416,37 @@ namespace SoitMed.Services
                 if (equipment == null)
                     return null;
 
-                if (!string.IsNullOrWhiteSpace(request.SerialNumber))
+                if (!string.IsNullOrWhiteSpace(request.ModelId))
                 {
-                    equipment.QRCode = request.SerialNumber;
-                    equipment.SerialNumber = request.SerialNumber;
+                    equipment.QRCode = request.ModelId;
                 }
                 if (!string.IsNullOrWhiteSpace(request.Model))
                     equipment.Model = request.Model;
                 if (!string.IsNullOrWhiteSpace(request.Manufacturer))
                     equipment.Manufacturer = request.Manufacturer;
-                if (!string.IsNullOrWhiteSpace(request.InstallationDate))
+                if (request.InstallationDate.HasValue)
                 {
-                    equipment.PurchaseDate = DateTime.Parse(request.InstallationDate);
-                    equipment.InstallationDate = DateTime.Parse(request.InstallationDate);
+                    equipment.PurchaseDate = request.InstallationDate.Value;
                 }
-                if (!string.IsNullOrWhiteSpace(request.WarrantyExpiryDate))
-                    equipment.WarrantyExpiry = DateTime.Parse(request.WarrantyExpiryDate);
+                if (request.WarrantyExpiryDate.HasValue)
+                    equipment.WarrantyExpiry = request.WarrantyExpiryDate.Value;
                 if (!string.IsNullOrWhiteSpace(request.Status))
                     equipment.Status = Enum.Parse<Models.Equipment.EquipmentStatus>(request.Status);
-                if (!string.IsNullOrWhiteSpace(request.Location))
-                    equipment.Location = request.Location;
 
                 await _newDbContext.SaveChangesAsync();
 
                 return new EquipmentDTO
                 {
                     Id = equipment.Id.ToString(),
-                    SerialNumber = equipment.SerialNumber,
+                    SerialNumber = equipment.QRCode,
                     Model = equipment.Model,
                     Manufacturer = equipment.Manufacturer,
                     CustomerId = equipment.CustomerId,
-                    InstallationDate = equipment.InstallationDate?.ToString("yyyy-MM-dd"),
-                    WarrantyExpiryDate = equipment.WarrantyExpiry?.ToString("yyyy-MM-dd"),
+                    InstallationDate = equipment.PurchaseDate,
+                    WarrantyExpiryDate = equipment.WarrantyExpiry,
                     Status = equipment.Status.ToString(),
-                    Location = equipment.Location,
-                    CreatedAt = equipment.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                    Location = equipment.Hospital?.Name ?? string.Empty,
+                    CreatedAt = equipment.CreatedAt
                 };
             }
             catch (Exception ex)
@@ -478,7 +475,6 @@ namespace SoitMed.Services
                 throw;
             }
         }
-        #endregion
 
         #region Visit Management
         public async Task<MaintenanceVisitDTO> GetVisitAsync(string visitId)
@@ -497,15 +493,15 @@ namespace SoitMed.Services
                 {
                     Id = visit.Id.ToString(),
                     EquipmentId = visit.DeviceId.ToString(),
-                    EquipmentSerialNumber = visit.Device.SerialNumber ?? visit.Device.QRCode,
-                    VisitDate = visit.ScheduledDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    VisitType = visit.VisitType ?? 1,
-                    Status = (VisitStatus)visit.Status,
+                    EquipmentSerialNumber = visit.QRCode ?? visit.SerialCode,
+                    VisitDate = visit.ScheduledDate,
+                    VisitType = visit.Origin.ToString(),
+                    Status = visit.Status.ToString(),
                     EngineerId = visit.EngineerId,
-                    EngineerName = null, // Would need to join with ApplicationUser to get name
+                    EngineerName = null,
                     Report = visit.Report,
-                    CompletionDate = visit.CompletionDate?.ToString("yyyy-MM-ddTHH:mm:ss") ?? visit.CompletedAt?.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    CreatedAt = visit.CreatedAt?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss")
+                    CompletionDate = visit.CompletedAt,
+                    CreatedAt = visit.VisitDate
                 };
             }
             catch (Exception ex)
@@ -519,16 +515,15 @@ namespace SoitMed.Services
         {
             try
             {
-                var id = int.Parse(equipmentId);
                 var query = _newDbContext.MaintenanceVisits
                     .Include(v => v.Device)
-                    .Where(v => v.DeviceId == id);
+                    .Where(v => v.DeviceId == equipmentId);
 
-                if (criteria.Status.HasValue)
-                    query = query.Where(v => v.Status == (int)criteria.Status.Value);
+                if (!string.IsNullOrEmpty(criteria.Status))
+                    query = query.Where(v => v.Status == Enum.Parse<VisitStatus>(criteria.Status));
 
-                if (criteria.VisitType.HasValue)
-                    query = query.Where(v => v.VisitType == criteria.VisitType.Value);
+                if (!string.IsNullOrEmpty(criteria.VisitType))
+                    query = query.Where(v => v.Origin == Enum.Parse<VisitOrigin>(criteria.VisitType));
 
                 if (criteria.StartDate.HasValue)
                     query = query.Where(v => v.ScheduledDate >= criteria.StartDate.Value);
@@ -545,23 +540,22 @@ namespace SoitMed.Services
                     {
                         Id = v.Id.ToString(),
                         EquipmentId = v.DeviceId.ToString(),
-                        EquipmentSerialNumber = v.Device.SerialNumber ?? v.Device.QRCode,
-                        VisitDate = v.ScheduledDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                        VisitType = v.VisitType ?? 1,
-                        Status = (VisitStatus)v.Status,
+                        EquipmentSerialNumber = v.QRCode ?? v.SerialCode,
+                        VisitDate = v.ScheduledDate,
+                        VisitType = v.Origin.ToString(),
+                        Status = v.Status.ToString(),
                         EngineerId = v.EngineerId,
                         EngineerName = null,
                         Report = v.Report,
-                        CompletionDate = v.CompletionDate?.ToString("yyyy-MM-ddTHH:mm:ss") ?? v.CompletedAt?.ToString("yyyy-MM-ddTHH:mm:ss"),
-                        CreatedAt = v.CreatedAt?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss")
+                        CompletionDate = v.CompletedAt,
+                        CreatedAt = v.VisitDate
                     })
                     .ToListAsync();
 
                 return new PagedResult<MaintenanceVisitDTO>
                 {
-                    Data = visits,
+                    Items = visits,
                     TotalCount = totalCount,
-                    Page = criteria.Page,
                     PageSize = criteria.PageSize
                 };
             }
@@ -572,22 +566,22 @@ namespace SoitMed.Services
             }
         }
 
-        public async Task<MaintenanceVisitDTO> CreateVisitAsync(CreateVisitRequest request)
+        public async Task<MaintenanceVisitDTO> CreateVisitAsync(CreateVisitRequestDTO request)
         {
             try
             {
                 var visit = new Models.Equipment.MaintenanceVisit
                 {
-                    DeviceId = int.Parse(request.EquipmentId),
+                    DeviceId = request.EquipmentId,
                     CustomerId = null, // Will be set based on equipment
                     ScheduledDate = DateTime.Parse(request.VisitDate),
-                    VisitType = request.VisitType,
-                    Status = 1, // PendingApproval
-                    CreatedAt = DateTime.UtcNow
+                    Origin = Enum.Parse<VisitOrigin>(request.VisitType?.ToString() ?? "Preventive"),
+                    Status = VisitStatus.PendingApproval,
+                    VisitDate = DateTime.UtcNow
                 };
 
                 // Set CustomerId based on equipment
-                var equipment = await _newDbContext.Equipment.FindAsync(int.Parse(request.EquipmentId));
+                var equipment = await _newDbContext.Equipment.FindAsync(request.EquipmentId);
                 if (equipment != null)
                 {
                     visit.CustomerId = equipment.CustomerId;
@@ -600,15 +594,15 @@ namespace SoitMed.Services
                 {
                     Id = visit.Id.ToString(),
                     EquipmentId = visit.DeviceId.ToString(),
-                    EquipmentSerialNumber = equipment?.SerialNumber ?? equipment?.QRCode,
-                    VisitDate = visit.ScheduledDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    VisitType = visit.VisitType,
-                    Status = (VisitStatus)visit.Status,
+                    EquipmentSerialNumber = equipment?.QRCode,
+                    VisitDate = visit.ScheduledDate,
+                    VisitType = visit.Origin.ToString(),
+                    Status = visit.Status.ToString(),
                     EngineerId = null,
                     EngineerName = null,
                     Report = null,
                     CompletionDate = null,
-                    CreatedAt = visit.CreatedAt?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss")
+                    CreatedAt = visit.VisitDate
                 };
             }
             catch (Exception ex)
@@ -630,17 +624,14 @@ namespace SoitMed.Services
                 if (request.VisitDate.HasValue)
                     visit.ScheduledDate = request.VisitDate.Value;
 
-                if (request.VisitType.HasValue)
-                    visit.VisitType = request.VisitType.Value;
+                if (!string.IsNullOrEmpty(request.VisitType))
+                    visit.Origin = Enum.Parse<VisitOrigin>(request.VisitType);
 
-                if (request.Status.HasValue)
-                    visit.Status = (int)request.Status.Value;
+                if (!string.IsNullOrEmpty(request.Status))
+                    visit.Status = Enum.Parse<VisitStatus>(request.Status);
 
-                if (request.CompletionDate.HasValue)
-                {
-                    visit.CompletionDate = request.CompletionDate.Value;
-                    visit.CompletedAt = request.CompletionDate.Value;
-                }
+                if (!string.IsNullOrEmpty(request.CompletionDate) && DateTime.TryParse(request.CompletionDate, out DateTime completionDate))
+                    visit.CompletedAt = completionDate;
 
                 await _newDbContext.SaveChangesAsync();
 
@@ -650,15 +641,15 @@ namespace SoitMed.Services
                 {
                     Id = visit.Id.ToString(),
                     EquipmentId = visit.DeviceId.ToString(),
-                    EquipmentSerialNumber = equipment?.SerialNumber ?? equipment?.QRCode,
-                    VisitDate = visit.ScheduledDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    VisitType = visit.VisitType ?? 1,
-                    Status = (VisitStatus)visit.Status,
+                    EquipmentSerialNumber = equipment?.QRCode,
+                    VisitDate = visit.ScheduledDate,
+                    VisitType = visit.Origin.ToString(),
+                    Status = visit.Status.ToString(),
                     EngineerId = visit.EngineerId,
                     EngineerName = null,
                     Report = visit.Report,
-                    CompletionDate = visit.CompletionDate?.ToString("yyyy-MM-ddTHH:mm:ss") ?? visit.CompletedAt?.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    CreatedAt = visit.CreatedAt?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss")
+                    CompletionDate = visit.CompletedAt,
+                    CreatedAt = visit.VisitDate
                 };
             }
             catch (Exception ex)
@@ -697,9 +688,8 @@ namespace SoitMed.Services
                 if (visit == null)
                     return new VisitCompletionResponse { Success = false, Message = "Visit not found" };
 
-                visit.Status = 5; // Completed
+                visit.Status = VisitStatus.Completed;
                 visit.CompletedAt = DateTime.UtcNow;
-                visit.CompletionDate = DateTime.UtcNow;
                 visit.Report = request.Report;
 
                 await _newDbContext.SaveChangesAsync();
@@ -708,7 +698,7 @@ namespace SoitMed.Services
                 {
                     Success = true,
                     Message = "Visit completed successfully",
-                    CompletedAt = visit.CompletedAt?.ToString("yyyy-MM-ddTHH:mm:ss")
+                    CompletedAt = visit.CompletedAt
                 };
             }
             catch (Exception ex)
@@ -736,14 +726,14 @@ namespace SoitMed.Services
                     Id = contract.Id,
                     ContractNumber = contract.ContractNumber,
                     ClientId = contract.ClientId,
-                    ClientName = contract.Client?.Name,
-                    StartDate = contract.StartDate.ToString("yyyy-MM-dd"),
-                    EndDate = contract.EndDate.ToString("yyyy-MM-dd"),
-                    ContractValue = contract.ContractValue,
-                    Status = (ContractStatus)contract.Status,
-                    ContractType = contract.ContractType,
+                    ClientName = contract.Client?.FullName,
+                    StartDate = contract.StartDate,
+                    EndDate = contract.EndDate,
+                    ContractValue = contract.TotalAmount,
+                    Status = contract.Status.ToString(),
+                    ContractType = "Standard", // Default contract type
                     PaymentTerms = contract.PaymentTerms,
-                    CreatedAt = contract.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                    CreatedAt = contract.CreatedAt
                 };
             }
             catch (Exception ex)
@@ -771,22 +761,21 @@ namespace SoitMed.Services
                         Id = mc.Id,
                         ContractNumber = mc.ContractNumber,
                         ClientId = mc.ClientId,
-                        ClientName = mc.Client.Name,
-                        StartDate = mc.StartDate.ToString("yyyy-MM-dd"),
-                        EndDate = mc.EndDate.ToString("yyyy-MM-dd"),
-                        ContractValue = mc.ContractValue,
-                        Status = (ContractStatus)mc.Status,
-                        ContractType = mc.ContractType,
+                        ClientName = mc.Client.FullName,
+                        StartDate = mc.StartDate,
+                        EndDate = mc.EndDate,
+                        ContractValue = mc.TotalAmount,
+                        Status = mc.Status.ToString(),
+                        ContractType = "Standard", // Default contract type
                         PaymentTerms = mc.PaymentTerms,
-                        CreatedAt = mc.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                        CreatedAt = mc.CreatedAt
                     })
                     .ToListAsync();
 
                 return new PagedResult<MaintenanceContractDTO>
                 {
-                    Data = contracts,
+                    Items = contracts,
                     TotalCount = totalCount,
-                    Page = request.Page,
                     PageSize = request.PageSize
                 };
             }
@@ -801,16 +790,15 @@ namespace SoitMed.Services
         {
             try
             {
-                var contract = new Models.MaintenanceEntities.MaintenanceContract
+                var contract = new Models.MaintenanceContract
                 {
                     Id = Guid.NewGuid().ToString(),
                     ContractNumber = request.ContractNumber,
                     ClientId = request.ClientId,
-                    StartDate = DateTime.Parse(request.StartDate),
-                    EndDate = DateTime.Parse(request.EndDate),
-                    ContractValue = request.ContractValue,
-                    Status = (int)ContractStatus.Draft,
-                    ContractType = request.ContractType,
+                    StartDate = request.StartDate,
+                    EndDate = request.EndDate,
+                    TotalAmount = request.ContractValue,
+                    Status = ContractStatus.Draft,
                     PaymentTerms = request.PaymentTerms,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -823,13 +811,13 @@ namespace SoitMed.Services
                     Id = contract.Id,
                     ContractNumber = contract.ContractNumber,
                     ClientId = contract.ClientId,
-                    StartDate = contract.StartDate.ToString("yyyy-MM-dd"),
-                    EndDate = contract.EndDate.ToString("yyyy-MM-dd"),
-                    ContractValue = contract.ContractValue,
-                    Status = (ContractStatus)contract.Status,
-                    ContractType = contract.ContractType,
+                    StartDate = contract.StartDate,
+                    EndDate = contract.EndDate,
+                    ContractValue = contract.TotalAmount,
+                    Status = contract.Status.ToString(),
+                    ContractType = "Standard", // Default contract type
                     PaymentTerms = contract.PaymentTerms,
-                    CreatedAt = contract.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                    CreatedAt = contract.CreatedAt
                 };
             }
             catch (Exception ex)
@@ -847,19 +835,19 @@ namespace SoitMed.Services
                 if (contract == null)
                     return null;
 
-                if (!string.IsNullOrWhiteSpace(request.ContractNumber))
+                if (!string.IsNullOrEmpty(request.ContractNumber))
                     contract.ContractNumber = request.ContractNumber;
                 if (request.StartDate.HasValue)
                     contract.StartDate = request.StartDate.Value;
                 if (request.EndDate.HasValue)
                     contract.EndDate = request.EndDate.Value;
                 if (request.ContractValue.HasValue)
-                    contract.ContractValue = request.ContractValue.Value;
-                if (request.Status.HasValue)
-                    contract.Status = (int)request.Status.Value;
-                if (!string.IsNullOrWhiteSpace(request.ContractType))
-                    contract.ContractType = request.ContractType;
-                if (!string.IsNullOrWhiteSpace(request.PaymentTerms))
+                    contract.TotalAmount = request.ContractValue.Value;
+                if (!string.IsNullOrEmpty(request.Status))
+                    contract.Status = Enum.Parse<ContractStatus>(request.Status);
+                if (!string.IsNullOrEmpty(request.ContractType))
+                    contract.Notes = request.ContractType; // Use Notes field for contract type
+                if (!string.IsNullOrEmpty(request.PaymentTerms))
                     contract.PaymentTerms = request.PaymentTerms;
 
                 contract.UpdatedAt = DateTime.UtcNow;
@@ -870,13 +858,13 @@ namespace SoitMed.Services
                     Id = contract.Id,
                     ContractNumber = contract.ContractNumber,
                     ClientId = contract.ClientId,
-                    StartDate = contract.StartDate.ToString("yyyy-MM-dd"),
-                    EndDate = contract.EndDate.ToString("yyyy-MM-dd"),
-                    ContractValue = contract.ContractValue,
-                    Status = (ContractStatus)contract.Status,
-                    ContractType = contract.ContractType,
+                    StartDate = contract.StartDate,
+                    EndDate = contract.EndDate,
+                    ContractValue = contract.TotalAmount,
+                    Status = contract.Status.ToString(),
+                    ContractType = "Standard", // Default contract type
                     PaymentTerms = contract.PaymentTerms,
-                    CreatedAt = contract.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")
+                    CreatedAt = contract.CreatedAt
                 };
             }
             catch (Exception ex)
@@ -907,7 +895,7 @@ namespace SoitMed.Services
         #endregion
 
         #region Dashboard & Statistics
-        public async Task<MaintenanceDashboardStats> GetMaintenanceDashboardStatsAsync()
+        public async Task<MaintenanceDashboardStatsDTO> GetMaintenanceDashboardStatsAsync()
         {
             try
             {
@@ -922,18 +910,18 @@ namespace SoitMed.Services
                     .Where(v => v.ScheduledDate >= startOfMonth && v.ScheduledDate <= endOfMonth)
                     .CountAsync();
                 var pendingVisits = await _newDbContext.MaintenanceVisits
-                    .Where(v => v.Status == 1) // PendingApproval
+                    .Where(v => v.Status == VisitStatus.PendingApproval)
                     .CountAsync();
                 var completedVisits = await _newDbContext.MaintenanceVisits
-                    .Where(v => v.Status == 5) // Completed
+                    .Where(v => v.Status == VisitStatus.Completed)
                     .CountAsync();
                 var activeContracts = await _newDbContext.MaintenanceContracts
-                    .Where(mc => mc.Status == (int)ContractStatus.Active && mc.EndDate >= now)
+                    .Where(mc => mc.Status == ContractStatus.Signed && mc.EndDate >= now)
                     .CountAsync();
 
                 var visitCompletionRate = totalVisits > 0 ? (completedVisits * 100.0 / totalVisits) : 0;
 
-                return new MaintenanceDashboardStats
+                return new MaintenanceDashboardStatsDTO
                 {
                     TotalCustomers = totalCustomers,
                     TotalEquipment = totalEquipment,

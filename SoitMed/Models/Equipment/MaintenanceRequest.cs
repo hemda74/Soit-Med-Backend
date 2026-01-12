@@ -29,7 +29,8 @@ namespace SoitMed.Models.Equipment
 
         // Equipment information
         [Required]
-        public int EquipmentId { get; set; }
+        [MaxLength(50)]
+        public string EquipmentId { get; set; } = string.Empty;
 
         [ForeignKey("EquipmentId")]
         public virtual Equipment Equipment { get; set; } = null!;

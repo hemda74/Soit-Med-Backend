@@ -8,7 +8,8 @@ namespace SoitMed.DTO
     public class CreateMaintenanceRequestDTO
     {
         [Required]
-        public int EquipmentId { get; set; }
+        [MaxLength(50)]
+        public string EquipmentId { get; set; } = string.Empty;
 
         [Required]
         [MaxLength(2000)]
@@ -26,7 +27,7 @@ namespace SoitMed.DTO
         public string CustomerType { get; set; } = string.Empty;
         public string? HospitalId { get; set; }
         public string? HospitalName { get; set; }
-        public int EquipmentId { get; set; }
+        public string EquipmentId { get; set; } = string.Empty;
         public string EquipmentName { get; set; } = string.Empty;
         public string EquipmentQRCode { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
@@ -270,10 +271,28 @@ namespace SoitMed.DTO
         public MaintenanceRequestStatus? Status { get; set; }
         public string? CustomerId { get; set; }
         public string? EngineerId { get; set; }
-        public int? EquipmentId { get; set; }
+        public string? EquipmentId { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public string? SearchQuery { get; set; }
+    }
+
+    // Visit Creation DTO
+    public class CreateVisitDTO
+    {
+        [Required]
+        public int MaintenanceRequestId { get; set; }
+        
+        [Required]
+        [MaxLength(50)]
+        public string DeviceId { get; set; } = string.Empty;
+        
+        public DateTime ScheduledDate { get; set; }
+        public VisitOrigin Origin { get; set; }
+        public string? EngineerId { get; set; }
+        public List<string>? EngineerIds { get; set; }
+        public bool IsPaidVisit { get; set; }
+        public decimal? Cost { get; set; }
     }
 }
 

@@ -185,7 +185,7 @@ namespace SoitMed.Services
                 if (legacyContract.SoId.HasValue)
                 {
                     var deal = await _context.SalesDeals
-                        .FirstOrDefaultAsync(d => d.Id == legacyContract.SoId.Value);
+                        .FirstOrDefaultAsync(d => d.Id == legacyContract.SoId.Value.ToString());
 
                     if (deal == null)
                     {
@@ -194,7 +194,7 @@ namespace SoitMed.Services
                     }
                     else
                     {
-                        dealId = deal.Id;
+                        dealId = long.Parse(deal.Id);
                     }
                 }
 
@@ -214,7 +214,7 @@ namespace SoitMed.Services
                 // Create new Contract
                 var contract = new ContractEntity
                 {
-                    DealId = dealId,
+                    DealId = dealId?.ToString(),
                     ContractNumber = legacyContract.ContractCode?.ToString() ?? $"LEG-{legacyContract.ContractId}",
                     Title = $"Maintenance Contract {legacyContract.ContractCode ?? legacyContract.ContractId}",
                     ContractContent = BuildContractContent(legacyContract),
@@ -255,7 +255,7 @@ namespace SoitMed.Services
                 if (legacyContract.InstallmentMonths.HasValue && legacyContract.InstallmentAmount.HasValue)
                 {
                     var installments = await CreateInstallmentSchedulesAsync(
-                        contract.Id, 
+                        long.Parse(contract.Id), 
                         legacyContract.InstallmentAmount.Value,
                         legacyContract.InstallmentMonths.Value,
                         legacyContract.StartDate);
@@ -286,24 +286,24 @@ namespace SoitMed.Services
             }
         }
 
-        private ContractStatus DetermineContractStatus(TbsMaintenanceContract legacyContract)
+        private SoitMed.Models.Enums.ContractStatus DetermineContractStatus(TbsMaintenanceContract legacyContract)
         {
             var now = DateTime.UtcNow;
 
             // If end date has passed, mark as expired
             if (legacyContract.EndDate < now)
             {
-                return ContractStatus.Expired;
+                return SoitMed.Models.Enums.ContractStatus.Expired;
             }
 
             // If contract has start date and is within valid period, mark as signed
             if (legacyContract.StartDate <= now && legacyContract.EndDate >= now)
             {
-                return ContractStatus.Signed;
+                return SoitMed.Models.Enums.ContractStatus.Signed;
             }
 
             // Default to signed for completed legacy contracts
-            return ContractStatus.Signed;
+            return SoitMed.Models.Enums.ContractStatus.Signed;
         }
 
         private string BuildContractContent(TbsMaintenanceContract legacyContract)
@@ -346,7 +346,7 @@ namespace SoitMed.Services
                 var dueDate = startDate.AddMonths(i);
                 var installment = new InstallmentSchedule
                 {
-                    ContractId = contractId,
+                    ContractId = contractId.ToString(),
                     InstallmentNumber = i,
                     Amount = installmentAmount,
                     DueDate = dueDate,

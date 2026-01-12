@@ -59,7 +59,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Gets a product by ID with caching
         /// </summary>
-        public async Task<Product?> GetProductByIdAsync(long id, CancellationToken cancellationToken = default)
+        public async Task<Product?> GetProductByIdAsync(string id, CancellationToken cancellationToken = default)
         {
             return await _cacheService.GetOrCreateAsync(
                 CacheKeys.Products.ById(id),
@@ -76,7 +76,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Gets products by category with caching
         /// </summary>
-        public async Task<IEnumerable<Product>> GetProductsByCategoryAsync(long categoryId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<Product>> GetProductsByCategoryAsync(string categoryId, CancellationToken cancellationToken = default)
         {
             return await _cacheService.GetOrCreateAsync(
                 CacheKeys.Products.ByCategory(categoryId),
@@ -114,7 +114,7 @@ namespace SoitMed.Services
         /// </summary>
         public async Task<Product> SaveProductAsync(Product product, CancellationToken cancellationToken = default)
         {
-            if (product.Id == 0)
+            if (string.IsNullOrEmpty(product.Id) || product.Id == "0")
             {
                 // Create new product
                 _context.Products.Add(product);
@@ -138,7 +138,7 @@ namespace SoitMed.Services
         /// <summary>
         /// Deletes a product and invalidates cache
         /// </summary>
-        public async Task DeleteProductAsync(long id, CancellationToken cancellationToken = default)
+        public async Task DeleteProductAsync(string id, CancellationToken cancellationToken = default)
         {
             var product = await _unitOfWork.Products.GetByIdAsync(id, cancellationToken);
             if (product == null)
@@ -164,10 +164,10 @@ namespace SoitMed.Services
             await _cacheService.RemoveAsync(CacheKeys.Products.ById(product.Id), cancellationToken);
 
             // Remove category cache if product has category
-            if (product.CategoryId.HasValue)
+            if (!string.IsNullOrEmpty(product.CategoryId))
             {
                 await _cacheService.RemoveAsync(
-                    CacheKeys.Products.ByCategory(product.CategoryId.Value),
+                    CacheKeys.Products.ByCategory(product.CategoryId),
                     cancellationToken
                 );
             }
@@ -195,11 +195,11 @@ namespace SoitMed.Services
     public interface ICachedProductService
     {
         Task<IEnumerable<Product>> GetAllActiveProductsAsync(CancellationToken cancellationToken = default);
-        Task<Product?> GetProductByIdAsync(long id, CancellationToken cancellationToken = default);
-        Task<IEnumerable<Product>> GetProductsByCategoryAsync(long categoryId, CancellationToken cancellationToken = default);
+        Task<Product?> GetProductByIdAsync(string id, CancellationToken cancellationToken = default);
+        Task<IEnumerable<Product>> GetProductsByCategoryAsync(string categoryId, CancellationToken cancellationToken = default);
         Task<IEnumerable<ProductCategory>> GetAllCategoriesAsync(CancellationToken cancellationToken = default);
         Task<Product> SaveProductAsync(Product product, CancellationToken cancellationToken = default);
-        Task DeleteProductAsync(long id, CancellationToken cancellationToken = default);
+        Task DeleteProductAsync(string id, CancellationToken cancellationToken = default);
         Task ClearAllProductCachesAsync(CancellationToken cancellationToken = default);
     }
 }

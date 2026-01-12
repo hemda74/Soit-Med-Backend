@@ -61,7 +61,7 @@ namespace SoitMed.DTO
         [MaxLength(100)]
         public string? Category { get; set; } // Legacy field - kept for backward compatibility
 
-        public long? CategoryId { get; set; } // New: Foreign key to ProductCategory
+        public string? CategoryId { get; set; } // New: Foreign key to ProductCategory
 
         [Range(0.01, double.MaxValue, ErrorMessage = "Base price must be greater than 0")]
         public decimal? BasePrice { get; set; }
@@ -83,14 +83,14 @@ namespace SoitMed.DTO
     /// </summary>
     public class ProductResponseDTO
     {
-        public long Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string? Model { get; set; }
         public string? Provider { get; set; }
         public string? ProviderImagePath { get; set; }
         public string? Country { get; set; }
         public string? Category { get; set; } // Legacy field - kept for backward compatibility
-        public long? CategoryId { get; set; } // New: Foreign key to ProductCategory
+        public string? CategoryId { get; set; } // New: Foreign key to ProductCategory
         public string? CategoryName { get; set; } // New: Category name from ProductCategory relationship
         public decimal BasePrice { get; set; }
         public string? Description { get; set; }

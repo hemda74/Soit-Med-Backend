@@ -13,7 +13,8 @@ namespace SoitMed.Models.Contract
         public long Id { get; set; }
 
         [Required]
-        public long ContractId { get; set; }
+        [MaxLength(50)]
+        public string ContractId { get; set; } = string.Empty;
 
         [ForeignKey("ContractId")]
         public virtual Contract Contract { get; set; } = null!;

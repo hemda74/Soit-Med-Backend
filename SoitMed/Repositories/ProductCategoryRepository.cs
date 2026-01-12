@@ -31,7 +31,7 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<List<ProductCategory>> GetSubCategoriesAsync(long parentCategoryId, CancellationToken cancellationToken = default)
+        public async Task<List<ProductCategory>> GetSubCategoriesAsync(string parentCategoryId, CancellationToken cancellationToken = default)
         {
             return await _context.ProductCategories
                 .Where(pc => pc.IsActive && pc.ParentCategoryId == parentCategoryId)
@@ -59,7 +59,7 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<List<ProductCategory>> GetByIdsAsync(IEnumerable<long> ids)
+        public async Task<List<ProductCategory>> GetByIdsAsync(IEnumerable<string> ids)
         {
             var idList = ids.ToList();
             if (!idList.Any())

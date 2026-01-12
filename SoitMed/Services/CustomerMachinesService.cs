@@ -48,7 +48,7 @@ namespace SoitMed.Services
                 // Try to match by Id (long) or LegacyCustomerId (int?)
                 var customer = await _context.Clients
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(c => c.Id == customerId || 
+                    .FirstOrDefaultAsync(c => c.Id == customerId.ToString() || 
                                              (c.LegacyCustomerId.HasValue && 
                                               customerId <= int.MaxValue && 
                                               c.LegacyCustomerId.Value == (int)customerId));
@@ -88,12 +88,12 @@ namespace SoitMed.Services
                     // Get equipment and map to TbsMachineInfo
                     var equipment = await _context.Equipment
                         .AsNoTracking()
-                        .Where(e => equipmentIds.Contains(e.Id) && e.IsActive)
+                        .Where(e => equipmentIds.Select(id => id.ToString()).Contains(e.Id) && e.IsActive)
                         .ToListAsync();
 
                     equipmentMachines = equipment.Select(e =>
                     {
-                        int machineId = e.Id;
+                        int machineId = int.Parse(e.Id);
                         if (e.LegacySourceId != null)
                         {
                             if (int.TryParse(e.LegacySourceId, out var ooiId))
@@ -156,9 +156,9 @@ namespace SoitMed.Services
         /// <summary>
         /// Get all equipment IDs for a customer through multiple relationship paths
         /// </summary>
-        private async Task<HashSet<int>> GetAllEquipmentIdsForCustomerAsync(Models.Client customer)
+        private async Task<HashSet<string>> GetAllEquipmentIdsForCustomerAsync(Models.Client customer)
         {
-            var equipmentIds = new HashSet<int>();
+            var equipmentIds = new HashSet<string>();
 
             // Path 1: Direct link via Equipment.CustomerId (if customer has RelatedUserId)
             if (!string.IsNullOrEmpty(customer.RelatedUserId))
@@ -266,13 +266,13 @@ namespace SoitMed.Services
                         .AsNoTracking()
                         .Where(rr => (doctorId.HasValue && rr.DoctorId == doctorId.Value) ||
                                      (technicianId.HasValue && rr.TechnicianId == technicianId.Value))
-                        .Select(rr => rr.EquipmentId)
+                        .Select(rr => int.Parse(rr.EquipmentId))
                         .Distinct()
                         .ToListAsync();
 
                     foreach (var id in equipmentFromRepairRequests)
                     {
-                        equipmentIds.Add(id);
+                        equipmentIds.Add(id.ToString());
                     }
 
                     if (equipmentFromRepairRequests.Any())
@@ -466,9 +466,9 @@ namespace SoitMed.Services
         /// <summary>
         /// Get media files for all equipment in batch
         /// </summary>
-        private async Task<Dictionary<int, List<MediaFileDto>>> GetMediaFilesForEquipmentBatchAsync(HashSet<int> equipmentIds)
+        private async Task<Dictionary<string, List<MediaFileDto>>> GetMediaFilesForEquipmentBatchAsync(HashSet<string> equipmentIds)
         {
-            var mediaData = new Dictionary<int, List<MediaFileDto>>();
+            var mediaData = new Dictionary<string, List<MediaFileDto>>();
 
             // Get all visit reports for equipment in one query
             var visitReports = await (from vr in _context.VisitReports.AsNoTracking()
@@ -533,7 +533,7 @@ namespace SoitMed.Services
             var visitCounts = new Dictionary<int, int>();
 
             // Get visit counts from new database (if machines have EquipmentId)
-            var equipmentIds = machines.Where(m => m.EquipmentId.HasValue).Select(m => m.EquipmentId!.Value).ToList();
+            var equipmentIds = machines.Where(m => !string.IsNullOrEmpty(m.EquipmentId)).Select(m => m.EquipmentId!).ToList();
             if (equipmentIds.Any())
             {
                 var newDbVisitCounts = await _context.MaintenanceVisits
@@ -595,10 +595,9 @@ namespace SoitMed.Services
         /// </summary>
         private async Task<Dictionary<int, List<MediaFileDto>>> GetMediaFilesForMachinesAsync(List<TbsMachineInfo> machines, int? legacyCustomerId)
         {
-            var mediaData = new Dictionary<int, List<MediaFileDto>>();
-
-            // Get media files from new database (if machines have EquipmentId)
-            var equipmentIds = machines.Where(m => m.EquipmentId.HasValue).Select(m => m.EquipmentId!.Value).ToList();
+                        var mediaData = new Dictionary<int, List<MediaFileDto>>();
+                        // Get media files from new database (if machines have EquipmentId)
+            var equipmentIds = machines.Where(m => !string.IsNullOrEmpty(m.EquipmentId)).Select(m => m.EquipmentId!).ToList();
             if (equipmentIds.Any())
             {
                 var visitReports = await (from vr in _context.VisitReports.AsNoTracking()
@@ -721,7 +720,7 @@ namespace SoitMed.Services
             public string? ModelName { get; set; }
             public string? ModelNameEn { get; set; }
             public string? ItemCode { get; set; }
-            public int? EquipmentId { get; set; } // Equipment table ID (if exists in new database)
+            public string? EquipmentId { get; set; } // Equipment table ID (if exists in new database)
         }
     }
 }

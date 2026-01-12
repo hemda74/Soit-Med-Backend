@@ -37,21 +37,21 @@ namespace SoitMed.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<Equipment?> GetEquipmentWithHospitalAsync(int id, CancellationToken cancellationToken = default)
+        public async Task<Equipment?> GetEquipmentWithHospitalAsync(string id, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(e => e.Hospital)
                 .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
         }
 
-        public async Task<Equipment?> GetEquipmentWithRepairRequestsAsync(int id, CancellationToken cancellationToken = default)
+        public async Task<Equipment?> GetEquipmentWithRepairRequestsAsync(string id, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(e => e.RepairRequests)
                 .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
         }
 
-        public async Task<Equipment?> GetEquipmentWithAllDetailsAsync(int id, CancellationToken cancellationToken = default)
+        public async Task<Equipment?> GetEquipmentWithAllDetailsAsync(string id, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .Include(e => e.Hospital)
@@ -66,7 +66,7 @@ namespace SoitMed.Repositories
                 .AnyAsync(e => e.QRCode == qrCode, cancellationToken);
         }
 
-        public async Task<bool> ExistsByQRCodeExcludingIdAsync(string qrCode, int id, CancellationToken cancellationToken = default)
+        public async Task<bool> ExistsByQRCodeExcludingIdAsync(string qrCode, string id, CancellationToken cancellationToken = default)
         {
             return await _dbSet
                 .AnyAsync(e => e.QRCode == qrCode && e.Id != id, cancellationToken);
